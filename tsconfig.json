@@ -1,13 +1,15 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
+    "jsx": "preserve",
     "noEmit": true,
     "allowJs": true,
     "paths": {
       "@fm27/shared-types": ["./packages/shared-types/src/index.ts"],
       "@fm27/fm-data": ["./packages/fm-data/src/index.ts"],
       "@fm27/fm-codec": ["./packages/fm-codec/src/index.ts"],
-      "@fm27/fm-engine": ["./packages/fm-engine/src/index.ts"]
+      "@fm27/fm-engine": ["./packages/fm-engine/src/index.ts"],
+      "@/*": ["./apps/web/src/*"]
     }
   },
   "include": ["tests/**/*.ts", "vitest.config.ts"]

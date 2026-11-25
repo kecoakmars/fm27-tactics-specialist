@@ -1,0 +1,18 @@
+{
+  "name": "FM27 Tactics Generator",
+  "short_name": "FM27 Tactics",
+  "description": "Web-native dual-phase tactics board, deterministic squad optimizer, binary .fmf codec, and tactical analytics for Football Manager 27.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0F19",
+  "theme_color": "#10B981",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
