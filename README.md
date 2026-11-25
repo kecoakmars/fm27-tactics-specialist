@@ -12,6 +12,8 @@ Client-first, patch-ready web platform for **Football Manager 27** dual-phase ta
 ## Quick Start
 
 ```bash
+git clone https://github.com/listiantohefiredfsen-debug/fm27-tactics-generator-specialist.git
+cd fm27-tactics-generator-specialist
 pnpm install
 pnpm data:validate
 pnpm test
