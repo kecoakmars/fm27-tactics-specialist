@@ -136,22 +136,39 @@ export default function TacticalBoardWorkspacePage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [redo, undo]);
 
+  const formatHexHeader = (bytes: Uint8Array, maxBytes = 16): string =>
+    Array.from(bytes.subarray(0, maxBytes))
+      .map((b) => b.toString(16).padStart(2, "0").toUpperCase())
+      .join(" ");
+
   const handleImportBytes = useCallback(
     async (fileName: string, bytes: Uint8Array) => {
       setBusyAction("import");
+      const isJson = fileName.toLowerCase().endsWith(".json");
       try {
-        if (fileName.toLowerCase().endsWith(".json")) {
+        if (isJson) {
           const text = new TextDecoder().decode(bytes);
           const imported = parseFm27Json(text);
           loadTactic(imported);
-          notify("ok", `Imported "${imported.title}" from ${fileName}`);
+          notify(
+            "ok",
+            `Imported "${imported.title}" (${imported.inFormation} → ${imported.outFormation}) from ${fileName}`,
+          );
         } else {
           const imported = await parseFmfInWorker(bytes, tactic.patchVersion);
           loadTactic(imported);
-          notify("ok", `Imported binary tactic "${imported.title}" (${bytes.byteLength} B)`);
+          notify(
+            "ok",
+            `Imported "${imported.title}" (${imported.inFormation} → ${imported.outFormation}) from ${fileName} (${bytes.byteLength} B)`,
+          );
         }
       } catch (err) {
-        notify("error", err instanceof Error ? err.message : "Failed to import tactic file");
+        const message = err instanceof Error ? err.message : String(err);
+        const headerSuffix =
+          !isJson && bytes.byteLength > 0
+            ? ` | Header[0..15]: ${formatHexHeader(bytes)}`
+            : "";
+        notify("error", `Import failed (${fileName}): ${message}${headerSuffix}`);
       } finally {
         setBusyAction(null);
       }
@@ -163,10 +180,17 @@ export default function TacticalBoardWorkspacePage() {
     setBusyAction("export-fmf");
     try {
       const bytes = await exportFmfInWorker(tactic);
-      triggerBrowserDownload(sanitizeFileName(tactic.title, ".fmf"), bytes);
-      notify("ok", `Exported ${sanitizeFileName(tactic.title, ".fmf")} (${bytes.byteLength} B)`);
+      const fileName = sanitizeFileName(tactic.title, ".fmf");
+      triggerBrowserDownload(fileName, bytes);
+      notify(
+        "ok",
+        `Downloaded ${fileName} (${tactic.inFormation} → ${tactic.outFormation}, ${bytes.byteLength} B)`,
+      );
     } catch (err) {
-      notify("error", err instanceof Error ? err.message : "Failed to export .fmf");
+      notify(
+        "error",
+        `Export .fmf failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
     } finally {
       setBusyAction(null);
     }
@@ -176,10 +200,23 @@ export default function TacticalBoardWorkspacePage() {
     setBusyAction("save-folder");
     try {
       const bytes = await exportFmfInWorker(tactic);
-      const savedPath = await saveTacticFmfDirect(tactic.title, bytes);
-      notify("ok", `Saved directly to FM27 folder: ${savedPath}`);
+      const fileName = sanitizeFileName(tactic.title, ".fmf");
+      try {
+        const savedPath = await saveTacticFmfDirect(tactic.title, bytes);
+        notify("ok", `Saved directly to FM27 folder: ${savedPath} (${bytes.byteLength} B)`);
+      } catch (diskErr) {
+        triggerBrowserDownload(fileName, bytes);
+        const reason = diskErr instanceof Error ? diskErr.message : String(diskErr);
+        notify(
+          "error",
+          `Folder write failed (${reason}) — downloaded ${fileName} via browser instead`,
+        );
+      }
     } catch (err) {
-      notify("error", err instanceof Error ? err.message : "Direct folder save failed");
+      notify(
+        "error",
+        `Export .fmf failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
     } finally {
       setBusyAction(null);
     }
@@ -257,7 +294,15 @@ export default function TacticalBoardWorkspacePage() {
         setIsDraggingFile(false);
         const file = e.dataTransfer.files?.[0];
         if (!file) return;
-        void file.arrayBuffer().then((ab) => handleImportBytes(file.name, new Uint8Array(ab)));
+        void file
+          .arrayBuffer()
+          .then((ab) => handleImportBytes(file.name, new Uint8Array(ab)))
+          .catch((err) =>
+            notify(
+              "error",
+              `Failed to read ${file.name}: ${err instanceof Error ? err.message : String(err)}`,
+            ),
+          );
       }}
       className="flex flex-col gap-4 relative"
     >
@@ -332,10 +377,21 @@ export default function TacticalBoardWorkspacePage() {
               accept=".fmf,.tac,.json"
               className="hidden"
               onChange={(e) => {
-                const f = e.target.files?.[0];
+                const input = e.currentTarget;
+                const f = input.files?.[0];
                 if (!f) return;
-                void f.arrayBuffer().then((ab) => handleImportBytes(f.name, new Uint8Array(ab)));
-                e.currentTarget.value = "";
+                void f
+                  .arrayBuffer()
+                  .then((ab) => handleImportBytes(f.name, new Uint8Array(ab)))
+                  .catch((err) =>
+                    notify(
+                      "error",
+                      `Failed to read ${f.name}: ${err instanceof Error ? err.message : String(err)}`,
+                    ),
+                  )
+                  .finally(() => {
+                    input.value = "";
+                  });
               }}
             />
 

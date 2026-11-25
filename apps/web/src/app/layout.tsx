@@ -15,7 +15,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -24,7 +24,10 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen flex flex-col bg-[#0B0F19] text-slate-50">
+      <body
+        suppressHydrationWarning
+        className="min-h-screen flex flex-col bg-[#0B0F19] text-slate-50"
+      >
         <TopNavShell />
         <div className="flex-1 w-full max-w-[1640px] mx-auto px-4 sm:px-6 py-5">
           {children}

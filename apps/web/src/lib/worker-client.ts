@@ -21,15 +21,39 @@ import {
 type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never;
 type EngineWorkerPayload = DistributiveOmit<EngineWorkerRequest, "id">;
 
+const WORKER_TIMEOUT_MS = 2000;
+
 let sharedWorker: Worker | null = null;
+let workerDisabled = false;
 let seq = 0;
 const pending = new Map<
   string,
-  { resolve: (val: unknown) => void; reject: (err: Error) => void }
+  {
+    resolve: (val: unknown) => void;
+    reject: (err: Error) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }
 >();
 
+function teardownWorker(reason: string): void {
+  if (sharedWorker) {
+    try {
+      sharedWorker.terminate();
+    } catch {
+      // ignore terminate errors
+    }
+    sharedWorker = null;
+  }
+  workerDisabled = true;
+  for (const [, entry] of pending) {
+    clearTimeout(entry.timer);
+    entry.reject(new Error(reason));
+  }
+  pending.clear();
+}
+
 function getOrCreateWorker(): Worker | null {
-  if (typeof window === "undefined" || typeof Worker === "undefined") {
+  if (workerDisabled || typeof window === "undefined" || typeof Worker === "undefined") {
     return null;
   }
   if (!sharedWorker) {
@@ -42,6 +66,7 @@ function getOrCreateWorker(): Worker | null {
         const msg = event.data;
         const entry = pending.get(msg.id);
         if (!entry) return;
+        clearTimeout(entry.timer);
         pending.delete(msg.id);
         if (msg.ok) {
           entry.resolve(msg.result);
@@ -50,13 +75,14 @@ function getOrCreateWorker(): Worker | null {
         }
       };
       sharedWorker.onerror = (err) => {
-        for (const [, entry] of pending) {
-          entry.reject(new Error(err.message || "Worker execution error"));
-        }
-        pending.clear();
+        teardownWorker(err.message || "Worker execution error");
+      };
+      sharedWorker.onmessageerror = () => {
+        teardownWorker("Worker message deserialization error");
       };
     } catch {
       sharedWorker = null;
+      workerDisabled = true;
     }
   }
   return sharedWorker;
@@ -71,24 +97,60 @@ async function callEngineWorker<T>(payload: EngineWorkerPayload): Promise<T> {
     return (await dispatchWorkerTask(fullReq)) as T;
   }
 
-  return new Promise<T>((resolve, reject) => {
-    pending.set(id, {
-      resolve: (val) => resolve(val as T),
-      reject,
+  try {
+    return await new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        pending.delete(id);
+        teardownWorker("Worker timed out");
+        reject(new Error("Worker timed out"));
+      }, WORKER_TIMEOUT_MS);
+
+      pending.set(id, {
+        resolve: (val) => resolve(val as T),
+        reject,
+        timer,
+      });
+
+      try {
+        worker.postMessage(fullReq);
+      } catch (err) {
+        clearTimeout(timer);
+        pending.delete(id);
+        reject(err instanceof Error ? err : new Error(String(err)));
+      }
     });
-    worker.postMessage(fullReq);
-  });
+  } catch (err) {
+    // Fallback to main thread on worker initialization/timeout/DataCloneError
+    const msg = err instanceof Error ? err.message : String(err);
+    const shouldFallback =
+      workerDisabled ||
+      err instanceof DOMException ||
+      msg.includes("Worker") ||
+      msg.includes("DataCloneError") ||
+      msg.includes("BigInt");
+    if (shouldFallback) {
+      return (await dispatchWorkerTask(fullReq)) as T;
+    }
+    throw err;
+  }
+}
+
+async function runOnMainThread<T>(payload: EngineWorkerPayload): Promise<T> {
+  const id = `m-${++seq}-${Date.now()}`;
+  return (await dispatchWorkerTask({ ...payload, id } as EngineWorkerRequest)) as T;
 }
 
 export function exportFmfInWorker(tactic: DualPhaseTactic): Promise<Uint8Array> {
-  return callEngineWorker<Uint8Array>({ type: "EXPORT_FMF", tactic });
+  // .fmf files are tiny (<100 KB); run directly on main thread to avoid worker hang/DataCloneError
+  return runOnMainThread<Uint8Array>({ type: "EXPORT_FMF", tactic });
 }
 
 export function parseFmfInWorker(
   bytes: Uint8Array,
   patchVersion?: string,
 ): Promise<DualPhaseTactic> {
-  return callEngineWorker<DualPhaseTactic>({
+  // .fmf files are tiny (<100 KB); run directly on main thread to avoid worker hang/DataCloneError
+  return runOnMainThread<DualPhaseTactic>({
     type: "PARSE_FMF",
     bytes,
     patchVersion,

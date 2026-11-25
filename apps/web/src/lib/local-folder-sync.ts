@@ -102,6 +102,7 @@ export function sanitizeFileName(rawTitle: string, extension: string): string {
     .trim()
     .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
     .replace(/\s+/g, " ")
+    .replace(/[. ]+$/g, "")
     .slice(0, 80) || "FM27-Export";
   const cleanExt = extension.startsWith(".") ? extension : `.${extension}`;
   return base.toLowerCase().endsWith(cleanExt.toLowerCase()) ? base : `${base}${cleanExt}`;
@@ -222,5 +223,5 @@ export function triggerBrowserDownload(
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1500);
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
 }

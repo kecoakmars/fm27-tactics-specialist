@@ -417,9 +417,41 @@ export const useTacticStore = create<TacticStoreState>()(
         })),
 
       loadTactic: (tactic) =>
-        set({
-          tactic,
-          selectedSlotIndex: 0,
+        set(() => {
+          const catalog = getPitchCatalog(tactic.patchVersion);
+          const clonedSlots: SlotAssignment[] = tactic.slots.map((s, idx) => ({
+            ...s,
+            slotIndex: s.slotIndex ?? idx,
+            inPossession: {
+              ...s.inPossession,
+              playerInstructionBits: [...s.inPossession.playerInstructionBits],
+            },
+            outOfPossession: {
+              ...s.outOfPossession,
+              playerInstructionBits: [...s.outOfPossession.playerInstructionBits],
+            },
+          }));
+          return {
+            tactic: {
+              ...tactic,
+              inFormation:
+                tactic.inFormation ||
+                detectFormation(
+                  clonedSlots.map((s) => s.inPossession.positionId),
+                  { catalog },
+                ),
+              outFormation:
+                tactic.outFormation ||
+                detectFormation(
+                  clonedSlots.map((s) => s.outOfPossession.positionId),
+                  { catalog },
+                ),
+              teamInstructions: { ...tactic.teamInstructions },
+              slots: clonedSlots,
+            },
+            selectedSlotIndex: 0,
+            playerModalOpen: false,
+          };
         }),
     }),
     {
