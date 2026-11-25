@@ -11,6 +11,7 @@ import type {
   TacticalPriorities,
   TacticPlanResult,
 } from "@fm27/shared-types";
+import { useTacticStore } from "./useTacticStore";
 
 /**
  * Builds a balanced 22-player demo club squad from the validated v27.0 Wonderkids Registry
@@ -135,6 +136,7 @@ export const useSquadStore = create<SquadStoreState>((set) => ({
       auditResult: null,
       errorMessage: null,
     });
+    useTacticStore.getState().syncClubData({ players: parsed });
     return parsed.length;
   },
 
@@ -148,9 +150,10 @@ export const useSquadStore = create<SquadStoreState>((set) => ({
       auditResult: null,
       errorMessage: null,
     });
+    useTacticStore.getState().syncClubData({ players: demo });
   },
 
-  clearSquad: () =>
+  clearSquad: () => {
     set({
       players: [],
       sourceLabel: null,
@@ -158,7 +161,9 @@ export const useSquadStore = create<SquadStoreState>((set) => ({
       generatedPlans: [],
       auditResult: null,
       errorMessage: null,
-    }),
+    });
+    useTacticStore.getState().syncClubData({ players: [] });
+  },
 
   toggleMustStart: (playerUid) =>
     set((state) => {

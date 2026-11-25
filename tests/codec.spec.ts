@@ -466,4 +466,44 @@ describe("Phase 1 — @fm27/fm-codec Binary & Serialization Suite", () => {
       expect(tactic.mentality).toBeGreaterThanOrEqual(1);
     }
   });
+
+  it("parses real sample-real.fmf with 11 IP & 11 OOP slots, binary details.aom metadata, and passes exportFmf -> parseFmf round-trip", async () => {
+    const fixturePath = path.resolve(process.cwd(), "tests/fixtures/sample-real.fmf");
+    const realBytes = new Uint8Array(fs.readFileSync(fixturePath));
+
+    const parsed = await parseFmf(realBytes);
+    expect(parsed.title).toBe("Manchester United 4-2-3-1 Edited");
+    expect(parsed.author).toBe("Doctor W");
+    expect(parsed.description).toContain("4-2-3-1");
+    expect(parsed.inFormation).toBe("4-2-3-1");
+    expect(parsed.outFormation).toBe("4-2-3-1");
+    expect(parsed.slots).toHaveLength(11);
+
+    const ipPositions = parsed.slots.map((s) => s.inPossession.positionId);
+    const oopPositions = parsed.slots.map((s) => s.outOfPossession.positionId);
+    expect(new Set(ipPositions).size).toBe(11);
+    expect(new Set(oopPositions).size).toBe(11);
+    expect(ipPositions).toContain("GK");
+    expect(oopPositions).toContain("GK");
+
+    // Verify PHASE_ORDER cross-phase pairing (MCL->MCL, DMR->DMR, DL->DL, DCL->DCL, DCR->DCR) & 2-entry PI extraction
+    for (const slot of parsed.slots) {
+      expect(slot.inPossession.positionId).toBe(slot.outOfPossession.positionId);
+      expect(slot.outOfPossession.roleId.startsWith("OP")).toBe(true);
+    }
+    const amlSlot = parsed.slots.find((s) => s.inPossession.positionId === "AML");
+    expect(amlSlot?.inPossession.playerInstructionBits).toEqual([13]);
+
+    // Round-trip exportFmf -> parseFmf
+    const reExported = exportFmf(parsed);
+    const roundTripped = await parseFmf(reExported);
+    expect(roundTripped.title).toBe(parsed.title);
+    expect(roundTripped.author).toBe(parsed.author);
+    expect(roundTripped.description).toBe(parsed.description);
+    expect(roundTripped.mentality).toBe(parsed.mentality);
+    expect(roundTripped.inFormation).toBe("4-2-3-1");
+    expect(roundTripped.outFormation).toBe("4-2-3-1");
+    expect(roundTripped.teamInstructions).toEqual(parsed.teamInstructions);
+    expect(roundTripped.slots).toEqual(parsed.slots);
+  });
 });

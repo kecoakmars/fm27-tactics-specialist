@@ -13,6 +13,7 @@ export * from "./squad-audit.js";
 export * from "./wonderkid-ranker.js";
 export * from "./staff-calculator.js";
 export * from "./training-recommender.js";
+export * from "./unified-analyzer.js";
 export * from "./parsers/csv-squad-parser.js";
 export * from "./parsers/html-fm-parser.js";
 export * from "./parsers/fm-save-adapter.js";

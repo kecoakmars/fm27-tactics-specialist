@@ -97,13 +97,19 @@ async function resolveSubdirHandle(
   })) as ExtendedDirectoryHandle;
 }
 
+const WINDOWS_RESERVED_BASENAMES = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+
 export function sanitizeFileName(rawTitle: string, extension: string): string {
-  const base = rawTitle
-    .trim()
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
-    .replace(/\s+/g, " ")
-    .replace(/[. ]+$/g, "")
-    .slice(0, 80) || "FM27-Export";
+  let base =
+    rawTitle
+      .trim()
+      .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
+      .replace(/\s+/g, " ")
+      .replace(/[. ]+$/g, "")
+      .slice(0, 80) || "FM27-Export";
+  if (WINDOWS_RESERVED_BASENAMES.test(base)) {
+    base = `FM27-${base}`;
+  }
   const cleanExt = extension.startsWith(".") ? extension : `.${extension}`;
   return base.toLowerCase().endsWith(cleanExt.toLowerCase()) ? base : `${base}${cleanExt}`;
 }

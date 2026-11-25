@@ -52,6 +52,11 @@ export function detectFormation(
     return am > 0 && st > 0 ? `3-${midBand}-${am}-${st}` : `3-${midBand}-${am + st}`;
   }
 
+  // Standard 4-2-3-1 (including asymmetric 1 DM + 1 MC double-pivot + 3 AM + 1 ST)
+  if (def === 4 && wb === 0 && dm + mid === 2 && am === 3 && st === 1) {
+    return "4-2-3-1";
+  }
+
   // Standard 4-3-3 DM (1 DMC + 2 MC + AML/AMR/ST)
   if (def === 4 && wb === 0 && dm === 1 && mid === 2 && am === 2 && st === 1) {
     return "4-3-3 DM";

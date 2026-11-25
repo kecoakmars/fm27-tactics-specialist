@@ -27,7 +27,26 @@ export const PHASE_ORDER = [
   0x00, 0x01, 0x02, 0x03, 0x04, 0x09, 0x05, 0x06, 0x07, 0x08, 0x0a,
 ] as const;
 
-export const DEFAULT_PREFERENCES_152 = new Uint8Array(152);
+/**
+ * Authentic 204-byte FM27 set-piece & tactical preferences trailer verified against real FM27 `.fmf` exports.
+ */
+export const DEFAULT_PREFERENCES_204 = Uint8Array.from([
+  0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+  0x00, 0x95, 0x24, 0x49, 0x10, 0x08, 0x60, 0x15, 0x00, 0x05, 0x05, 0x09, 0x07, 0x05, 0x25, 0x49,
+  0x4a, 0x10, 0x08, 0x60, 0x15, 0x00, 0x0a, 0x0a, 0x09, 0x09, 0x0a, 0x95, 0x24, 0x49, 0x10, 0x08,
+  0x60, 0x19, 0x00, 0x05, 0x05, 0x09, 0x07, 0x05, 0x95, 0x24, 0x49, 0x10, 0x08, 0x60, 0x19, 0x00,
+  0x05, 0x05, 0x09, 0x07, 0x05, 0x25, 0x49, 0x4a, 0x10, 0x08, 0x60, 0x15, 0x00, 0x0a, 0x0a, 0x09,
+  0x09, 0x0a, 0x95, 0x48, 0x49, 0x10, 0x08, 0x60, 0x19, 0x00, 0x05, 0x05, 0x09, 0x0a, 0x05, 0x25,
+  0x51, 0x4a, 0x10, 0x08, 0x60, 0x15, 0x00, 0x0a, 0x0a, 0x09, 0x0a, 0x0a, 0x45, 0x52, 0x4a, 0x10,
+  0x08, 0x60, 0x15, 0x00, 0x0f, 0x0f, 0x09, 0x0c, 0x0f, 0x25, 0x52, 0x4c, 0x10, 0x08, 0x88, 0x15,
+  0x00, 0x0a, 0x0f, 0x09, 0x0c, 0x0a, 0x25, 0x52, 0x4c, 0x10, 0x08, 0x88, 0x15, 0x00, 0x0a, 0x0f,
+  0x09, 0x0e, 0x0a, 0x25, 0x49, 0x4a, 0x10, 0x08, 0x60, 0x16, 0x00, 0x0f, 0x11, 0x09, 0x0e, 0x0f,
+  0x49, 0x20, 0x4a, 0x42, 0x0a, 0x0a, 0x0b, 0x0a, 0x0a, 0x0a, 0x0a, 0x09, 0x0a, 0x04, 0x09, 0x00,
+  0x07, 0x00, 0x07, 0x00, 0x09, 0x01, 0x07, 0x00, 0x07, 0x00, 0x09, 0x01, 0x0f, 0x09, 0x00, 0x07,
+  0x00, 0x07, 0x00, 0x07, 0x00, 0x07, 0x00, 0x07, 0x00, 0x07, 0x00, 0x0f,
+]);
+
+export const DEFAULT_PREFERENCES_152 = DEFAULT_PREFERENCES_204;
 
 const CLEAR_DUTY_MASK = ~0x400e00000n;
 const DEFEND_DUTY_BIT = BigInt(DutyMaskMap.Defend); // 0x200000n
@@ -189,6 +208,7 @@ export function detectFormationFromPositions(
     const midBand = wb + dm + mid;
     return am > 0 && st > 0 ? `3-${midBand}-${am}-${st}` : `3-${midBand}-${am + st}`;
   }
+  if (def === 4 && wb === 0 && dm + mid === 2 && am === 3 && st === 1) return "4-2-3-1";
   if (def === 4 && wb === 0 && dm === 1 && mid === 2 && am === 2 && st === 1) return "4-3-3 DM";
   if (def === 4 && wb === 0 && dm === 1 && mid === 2 && am === 1 && st === 2) return "4-3-1-2";
   if (def === 5 && wb === 0 && dm === 1 && mid === 2 && am === 0 && st === 2) return "5-3-2";
@@ -204,6 +224,7 @@ function writeBinarySlot(
   phase: 0 | 1,
   posMaskMap: Map<string, number>,
   roleFlagMap: Map<string, bigint>,
+  catalog: PitchCatalog,
 ): void {
   const posMask = posMaskMap.get(slotCfg.positionId);
   const roleFlags = roleFlagMap.get(slotCfg.roleId);
@@ -211,13 +232,26 @@ function writeBinarySlot(
     throw new Error(`Unresolved mask/flags for ${slotCfg.positionId}:${slotCfg.roleId}`);
   }
 
+  const defaultRoleId = catalog.Eligibility["0:0"][slotCfg.positionId]?.[phase]?.[0];
+  const defaultRoleFlags = defaultRoleId ? roleFlagMap.get(defaultRoleId) : undefined;
+  const writeDefaultEntryFirst =
+    defaultRoleFlags !== undefined &&
+    (slotCfg.positionId !== "GK" || phase === 1 || defaultRoleFlags !== roleFlags);
+
   writer.writeBytes(SLOT_HEADER);
   writer.writeInt32(posMask);
   writer.writeBytes(SLOT_VERSION);
-  writer.writeInt32(1); // 1 role-instruction entry
-  writer.writeUint64(roleFlags);
+  writer.writeInt32(writeDefaultEntryFirst ? 2 : 1);
 
-  // 16-byte PlayerInstructions block
+  if (writeDefaultEntryFirst && defaultRoleFlags !== undefined) {
+    writer.writeUint64(defaultRoleFlags);
+    writer.writeBytes(PI_BLOCK_HEADER);
+    writer.writeUint64(0n);
+    writer.writeUint8(0xff);
+    writer.writeInt32(0);
+  }
+
+  writer.writeUint64(roleFlags);
   writer.writeBytes(PI_BLOCK_HEADER);
   writer.writeUint64(encodePlayerInstructionBits(slotCfg.playerInstructionBits));
   writer.writeUint8(0xff);
@@ -246,13 +280,15 @@ function readBinarySlot(
   const posMask = reader.readInt32();
   reader.skip(3); // slot version (00 01 01)
   const entryCount = reader.readInt32();
-  if (entryCount < 1 || entryCount > 8) {
+  if (entryCount < 1 || entryCount > 16) {
     throw new Error(`Unexpected slot entryCount: ${entryCount}`);
   }
 
-  let baseRoleFlags = 0n;
-  let piBitsMask = 0n;
-  let markPosMask = 0;
+  const entries: Array<{
+    cleanRoleFlags: bigint;
+    piBitsMask: bigint;
+    markPosMask: number;
+  }> = [];
 
   for (let e = 0; e < entryCount; e++) {
     const entryRoleFlags = reader.readUint64();
@@ -260,16 +296,25 @@ function readBinarySlot(
     const entryPiMask = reader.readUint64();
     reader.skip(1); // 0xFF target marker
     const entryMarkMask = reader.readInt32();
-    if (e === 0) {
-      baseRoleFlags = entryRoleFlags;
-      piBitsMask = entryPiMask;
-      markPosMask = entryMarkMask;
-    }
+    entries.push({
+      cleanRoleFlags: entryRoleFlags & CLEAR_DUTY_MASK,
+      piBitsMask: entryPiMask,
+      markPosMask: entryMarkMask,
+    });
   }
 
   reader.skip(4); // int32(0) separator
   const activeRoleFlags = reader.readUint64();
   const cleanActiveFlags = activeRoleFlags & CLEAR_DUTY_MASK;
+
+  // Match the active role entry from the end (handles ec=2 where entry[0] is default role & entry[1] is active role)
+  let matchedEntry = entries[entries.length - 1]!;
+  for (let e = entries.length - 1; e >= 0; e--) {
+    if (entries[e]!.cleanRoleFlags === cleanActiveFlags) {
+      matchedEntry = entries[e]!;
+      break;
+    }
+  }
 
   const positionId = maskToPosId.get(posMask);
   if (!positionId) {
@@ -277,7 +322,8 @@ function readBinarySlot(
   }
 
   const lookupMap = phase === 0 ? ipFlagsToRoleId : oopFlagsToRoleId;
-  const roleId = lookupMap.get(cleanActiveFlags) ?? lookupMap.get(baseRoleFlags & CLEAR_DUTY_MASK);
+  const roleId =
+    lookupMap.get(cleanActiveFlags) ?? lookupMap.get(matchedEntry.cleanRoleFlags);
   if (!roleId) {
     throw new Error(
       `Unknown Role.Flags ${cleanActiveFlags.toString()} in phase ${phase} at position ${positionId}`,
@@ -288,9 +334,51 @@ function readBinarySlot(
     positionId,
     roleId,
     duty: phase === 0 ? extractDutyFromActiveRoleFlags(activeRoleFlags) : "Defend",
-    playerInstructionBits: decodePlayerInstructionBits(piBitsMask),
-    markingPositionMask: markPosMask,
+    playerInstructionBits: decodePlayerInstructionBits(matchedEntry.piBitsMask),
+    markingPositionMask: matchedEntry.markPosMask,
   };
+}
+
+function seekPastPlanHeader(reader: BinaryReader, bytes: Uint8Array): void {
+  // Case 1: raw PlanHeader starting directly with 22 44
+  if (bytes.byteLength >= 8 && bytes[0] === 0x22 && bytes[1] === 0x44) {
+    reader.skip(8);
+    return;
+  }
+
+  // Case 2: standard TacticOuterHeader with `cat.` prefix at [2..5] followed by PlanHeader `22 44`
+  if (
+    bytes.byteLength >= 16 &&
+    bytes[2] === 0x63 &&
+    bytes[3] === 0x61 &&
+    bytes[4] === 0x74 &&
+    bytes[5] === 0x2e
+  ) {
+    // Scan for `22 44 00 1b` (or `22 44`) starting at offset 8 up to 32 bytes
+    for (let off = 8; off <= Math.min(32, bytes.byteLength - 8); off++) {
+      if (bytes[off] === 0x22 && bytes[off + 1] === 0x44) {
+        reader.seek(off + 8);
+        return;
+      }
+    }
+    throw new Error("Found 'cat.' outer header, but missing PlanHeader (0x22 0x44)");
+  }
+
+  reader.expectBytes(TACTIC_OUTER_HEADER, "TacticOuterHeader");
+  reader.expectBytes(PLAN_HEADER, "PlanHeader");
+}
+
+function skipStyleSentinelBeforeSlots(reader: BinaryReader): void {
+  const marker = reader.readUint8();
+  if (marker !== 0xff) {
+    throw new Error(
+      `Invalid style sentinel marker at offset ${reader.offset - 1}: expected 0xff, got 0x${marker.toString(16).padStart(2, "0")}`,
+    );
+  }
+  // Length-prefixed style label ("" -> 00 00 00 00 in standard exports, or e.g. "Custom" in game saves)
+  reader.readLengthPrefixedUtf8(256);
+  // 4-byte reversed FourCC (e.g. "LLUN" = 4c 4c 55 4e, or preset FourCC like "IKIT")
+  reader.skip(4);
 }
 
 /**
@@ -314,15 +402,17 @@ export function encodeTacPayload(
   }
   const orderedPairs = [gkSlot, ...outfieldSlots];
 
-  // Build attackSlots11[i] and defenceSlots11[defIdx] so PhaseOrder[defIdx] === i pairs the same player!
+  // FM27 cross-phase pairing invariant:
+  // At binary slot i, attackSlots11[i] is player i's IP config, orderByte is PHASE_ORDER[i],
+  // and player i's OOP config is stored at defenceSlots11[PHASE_ORDER[i]].
   const attackSlots11: SlotPhaseConfig[] = orderedPairs.map((s) => s.inPossession);
   const defenceSlots11: SlotPhaseConfig[] = new Array<SlotPhaseConfig>(11);
-  for (let k = 0; k < 11; k++) {
-    const playerIdx = PHASE_ORDER[k]!;
-    defenceSlots11[k] = orderedPairs[playerIdx]!.outOfPossession;
+  for (let playerIdx = 0; playerIdx < 11; playerIdx++) {
+    const defSlotIdx = PHASE_ORDER[playerIdx]!;
+    defenceSlots11[defSlotIdx] = orderedPairs[playerIdx]!.outOfPossession;
   }
 
-  const writer = new BinaryWriter(1536);
+  const writer = new BinaryWriter(2048);
   writer.writeBytes(TACTIC_OUTER_HEADER);
   writer.writeBytes(PLAN_HEADER);
   writer.writeLengthPrefixedUtf8(tactic.title);
@@ -348,13 +438,12 @@ export function encodeTacPayload(
   writer.writeBytes(LLUN_SENTINEL);
 
   for (let i = 0; i < 11; i++) {
-    writeBinarySlot(writer, attackSlots11[i]!, 0, posMaskMap, roleFlagMap);
-    const defIdx = PHASE_ORDER.indexOf(i as (typeof PHASE_ORDER)[number]);
-    writeBinarySlot(writer, defenceSlots11[defIdx]!, 1, posMaskMap, roleFlagMap);
+    writeBinarySlot(writer, attackSlots11[i]!, 0, posMaskMap, roleFlagMap, catalog);
+    writeBinarySlot(writer, defenceSlots11[i]!, 1, posMaskMap, roleFlagMap, catalog);
     writer.writeUint8(PHASE_ORDER[i]!);
   }
 
-  writer.writeBytes(options?.trailingPreferences ?? DEFAULT_PREFERENCES_152);
+  writer.writeBytes(options?.trailingPreferences ?? DEFAULT_PREFERENCES_204);
   return writer.toUint8Array();
 }
 
@@ -388,8 +477,7 @@ export function decodeTacPayload(
   }
 
   const reader = new BinaryReader(bytes);
-  reader.expectBytes(TACTIC_OUTER_HEADER, "TacticOuterHeader");
-  reader.expectBytes(PLAN_HEADER, "PlanHeader");
+  seekPastPlanHeader(reader, bytes);
 
   const title = reader.readLengthPrefixedUtf8() || "Imported FM27 Tactic";
   reader.skip(12); // reserved zeroes
@@ -410,7 +498,7 @@ export function decodeTacPayload(
     }
   }
 
-  reader.expectBytes(LLUN_SENTINEL, "LLUN Sentinel");
+  skipStyleSentinelBeforeSlots(reader);
 
   const attackParsed: ParsedBinarySlot[] = [];
   const defenceByRawIndex: ParsedBinarySlot[] = new Array<ParsedBinarySlot>(11);
@@ -421,19 +509,22 @@ export function decodeTacPayload(
     const def = readBinarySlot(reader, 1, maskToPosId, ipFlagsToRoleId, oopFlagsToRoleId);
     const orderByte = reader.readUint8();
     attackParsed.push(att);
-    // In WriteTacPayload: at iteration i, defenceSlots11[defIdx] was written where PhaseOrder[defIdx] == i
     defenceByRawIndex[i] = def;
     phaseOrderRead.push(orderByte);
   }
 
-  // Reconstruct paired slots: for iteration i, att is attackSlots11[i] and def written in the same pair
-  // already corresponds to PhaseOrder[defIdx] == i -> the exact same player!
-  void phaseOrderRead;
-  const slots: SlotAssignment[] = attackParsed.map((att, idx) => ({
-    slotIndex: idx,
-    inPossession: att,
-    outOfPossession: defenceByRawIndex[idx]!,
-  }));
+  // Pair attack slot `idx` with defence slot `phaseOrderRead[idx]` (when valid permutation of 0..10)
+  const validPermutation =
+    phaseOrderRead.every((n) => n >= 0 && n < 11) && new Set(phaseOrderRead).size === 11;
+
+  const slots: SlotAssignment[] = attackParsed.map((att, idx) => {
+    const defIdx = validPermutation ? phaseOrderRead[idx]! : idx;
+    return {
+      slotIndex: idx,
+      inPossession: att,
+      outOfPossession: defenceByRawIndex[defIdx]!,
+    };
+  });
 
   const inFormation = detectFormationFromPositions(
     slots.map((s) => s.inPossession.positionId),

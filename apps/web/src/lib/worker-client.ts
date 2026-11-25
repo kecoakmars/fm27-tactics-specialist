@@ -1,5 +1,6 @@
 "use client";
 
+import { exportFmf, parseFmf } from "@fm27/fm-codec";
 import type {
   DualPhaseTactic,
   Player,
@@ -37,11 +38,7 @@ const pending = new Map<
 
 function teardownWorker(reason: string): void {
   if (sharedWorker) {
-    try {
-      sharedWorker.terminate();
-    } catch {
-      // ignore terminate errors
-    }
+    sharedWorker.terminate();
     sharedWorker = null;
   }
   workerDisabled = true;
@@ -80,9 +77,10 @@ function getOrCreateWorker(): Worker | null {
       sharedWorker.onmessageerror = () => {
         teardownWorker("Worker message deserialization error");
       };
-    } catch {
+    } catch (initErr) {
       sharedWorker = null;
       workerDisabled = true;
+      console.warn("[fm27-worker] Falling back to main thread:", initErr);
     }
   }
   return sharedWorker;
@@ -120,7 +118,6 @@ async function callEngineWorker<T>(payload: EngineWorkerPayload): Promise<T> {
       }
     });
   } catch (err) {
-    // Fallback to main thread on worker initialization/timeout/DataCloneError
     const msg = err instanceof Error ? err.message : String(err);
     const shouldFallback =
       workerDisabled ||
@@ -135,26 +132,17 @@ async function callEngineWorker<T>(payload: EngineWorkerPayload): Promise<T> {
   }
 }
 
-async function runOnMainThread<T>(payload: EngineWorkerPayload): Promise<T> {
-  const id = `m-${++seq}-${Date.now()}`;
-  return (await dispatchWorkerTask({ ...payload, id } as EngineWorkerRequest)) as T;
+export async function exportFmfInWorker(tactic: DualPhaseTactic): Promise<Uint8Array> {
+  // Direct main-thread execution avoids Web Worker hang or BigInt DataCloneError
+  return exportFmf(tactic);
 }
 
-export function exportFmfInWorker(tactic: DualPhaseTactic): Promise<Uint8Array> {
-  // .fmf files are tiny (<100 KB); run directly on main thread to avoid worker hang/DataCloneError
-  return runOnMainThread<Uint8Array>({ type: "EXPORT_FMF", tactic });
-}
-
-export function parseFmfInWorker(
+export async function parseFmfInWorker(
   bytes: Uint8Array,
   patchVersion?: string,
 ): Promise<DualPhaseTactic> {
-  // .fmf files are tiny (<100 KB); run directly on main thread to avoid worker hang/DataCloneError
-  return runOnMainThread<DualPhaseTactic>({
-    type: "PARSE_FMF",
-    bytes,
-    patchVersion,
-  });
+  // Direct main-thread execution avoids Web Worker hang or BigInt DataCloneError
+  return parseFmf(bytes, { patchVersion });
 }
 
 export function computeHeatmapInWorker(

@@ -6,7 +6,9 @@ import {
   decodeTacticFromUrlHash,
   encodeTacticToUrlHash,
   exportFm27Json,
+  exportFmf,
   parseFm27Json,
+  parseFmf,
 } from "@fm27/fm-codec";
 import { getPitchCatalog, getTacticalStyles } from "@fm27/fm-data";
 import { computeTacticalBalance } from "@fm27/fm-engine";
@@ -17,6 +19,7 @@ import {
   Heatmap18Zone,
   type HeatmapOverlayMode,
 } from "@/components/analytics/Heatmap18Zone";
+import { UnifiedReportDashboard } from "@/components/analytics/UnifiedReportDashboard";
 import { MentalityBar } from "@/components/instructions/MentalityBar";
 import { PlayerInstructionModal } from "@/components/instructions/PlayerInstructionModal";
 import { TeamInstructionPanel } from "@/components/instructions/TeamInstructionPanel";
@@ -24,14 +27,15 @@ import { DualPhasePitch } from "@/components/pitch/DualPhasePitch";
 import { SplitViewPitch } from "@/components/pitch/SplitViewPitch";
 import { sanitizeFileName, triggerBrowserDownload } from "@/lib/local-folder-sync";
 import { exportDualPhasePngCard } from "@/lib/svg-card-exporter";
-import { exportFmfInWorker, parseFmfInWorker } from "@/lib/worker-client";
 import { useFolderSyncStore } from "@/stores/useFolderSyncStore";
 import { useTacticStore } from "@/stores/useTacticStore";
 
 export default function TacticalBoardWorkspacePage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const {
     tactic,
+    unifiedReport,
     viewMode,
     showTransitionVectors,
     selectedSlotIndex,
@@ -42,6 +46,7 @@ export default function TacticalBoardWorkspacePage() {
     applyPresetStyle,
     applyDualShape,
     loadTactic,
+    refreshUnifiedReport,
   } = useTacticStore();
 
   const undo = useStore(useTacticStore.temporal, (s) => s.undo);
@@ -60,7 +65,7 @@ export default function TacticalBoardWorkspacePage() {
   const [heatmapMode, setHeatmapMode] = useState<HeatmapOverlayMode>("off");
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [inspectorTab, setInspectorTab] = useState<"instructions" | "analytics">("analytics");
-  const [statusBanner, setStatusBanner] = useState<{
+  const [toast, setToast] = useState<{
     tone: "ok" | "error";
     text: string;
   } | null>(null);
@@ -80,11 +85,23 @@ export default function TacticalBoardWorkspacePage() {
     [pitchCatalog.Roles],
   );
 
-  // Real-time 18-zone Heatmap & 6-pillar Tactical Balance evaluation
   const balanceReport = useMemo(() => computeTacticalBalance(tactic), [tactic]);
 
   const notify = useCallback((tone: "ok" | "error", text: string) => {
-    setStatusBanner({ tone, text });
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setToast({ tone, text });
+    toastTimerRef.current = setTimeout(
+      () => setToast(null),
+      tone === "error" ? 9000 : 5000,
+    );
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -146,29 +163,32 @@ export default function TacticalBoardWorkspacePage() {
       setBusyAction("import");
       const isJson = fileName.toLowerCase().endsWith(".json");
       try {
+        if (bytes.byteLength === 0) {
+          throw new Error("File kosong (0 bytes)");
+        }
         if (isJson) {
           const text = new TextDecoder().decode(bytes);
           const imported = parseFm27Json(text);
           loadTactic(imported);
           notify(
             "ok",
-            `Imported "${imported.title}" (${imported.inFormation} → ${imported.outFormation}) from ${fileName}`,
+            `Imported "${imported.title}" (${imported.inFormation} → ${imported.outFormation}) dari ${fileName}`,
           );
         } else {
-          const imported = await parseFmfInWorker(bytes, tactic.patchVersion);
+          // Run parseFmf directly on main thread to avoid Web Worker hang / BigInt DataCloneError
+          const imported = await parseFmf(bytes, { patchVersion: tactic.patchVersion });
           loadTactic(imported);
           notify(
             "ok",
-            `Imported "${imported.title}" (${imported.inFormation} → ${imported.outFormation}) from ${fileName} (${bytes.byteLength} B)`,
+            `Imported "${imported.title}" (IP ${imported.inFormation} → OOP ${imported.outFormation}) dari ${fileName} (${bytes.byteLength} B)`,
           );
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        const headerSuffix =
-          !isJson && bytes.byteLength > 0
-            ? ` | Header[0..15]: ${formatHexHeader(bytes)}`
-            : "";
-        notify("error", `Import failed (${fileName}): ${message}${headerSuffix}`);
+        const headerSuffix = ` | Header[0..15]: ${
+          bytes.byteLength > 0 ? formatHexHeader(bytes, 16) : "(empty)"
+        }`;
+        notify("error", `Gagal impor ${fileName}: ${message}${headerSuffix}`);
       } finally {
         setBusyAction(null);
       }
@@ -176,20 +196,21 @@ export default function TacticalBoardWorkspacePage() {
     [loadTactic, notify, tactic.patchVersion],
   );
 
-  const handleDownloadFmf = async () => {
+  const handleDownloadFmf = () => {
     setBusyAction("export-fmf");
     try {
-      const bytes = await exportFmfInWorker(tactic);
+      // Run exportFmf directly on main thread and trigger <a download="NamaTaktik.fmf"> Blob download
+      const bytes = exportFmf(tactic);
       const fileName = sanitizeFileName(tactic.title, ".fmf");
       triggerBrowserDownload(fileName, bytes);
       notify(
         "ok",
-        `Downloaded ${fileName} (${tactic.inFormation} → ${tactic.outFormation}, ${bytes.byteLength} B)`,
+        `Berhasil ekspor ${fileName} (IP ${tactic.inFormation} → OOP ${tactic.outFormation}, ${bytes.byteLength} B)`,
       );
     } catch (err) {
       notify(
         "error",
-        `Export .fmf failed: ${err instanceof Error ? err.message : String(err)}`,
+        `Gagal ekspor .fmf: ${err instanceof Error ? err.message : String(err)}`,
       );
     } finally {
       setBusyAction(null);
@@ -199,23 +220,28 @@ export default function TacticalBoardWorkspacePage() {
   const handleSaveDirectToFm27Folder = async () => {
     setBusyAction("save-folder");
     try {
-      const bytes = await exportFmfInWorker(tactic);
+      const bytes = exportFmf(tactic);
       const fileName = sanitizeFileName(tactic.title, ".fmf");
+      if (folderStatus !== "connected") {
+        triggerBrowserDownload(fileName, bytes);
+        notify("ok", `Folder lokal belum ditautkan — mengunduh ${fileName} (${bytes.byteLength} B)`);
+        return;
+      }
       try {
         const savedPath = await saveTacticFmfDirect(tactic.title, bytes);
-        notify("ok", `Saved directly to FM27 folder: ${savedPath} (${bytes.byteLength} B)`);
+        notify("ok", `Tersimpan langsung ke folder FM27: ${savedPath} (${bytes.byteLength} B)`);
       } catch (diskErr) {
         triggerBrowserDownload(fileName, bytes);
         const reason = diskErr instanceof Error ? diskErr.message : String(diskErr);
         notify(
           "error",
-          `Folder write failed (${reason}) — downloaded ${fileName} via browser instead`,
+          `Gagal tulis ke folder lokal (${reason}) — ${fileName} diunduh via browser`,
         );
       }
     } catch (err) {
       notify(
         "error",
-        `Export .fmf failed: ${err instanceof Error ? err.message : String(err)}`,
+        `Gagal ekspor .fmf: ${err instanceof Error ? err.message : String(err)}`,
       );
     } finally {
       setBusyAction(null);
@@ -225,12 +251,9 @@ export default function TacticalBoardWorkspacePage() {
   const handleExportJson = () => {
     try {
       const jsonText = exportFm27Json(tactic);
-      triggerBrowserDownload(
-        sanitizeFileName(tactic.title, ".fm27.json"),
-        jsonText,
-        "application/json",
-      );
-      notify("ok", `Exported ${sanitizeFileName(tactic.title, ".fm27.json")}`);
+      const fileName = sanitizeFileName(tactic.title, ".fm27.json");
+      triggerBrowserDownload(fileName, jsonText, "application/json");
+      notify("ok", `Exported ${fileName}`);
     } catch (err) {
       notify("error", err instanceof Error ? err.message : "JSON export failed");
     }
@@ -300,12 +323,34 @@ export default function TacticalBoardWorkspacePage() {
           .catch((err) =>
             notify(
               "error",
-              `Failed to read ${file.name}: ${err instanceof Error ? err.message : String(err)}`,
+              `Gagal membaca ${file.name}: ${err instanceof Error ? err.message : String(err)}`,
             ),
           );
       }}
       className="flex flex-col gap-4 relative"
     >
+      {/* Floating Toast Notification */}
+      {toast && (
+        <div
+          id="fmf-toast-alert"
+          role="alert"
+          className={`fixed bottom-5 right-5 z-50 max-w-lg px-4 py-3 rounded-xl shadow-2xl text-xs font-semibold flex items-start justify-between gap-3 backdrop-blur-md ${
+            toast.tone === "ok"
+              ? "bg-emerald-950/95 border border-emerald-400/50 text-emerald-100"
+              : "bg-rose-950/95 border border-rose-400/60 text-rose-100"
+          }`}
+        >
+          <span className="leading-relaxed break-words">{toast.text}</span>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            className="text-slate-300 hover:text-white font-bold cursor-pointer shrink-0"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {isDraggingFile && (
         <div className="fixed inset-4 z-50 rounded-2xl bg-emerald-950/80 border-2 border-dashed border-emerald-400 flex items-center justify-center pointer-events-none">
           <div className="text-center">
@@ -345,7 +390,7 @@ export default function TacticalBoardWorkspacePage() {
             </div>
           </div>
 
-          {/* Undo/Redo + Import/Export + AI Advisor */}
+          {/* Undo/Redo + Import/Export + Unified 5-Tab + AI Advisor */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center rounded-lg bg-[#0B0F19] border border-white/10 p-0.5">
               <button
@@ -377,8 +422,8 @@ export default function TacticalBoardWorkspacePage() {
               accept=".fmf,.tac,.json"
               className="hidden"
               onChange={(e) => {
-                const input = e.currentTarget;
-                const f = input.files?.[0];
+                const f = e.target.files?.[0];
+                e.target.value = "";
                 if (!f) return;
                 void f
                   .arrayBuffer()
@@ -386,12 +431,9 @@ export default function TacticalBoardWorkspacePage() {
                   .catch((err) =>
                     notify(
                       "error",
-                      `Failed to read ${f.name}: ${err instanceof Error ? err.message : String(err)}`,
+                      `Gagal membaca ${f.name}: ${err instanceof Error ? err.message : String(err)}`,
                     ),
-                  )
-                  .finally(() => {
-                    input.value = "";
-                  });
+                  );
               }}
             />
 
@@ -420,7 +462,7 @@ export default function TacticalBoardWorkspacePage() {
               id="export-fmf-btn"
               type="button"
               disabled={busyAction !== null}
-              onClick={() => void handleDownloadFmf()}
+              onClick={handleDownloadFmf}
               className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/18 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/28 transition cursor-pointer"
             >
               Export .fmf
@@ -453,6 +495,17 @@ export default function TacticalBoardWorkspacePage() {
             >
               Share URL
             </button>
+
+            {!unifiedReport && (
+              <button
+                id="open-unified-report-btn"
+                type="button"
+                onClick={() => refreshUnifiedReport()}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 transition cursor-pointer"
+              >
+                5-Tab Analisis (0% AI)
+              </button>
+            )}
 
             <button
               id="open-ai-advisor-btn"
@@ -565,19 +618,19 @@ export default function TacticalBoardWorkspacePage() {
           </div>
         </div>
 
-        {statusBanner && (
+        {toast && (
           <div
             role="status"
             className={`px-3.5 py-2 rounded-lg text-xs font-medium flex items-center justify-between ${
-              statusBanner.tone === "ok"
+              toast.tone === "ok"
                 ? "bg-emerald-500/12 border border-emerald-500/30 text-emerald-200"
                 : "bg-rose-500/15 border border-rose-500/35 text-rose-200"
             }`}
           >
-            <span>{statusBanner.text}</span>
+            <span>{toast.text}</span>
             <button
               type="button"
-              onClick={() => setStatusBanner(null)}
+              onClick={() => setToast(null)}
               className="text-slate-400 hover:text-slate-100 ml-3 cursor-pointer"
             >
               ×
@@ -585,6 +638,11 @@ export default function TacticalBoardWorkspacePage() {
           </div>
         )}
       </section>
+
+      {/* Auto-Displayed 5-Tab Deterministic Unified Dashboard (0% AI) */}
+      {unifiedReport && (
+        <UnifiedReportDashboard report={unifiedReport} onNotify={notify} />
+      )}
 
       {/* Main Tactical Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">

@@ -1,5 +1,11 @@
 import type { DualPhaseTactic, PitchCatalog } from "@fm27/shared-types";
-import { decryptAesCtrFmf, isEncryptedAfeArchive } from "./aes-ctr-decrypt.js";
+import {
+  decryptAesCtrFmf,
+  decryptAfeMemberSlice,
+  ENCRYPTED_AFE_HEADER,
+  isEncryptedAfeArchive,
+  isPerMemberEncryptedAfeArchive,
+} from "./aes-ctr-decrypt.js";
 import { BinaryReader } from "./binary-reader.js";
 import { BinaryWriter } from "./binary-writer.js";
 import {
@@ -15,7 +21,7 @@ export const FMF_ARCHIVE_HEADER = [
   0x02, 0x01, 0x66, 0x6d, 0x66, 0x2e, 0x08, 0x00, 0x00,
 ] as const;
 
-export const DEFAULT_FMF_TIMESTAMP = 1010308434000000064n; // 0x0E055598B8B70140n
+export const DEFAULT_FMF_TIMESTAMP = 1795265919n;
 const ARCHIVE_VERSION_BYTE = 0x03;
 const FIRST_MEMBER_REL_OFFSET = 17n;
 
@@ -29,6 +35,13 @@ export interface UnpackedFmfArchive {
   rootTitle: string;
   files: Map<string, Uint8Array>;
   details?: DetailsAomMetadata;
+}
+
+interface RawTocEntry {
+  fullKey: string;
+  relOffset: number;
+  packedLen: number;
+  rawLen: number;
 }
 
 function writeTocEntry(
@@ -51,6 +64,7 @@ function writeTocEntry(
 
 /**
  * Packs root files + `_data/details.aom` into an authentic FM27 `.fmf` container.
+ * Uses 0-based `dataStart`-relative TOC member offsets matching real FM27 `.fmf` files.
  */
 export function packFmfArchive(input: {
   rootTitle: string;
@@ -71,18 +85,19 @@ export function packFmfArchive(input: {
   tocWriter.writeLengthPrefixedUtf8(input.rootTitle);
   tocWriter.writeInt32(encodedMembers.length);
 
-  let runningRelOffset = FIRST_MEMBER_REL_OFFSET;
+  // Real FM27 TOC offsets start at 0 relative to dataStart (byte 26)
+  let runningDataOffset = 0n;
   for (const member of encodedMembers) {
     const packedLen = BigInt(member.frameBytes.byteLength);
     writeTocEntry(
       tocWriter,
       member.name,
       member.extension,
-      runningRelOffset,
+      runningDataOffset,
       packedLen,
       BigInt(member.rawBytes.byteLength),
     );
-    runningRelOffset += packedLen;
+    runningDataOffset += packedLen;
   }
 
   // 1 subdirectory: `_data/details.aom`
@@ -93,17 +108,17 @@ export function packFmfArchive(input: {
     tocWriter,
     "details",
     ".aom",
-    runningRelOffset,
+    runningDataOffset,
     BigInt(detailsFrame.byteLength),
     BigInt(input.detailsAomRaw.byteLength),
   );
-  runningRelOffset += BigInt(detailsFrame.byteLength);
+  runningDataOffset += BigInt(detailsFrame.byteLength);
   tocWriter.writeInt32(0); // 0 nested subdirs inside _data
 
   const tocRaw = tocWriter.toUint8Array();
   const tocFrame = encodeZstdRawFrame(tocRaw);
 
-  const totalMemberFramesBytes = runningRelOffset - FIRST_MEMBER_REL_OFFSET;
+  const totalMemberFramesBytes = runningDataOffset;
   const totalOutSize =
     9 + 8 + 8 + 1 + Number(totalMemberFramesBytes) + 9 + tocFrame.byteLength;
 
@@ -134,14 +149,21 @@ function hasZstdMagicAt(bytes: Uint8Array, offset: number): boolean {
   );
 }
 
+function hasAfeMemberHeaderAt(bytes: Uint8Array, offset: number): boolean {
+  if (offset < 0 || offset + 8 > bytes.byteLength) return false;
+  const view = new DataView(bytes.buffer, bytes.byteOffset + offset, 8);
+  return view.getInt32(0, true) === 16 && view.getInt32(4, true) === 16;
+}
+
 function resolveTocMemberOffset(
   archiveBytes: Uint8Array,
   relOffset: number,
   packedLen: number,
   dataStart: number,
+  perMemberAfe = false,
 ): number | null {
   if (packedLen < 0) return null;
-  const candidates = [9 + relOffset, dataStart + relOffset, relOffset];
+  const candidates = [dataStart + relOffset, 9 + relOffset, relOffset];
   const validCandidates: number[] = [];
 
   for (const off of candidates) {
@@ -153,17 +175,18 @@ function resolveTocMemberOffset(
   }
 
   if (validCandidates.length === 0) return null;
-  // Prefer the candidate that points directly at a Zstandard frame header (28 B5 2F FD)
+  if (perMemberAfe) {
+    const afeMatch = validCandidates.find((off) => hasAfeMemberHeaderAt(archiveBytes, off));
+    if (afeMatch !== undefined) return afeMatch;
+  }
   const zstdMatch = validCandidates.find((off) => hasZstdMagicAt(archiveBytes, off));
   return zstdMatch ?? validCandidates[0]!;
 }
 
-function readTocDirectory(
+function collectTocEntries(
   tocReader: BinaryReader,
-  archiveBytes: Uint8Array,
-  dataStart: number,
   prefix: string,
-  outFiles: Map<string, Uint8Array>,
+  outEntries: RawTocEntry[],
   depth = 0,
 ): void {
   if (depth > 8) {
@@ -185,25 +208,8 @@ function readTocDirectory(
     if (rawLen < 0 || rawLen > 16 * 1024 * 1024) {
       throw new RangeError(`TOC entry "${name}${ext}" rawLen out of safety bounds: ${rawLen}`);
     }
-    const absOffset = resolveTocMemberOffset(archiveBytes, relOffset, packedLen, dataStart);
-    if (absOffset === null) {
-      throw new RangeError(
-        `TOC entry "${name}${ext}" points outside archive bounds (relOffset=${relOffset}, packedLen=${packedLen}, rawLen=${rawLen}, dataStart=${dataStart}, archiveLen=${archiveBytes.byteLength})`,
-      );
-    }
-    const frameSlice = archiveBytes.subarray(absOffset, absOffset + packedLen);
-    const decompressed = hasZstdMagicAt(archiveBytes, absOffset)
-      ? decodeZstdFrame(frameSlice)
-      : packedLen === rawLen
-        ? frameSlice.slice()
-        : decodeZstdFrame(frameSlice);
-    if (rawLen > 0 && decompressed.byteLength !== rawLen) {
-      throw new Error(
-        `Decompressed size mismatch for "${name}${ext}": expected ${rawLen}, got ${decompressed.byteLength}`,
-      );
-    }
     const fullKey = prefix ? `${prefix}/${name}${ext}` : `${name}${ext}`;
-    outFiles.set(fullKey, decompressed);
+    outEntries.push({ fullKey, relOffset, packedLen, rawLen });
   }
 
   const subDirCount = tocReader.readInt32();
@@ -213,16 +219,24 @@ function readTocDirectory(
   for (let d = 0; d < subDirCount; d++) {
     const dirName = tocReader.readLengthPrefixedUtf8();
     const nextPrefix = prefix ? `${prefix}/${dirName}` : dirName;
-    readTocDirectory(tocReader, archiveBytes, dataStart, nextPrefix, outFiles, depth + 1);
+    collectTocEntries(tocReader, nextPrefix, outEntries, depth + 1);
   }
 }
 
-/**
- * Unpacks an unencrypted `fmf.` archive buffer.
- */
-export function unpackPlainFmfArchive(archiveBytes: Uint8Array): UnpackedFmfArchive {
+function readArchiveToc(
+  archiveBytes: Uint8Array,
+  allowAfeHeader = false,
+): {
+  rootTitle: string;
+  dataStart: number;
+  entries: RawTocEntry[];
+} {
   const reader = new BinaryReader(archiveBytes);
-  reader.expectBytes(FMF_ARCHIVE_HEADER, "FMF ArchiveHeader");
+  if (allowAfeHeader && isEncryptedAfeArchive(archiveBytes)) {
+    reader.expectBytes(ENCRYPTED_AFE_HEADER, "AFE ArchiveHeader");
+  } else {
+    reader.expectBytes(FMF_ARCHIVE_HEADER, "FMF ArchiveHeader");
+  }
 
   const tocRelOffset = Number(reader.readInt64());
   const firstMemberRelOffset = Number(reader.readInt64());
@@ -244,8 +258,44 @@ export function unpackPlainFmfArchive(archiveBytes: Uint8Array): UnpackedFmfArch
 
   const tocReader = new BinaryReader(tocRaw);
   const rootTitle = tocReader.readLengthPrefixedUtf8();
+  const entries: RawTocEntry[] = [];
+  collectTocEntries(tocReader, "", entries);
+  return { rootTitle, dataStart, entries };
+}
+
+/**
+ * Unpacks an unencrypted `fmf.` archive buffer.
+ */
+export function unpackPlainFmfArchive(archiveBytes: Uint8Array): UnpackedFmfArchive {
+  const { rootTitle, dataStart, entries } = readArchiveToc(archiveBytes, false);
   const files = new Map<string, Uint8Array>();
-  readTocDirectory(tocReader, archiveBytes, dataStart, "", files);
+
+  for (const entry of entries) {
+    const absOffset = resolveTocMemberOffset(
+      archiveBytes,
+      entry.relOffset,
+      entry.packedLen,
+      dataStart,
+      false,
+    );
+    if (absOffset === null) {
+      throw new RangeError(
+        `TOC entry "${entry.fullKey}" points outside archive bounds (relOffset=${entry.relOffset}, packedLen=${entry.packedLen}, rawLen=${entry.rawLen}, dataStart=${dataStart}, archiveLen=${archiveBytes.byteLength})`,
+      );
+    }
+    const frameSlice = archiveBytes.subarray(absOffset, absOffset + entry.packedLen);
+    const decompressed = hasZstdMagicAt(archiveBytes, absOffset)
+      ? decodeZstdFrame(frameSlice)
+      : entry.packedLen === entry.rawLen
+        ? frameSlice.slice()
+        : decodeZstdFrame(frameSlice);
+    if (entry.rawLen > 0 && decompressed.byteLength !== entry.rawLen) {
+      throw new Error(
+        `Decompressed size mismatch for "${entry.fullKey}": expected ${entry.rawLen}, got ${decompressed.byteLength}`,
+      );
+    }
+    files.set(entry.fullKey, decompressed);
+  }
 
   const detailsBytes = files.get("_data/details.aom");
   const details = detailsBytes ? decodeDetailsAom(detailsBytes) : undefined;
@@ -254,9 +304,40 @@ export function unpackPlainFmfArchive(archiveBytes: Uint8Array): UnpackedFmfArch
 }
 
 /**
- * Unpacks either a plain `fmf.` or an AES-128-CTR encrypted `afe.` archive.
+ * Unpacks either a plain `fmf.`, a native FM27 per-member `afe.`, or a whole-stream AES-128-CTR `afe.` archive.
  */
 export async function unpackFmfArchive(archiveBytes: Uint8Array): Promise<UnpackedFmfArchive> {
+  if (isPerMemberEncryptedAfeArchive(archiveBytes)) {
+    const { rootTitle, dataStart, entries } = readArchiveToc(archiveBytes, true);
+    const files = new Map<string, Uint8Array>();
+    for (const entry of entries) {
+      const absOffset = resolveTocMemberOffset(
+        archiveBytes,
+        entry.relOffset,
+        entry.packedLen,
+        dataStart,
+        true,
+      );
+      if (absOffset === null) {
+        throw new RangeError(`Encrypted TOC entry "${entry.fullKey}" points outside archive bounds`);
+      }
+      const memberSlice = archiveBytes.subarray(absOffset, absOffset + entry.packedLen);
+      const decryptedFrame = await decryptAfeMemberSlice(memberSlice);
+      const decompressed = hasZstdMagicAt(decryptedFrame, 0)
+        ? decodeZstdFrame(decryptedFrame)
+        : decryptedFrame;
+      if (entry.rawLen > 0 && decompressed.byteLength !== entry.rawLen) {
+        throw new Error(
+          `Decompressed size mismatch for "${entry.fullKey}": expected ${entry.rawLen}, got ${decompressed.byteLength}`,
+        );
+      }
+      files.set(entry.fullKey, decompressed);
+    }
+    const detailsBytes = files.get("_data/details.aom");
+    const details = detailsBytes ? decodeDetailsAom(detailsBytes) : undefined;
+    return { rootTitle, files, details };
+  }
+
   const plainBytes = isEncryptedAfeArchive(archiveBytes)
     ? await decryptAesCtrFmf(archiveBytes)
     : archiveBytes;
@@ -292,6 +373,17 @@ export function exportFmf(
   });
 }
 
+function isRawTacPayload(bytes: Uint8Array): boolean {
+  if (bytes.byteLength < 16) return false;
+  if (bytes[0] === 0x22 && bytes[1] === 0x44) return true;
+  return (
+    bytes[2] === 0x63 &&
+    bytes[3] === 0x61 &&
+    bytes[4] === 0x74 &&
+    bytes[5] === 0x2e
+  );
+}
+
 /**
  * High-level `.fmf` (or raw `.tac` / encrypted `afe.`) tactic importer.
  */
@@ -299,14 +391,7 @@ export async function parseFmf(
   inputBytes: Uint8Array,
   options?: { patchVersion?: string; catalog?: PitchCatalog },
 ): Promise<DualPhaseTactic> {
-  // Support raw .tac directly if user drops an extracted .tac file
-  if (
-    inputBytes.byteLength >= 16 &&
-    inputBytes[2] === 0x63 &&
-    inputBytes[3] === 0x61 &&
-    inputBytes[4] === 0x74 &&
-    inputBytes[5] === 0x2e
-  ) {
+  if (isRawTacPayload(inputBytes)) {
     return decodeTacPayload(inputBytes, options);
   }
 
@@ -324,8 +409,16 @@ export async function parseFmf(
 
   const tactic = decodeTacPayload(tacBytes, options);
   if (unpacked.details) {
+    if (
+      unpacked.details.title &&
+      (!tactic.title || tactic.title === "Imported FM27 Tactic")
+    ) {
+      tactic.title = unpacked.details.title;
+    }
     if (unpacked.details.description) tactic.description = unpacked.details.description;
     if (unpacked.details.author) tactic.author = unpacked.details.author;
+  } else if (unpacked.rootTitle && (!tactic.title || tactic.title === "Imported FM27 Tactic")) {
+    tactic.title = unpacked.rootTitle;
   }
   return tactic;
 }
