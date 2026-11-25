@@ -1,0 +1,31 @@
+name: Sync Weekly Trending Wonderkids
+
+on:
+  schedule:
+    # Refresh 7-day weighted time-decay materialized view every 6 hours
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  refresh-trending:
+    name: Refresh Supabase weekly_trending_wonderkids View
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Trigger refresh_weekly_trending_wonderkids RPC
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "Supabase secrets not configured; skipping remote RPC refresh."
+            exit 0
+          fi
+          curl --fail --silent --show-error \
+            -X POST "${SUPABASE_URL}/rest/v1/rpc/refresh_weekly_trending_wonderkids" \
+            -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{}"
+          echo "Successfully refreshed weekly_trending_wonderkids materialized view."

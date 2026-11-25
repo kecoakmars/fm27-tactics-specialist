@@ -1,0 +1,44 @@
+name: FM27 Data Registry Validation
+
+on:
+  pull_request:
+    paths:
+      - "packages/fm-data/**"
+      - "packages/shared-types/**"
+      - "scripts/**"
+  push:
+    branches: [main]
+    paths:
+      - "packages/fm-data/**"
+      - "packages/shared-types/**"
+      - "scripts/**"
+
+jobs:
+  validate-data:
+    name: Validate Zod Schemas, Bitmasks & Cross-File References
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate all patch versions in packages/fm-data
+        run: pnpm data:validate
+
+      - name: Run data-registry & codec/engine regression tests
+        run: pnpm exec vitest run tests/data-registry.spec.ts tests/codec.spec.ts tests/engine.spec.ts
