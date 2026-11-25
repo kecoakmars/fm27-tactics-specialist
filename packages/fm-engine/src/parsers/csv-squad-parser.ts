@@ -56,6 +56,24 @@ export const FM_ABBREV_TO_ATTRIBUTE: Readonly<Record<string, AttributeName>> = {
   tro: "rushing_out",
   ref: "reflexes",
   thr: "throwing",
+  // FM-View-Exporter (F9) FM27 full header normalized aliases (spaces/punctuation stripped)
+  firsttouch: "first_touch",
+  freekicktaking: "free_kick_taking",
+  longshots: "long_shots",
+  longthrows: "long_throws",
+  penaltytaking: "penalty_taking",
+  offtheball: "off_the_ball",
+  workrate: "work_rate",
+  jumpingreach: "jumping_reach",
+  naturalfitness: "natural_fitness",
+  aerialreach: "aerial_reach",
+  commandofarea: "command_of_area",
+  oneonones: "one_on_ones",
+  onevsone: "one_on_ones",
+  punchingtendency: "punching",
+  rushingout: "rushing_out",
+  rushingouttendency: "rushing_out",
+  injuryproneness: "injury_proneness",
 };
 
 function detectDelimiter(headerLine: string): string {
@@ -151,7 +169,7 @@ export function parseFmPositionString(posText: string): Record<PositionKey14, nu
 
 function parseRangeOrNumber(raw: string | undefined): number | undefined {
   if (!raw) return undefined;
-  const cleaned = raw.trim();
+  const cleaned = raw.trim().replace(/^(\d+),(\d+)$/, "$1.$2");
   if (!cleaned || cleaned === "-") return undefined;
   // Support scouted attribute ranges like "14-16" -> 15
   const rangeMatch = cleaned.match(/^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)$/);
@@ -165,7 +183,7 @@ function parseRangeOrNumber(raw: string | undefined): number | undefined {
 /**
  * Parses squad players from either:
  * 1) `fmsave` CSV (`uid, name, club_uid, club_name, team_id, team_slot, pos_*, raw_*...`)
- * 2) `FM-View-Exporter` (F9) CSV export (`Name, Position, Age, Acc, Pac, Pas...`)
+ * 2) `FM-View-Exporter` (F9) CSV export (`Unique ID, Player/Name, Position, Age, Acc/Acceleration...`)
  */
 export function parseSquadCsv(csvText: string): Player[] {
   const lines = csvText
@@ -197,7 +215,10 @@ export function parseSquadCsv(csvText: string): Player[] {
       const valStr = cells[colIdx] ?? "";
       const keyExact = rawH.trim();
       const keyLower = normHeaders[colIdx] ?? "";
-      strMap[keyLower] = valStr;
+      // FM-View-Exporter exports two "Nation" columns (code first, full name second): keep first non-empty
+      if (!strMap[keyLower]) {
+        strMap[keyLower] = valStr;
+      }
       const parsedNum = parseRangeOrNumber(valStr);
       if (parsedNum !== undefined) {
         numMap[keyExact] = parsedNum;
@@ -255,22 +276,32 @@ export function parseSquadCsv(csvText: string): Player[] {
       numMap.preferred_foot_left ??
       (numMap.raw_preferred_foot_left !== undefined
         ? Math.min(20, numMap.raw_preferred_foot_left / 5)
-        : footText.includes("left")
+        : footText.includes("left") || footText.includes("links")
           ? 20
-          : footText.includes("either")
+          : footText.includes("either") || footText.includes("beid")
             ? 18
             : 10);
     const rightFoot =
       numMap.preferred_foot_right ??
       (numMap.raw_preferred_foot_right !== undefined
         ? Math.min(20, numMap.raw_preferred_foot_right / 5)
-        : footText.includes("right")
+        : footText.includes("right") || footText.includes("rechts")
           ? 20
-          : footText.includes("either")
+          : footText.includes("either") || footText.includes("beid")
             ? 18
-            : footText.includes("left")
+            : footText.includes("left") || footText.includes("links")
               ? 10
               : 18);
+
+    // FM-View-Exporter exports `Ability` and `Potential` in 0.5..5.0 stars when CA/PA are hidden
+    const starCa =
+      numMap.ability !== undefined && numMap.ability > 0 && numMap.ability <= 5
+        ? Math.round(numMap.ability * 36)
+        : undefined;
+    const starPa =
+      numMap.potential !== undefined && numMap.potential > 0 && numMap.potential <= 5
+        ? Math.round(numMap.potential * 38)
+        : undefined;
 
     players.push({
       uid,
@@ -278,13 +309,13 @@ export function parseSquadCsv(csvText: string): Player[] {
       age: numMap.age !== undefined ? Math.trunc(numMap.age) : undefined,
       clubUid: numMap.club_uid !== undefined ? Math.trunc(numMap.club_uid) : undefined,
       clubName: strMap.club_name || strMap.club || undefined,
-      nationality: strMap.nat || strMap.nationality || undefined,
+      nationality: strMap.nat || strMap.nation || strMap.nationality || undefined,
       teamId: numMap.team_id !== undefined ? Math.trunc(numMap.team_id) : undefined,
       teamSlot: strMap.team_slot || strMap.pkd || undefined,
       leftFoot,
       rightFoot,
-      currentAbility: numMap.ability_current ?? numMap.ca,
-      potentialAbility: numMap.ability_potential ?? numMap.pa,
+      currentAbility: numMap.ability_current ?? numMap.ca ?? starCa,
+      potentialAbility: numMap.ability_potential ?? numMap.pa ?? starPa,
       attributes: attributes as Record<AttributeName, number>,
       positions,
     });

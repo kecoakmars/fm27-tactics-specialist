@@ -140,6 +140,17 @@ export function exportScheduleFmfInWorker(
   return callEngineWorker<Uint8Array>({ type: "EXPORT_SCHEDULE_FMF", schedule });
 }
 
+export function parseScheduleFmfInWorker(
+  bytes: Uint8Array,
+  patchVersion?: string,
+): Promise<WeeklySchedule> {
+  return callEngineWorker<WeeklySchedule>({
+    type: "PARSE_SCHEDULE_FMF",
+    bytes,
+    patchVersion,
+  });
+}
+
 export function exportShortlistFmfInWorker(
   title: string,
   playerUids: number[],
@@ -148,5 +159,27 @@ export function exportShortlistFmfInWorker(
     type: "EXPORT_SHORTLIST_FMF",
     title,
     playerUids,
+  });
+}
+
+export function parseShortlistFmfInWorker(
+  bytes: Uint8Array,
+): Promise<{ title: string; playerUids: number[] }> {
+  return callEngineWorker<{ title: string; playerUids: number[] }>({
+    type: "PARSE_SHORTLIST_FMF",
+    bytes,
+  });
+}
+
+export function gradeImportedTacticInWorker(
+  tactic: DualPhaseTactic,
+  players: Player[],
+  improve = true,
+): Promise<TacticPlanResult> {
+  return callEngineWorker<TacticPlanResult>({
+    type: "GRADE_IMPORTED",
+    tactic,
+    players,
+    improve,
   });
 }

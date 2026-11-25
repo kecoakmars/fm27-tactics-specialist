@@ -138,6 +138,11 @@ export interface TacticStoreState {
 
   applyPresetStyle: (styleId: string, shapeId?: string) => void;
   applyDualShape: (shapeId: string) => void;
+  assignPlayerToSlot: (
+    slotIndex: number,
+    playerUid: number | undefined,
+    playerName?: string,
+  ) => void;
   loadTactic: (tactic: DualPhaseTactic) => void;
 }
 
@@ -393,6 +398,23 @@ export const useTacticStore = create<TacticStoreState>()(
           selectedSlotIndex: 0,
         }));
       },
+
+      assignPlayerToSlot: (slotIndex, playerUid, playerName) =>
+        set((state) => ({
+          tactic: {
+            ...state.tactic,
+            slots: state.tactic.slots.map((s, idx) => {
+              if (idx === slotIndex) {
+                return { ...s, playerUid, playerName };
+              }
+              // Clear duplicate assignment if this player was already on another slot
+              if (playerUid !== undefined && s.playerUid === playerUid) {
+                return { ...s, playerUid: undefined, playerName: undefined };
+              }
+              return s;
+            }),
+          },
+        })),
 
       loadTactic: (tactic) =>
         set({

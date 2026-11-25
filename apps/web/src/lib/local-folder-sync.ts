@@ -170,6 +170,39 @@ export async function readFileBytesFromLocalSubdir(
   return new Uint8Array(ab);
 }
 
+export async function listExportFilesInRoot(
+  rootHandle: ExtendedDirectoryHandle,
+  extensions: readonly string[] = [".csv", ".html", ".htm"],
+): Promise<LocalFolderFileEntry[]> {
+  if (!rootHandle.values) return [];
+  const entries: LocalFolderFileEntry[] = [];
+  for await (const item of rootHandle.values()) {
+    if (item.kind !== "file") continue;
+    const lower = item.name.toLowerCase();
+    if (!extensions.some((ext) => lower.endsWith(ext))) continue;
+    try {
+      const file = await (item as FileSystemFileHandle).getFile();
+      entries.push({
+        name: item.name,
+        size: file.size,
+        lastModified: file.lastModified,
+      });
+    } catch {
+      // skip unreadable file
+    }
+  }
+  return entries.sort((a, b) => b.lastModified - a.lastModified);
+}
+
+export async function readRootFileText(
+  rootHandle: ExtendedDirectoryHandle,
+  fileName: string,
+): Promise<string> {
+  const fileHandle = await rootHandle.getFileHandle(fileName);
+  const file = await fileHandle.getFile();
+  return file.text();
+}
+
 /**
  * Universal fallback file download (works in Chrome, Edge, Firefox, and Safari).
  */
