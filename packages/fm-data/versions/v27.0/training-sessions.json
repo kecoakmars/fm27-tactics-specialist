@@ -1,0 +1,1002 @@
+{
+  "Sessions": [
+    {
+      "code": "REST",
+      "name": "Rest",
+      "category": "rest",
+      "max_sessions_per_week": 21,
+      "impact": {
+        "condition": 12,
+        "fatigue": -10,
+        "happiness": 2,
+        "injuries": -8,
+        "sharpness": -3
+      },
+      "attributes": {
+        "attacking": [],
+        "midfield": [],
+        "defending": [],
+        "goalkeeping": []
+      }
+    },
+    {
+      "code": "RECOVERY",
+      "name": "Recovery",
+      "category": "rest",
+      "max_sessions_per_week": 4,
+      "impact": {
+        "condition": 8,
+        "fatigue": -8,
+        "happiness": 2,
+        "injuries": -10,
+        "sharpness": -1
+      },
+      "attributes": {
+        "attacking": [
+          "natural_fitness"
+        ],
+        "midfield": [
+          "natural_fitness"
+        ],
+        "defending": [
+          "natural_fitness"
+        ],
+        "goalkeeping": [
+          "natural_fitness"
+        ]
+      }
+    },
+    {
+      "code": "MATCH_DAY",
+      "name": "Match Day",
+      "category": "match_prep",
+      "max_sessions_per_week": 3,
+      "impact": {
+        "condition": -18,
+        "fatigue": 16,
+        "happiness": 4,
+        "injuries": 10,
+        "sharpness": 14
+      },
+      "attributes": {
+        "attacking": [
+          "decisions",
+          "composure",
+          "concentration"
+        ],
+        "midfield": [
+          "decisions",
+          "composure",
+          "concentration"
+        ],
+        "defending": [
+          "decisions",
+          "composure",
+          "concentration"
+        ],
+        "goalkeeping": [
+          "decisions",
+          "composure",
+          "concentration"
+        ]
+      }
+    },
+    {
+      "code": "OVERALL",
+      "name": "Overall",
+      "category": "general",
+      "max_sessions_per_week": 3,
+      "impact": {
+        "condition": -8,
+        "fatigue": 7,
+        "happiness": 1,
+        "injuries": 5,
+        "sharpness": 4
+      },
+      "attributes": {
+        "attacking": [
+          "finishing",
+          "dribbling",
+          "off_the_ball",
+          "passing",
+          "pace"
+        ],
+        "midfield": [
+          "passing",
+          "vision",
+          "tackling",
+          "decisions",
+          "stamina"
+        ],
+        "defending": [
+          "marking",
+          "tackling",
+          "positioning",
+          "heading",
+          "strength"
+        ],
+        "goalkeeping": [
+          "reflexes",
+          "handling",
+          "command_of_area",
+          "kicking",
+          "positioning"
+        ]
+      }
+    },
+    {
+      "code": "OUTFIELD",
+      "name": "Outfield",
+      "category": "general",
+      "max_sessions_per_week": 3,
+      "impact": {
+        "condition": -7,
+        "fatigue": 6,
+        "happiness": 1,
+        "injuries": 4,
+        "sharpness": 3
+      },
+      "attributes": {
+        "attacking": [
+          "first_touch",
+          "technique",
+          "off_the_ball",
+          "decisions"
+        ],
+        "midfield": [
+          "passing",
+          "first_touch",
+          "vision",
+          "teamwork"
+        ],
+        "defending": [
+          "tackling",
+          "marking",
+          "positioning",
+          "anticipation"
+        ],
+        "goalkeeping": [
+          "kicking",
+          "throwing",
+          "communication"
+        ]
+      }
+    },
+    {
+      "code": "ATT_MOVEMENT",
+      "name": "Attacking Movement",
+      "category": "attacking",
+      "max_sessions_per_week": 3,
+      "impact": {
+        "condition": -6,
+        "fatigue": 5,
+        "happiness": 2,
+        "injuries": 4,
+        "sharpness": 4
+      },
+      "attributes": {
+        "attacking": [
+          "off_the_ball",
+          "anticipation",
+          "decisions",
+          "flair",
+          "vision"
+        ],
+        "midfield": [
+          "vision",
+          "passing",
+          "off_the_ball",
+          "decisions"
+        ],
+        "defending": [
+          "marking",
+          "positioning",
+          "anticipation"
+        ],
+        "goalkeeping": [
+          "one_on_ones",
+          "rushing_out"
+        ]
+      }
+    },
+    {
+      "code": "CHANCE_CREATION",
+      "name": "Chance Creation",
+      "category": "attacking",
+      "max_sessions_per_week": 3,
+      "impact": {
+        "condition": -6,
+        "fatigue": 5,
+        "happiness": 2,
+        "injuries": 3,
+        "sharpness": 3
+      },
+      "attributes": {
+        "attacking": [
+          "passing",
+          "vision",
+          "flair",
+          "dribbling",
+          "crossing"
+        ],
+        "midfield": [
+          "passing",
+          "vision",
+          "technique",
+          "decisions",
+          "off_the_ball"
+        ],
+        "defending": [
+          "anticipation",
+          "concentration"
+        ],
+        "goalkeeping": [
+          "handling",
+          "command_of_area"
+        ]
+      }
+    },
+    {
+      "code": "CHANCE_CONVERSION",
+      "name": "Chance Conversion",
+      "category": "attacking",
+      "max_sessions_per_week": 3,
+      "impact": {
+        "condition": -5,
+        "fatigue": 4,
+        "happiness": 3,
+        "injuries": 3,
+        "sharpness": 4
+      },
+      "attributes": {
+        "attacking": [
+          "finishing",
+          "composure",
+          "first_touch",
+          "heading",
+          "long_shots"
+        ],
+        "midfield": [
+          "long_shots",
+          "finishing",
+          "off_the_ball"
+        ],
+        "defending": [
+          "marking",
+          "bravery"
+        ],
+        "goalkeeping": [
+          "reflexes",
+          "one_on_ones",
+          "handling"
+        ]
+      }
+    },
+    {
+      "code": "ATT_WINGS",
+      "name": "Attacking Wings",
+      "category": "attacking",
+      "max_sessions_per_week": 2,
+      "impact": {
+        "condition": -7,
+        "fatigue": 6,
+        "happiness": 2,
+        "injuries": 4,
+        "sharpness": 3
+      },
+      "attributes": {
+        "attacking": [
+          "crossing",
+          "dribbling",
+          "acceleration",
+          "agility",
+          "heading"
+        ],
+        "midfield": [
+          "crossing",
+          "passing",
+          "off_the_ball"
+        ],
+        "defending": [
+          "jumping_reach",
+          "heading",
+          "positioning"
+        ],
+        "goalkeeping": [
+          "aerial_reach",
+          "command_of_area",
+          "punching"
+        ]
+      }
+    },
+    {
+      "code": "ATT_PATIENT",
+      "name": "Attacking Patient",
+      "category": "attacking",
+      "max_sessions_per_week": 2,
+      "impact": {
+        "condition": -5,
+        "fatigue": 4,
+        "happiness": 1,
+        "injuries": 2,
+        "sharpness": 3
+      },
+      "attributes": {
+        "attacking": [
+          "passing",
+          "first_touch",
+          "composure",
+          "vision",
+          "decisions"
+        ],
+        "midfield": [
+          "passing",
+          "vision",
+          "composure",
+          "decisions",
+          "teamwork"
+        ],
+        "defending": [
+          "concentration",
+          "positioning"
+        ],
+        "goalkeeping": [
+          "communication",
+          "positioning"
+        ]
+      }
+    },
+    {
+      "code": "ATT_DIRECT",
+      "name": "Attacking Direct",
+      "category": "attacking",
+      "max_sessions_per_week": 2,
+      "impact": {
+        "condition": -6,
+        "fatigue": 5,
+        "happiness": 1,
+        "injuries": 4,
+        "sharpness": 3
+      },
+      "attributes": {
+        "attacking": [
+          "jumping_reach",
+          "heading",
+          "strength",
+          "pace",
+          "off_the_ball"
+        ],
+        "midfield": [
+          "passing",
+          "vision",
+          "work_rate"
+        ],
+        "defending": [
+          "jumping_reach",
+          "heading",
+          "strength"
+        ],
+        "goalkeeping": [
+          "kicking",
+          "throwing"
+        ]
+      }
+    },
+    {
+      "code": "DEF_SHAPE",
+      "name": "Defensive Shape",
+      "category": "defending",
+      "max_sessions_per_week": 3,
+      "impact": {
+        "condition": -5,
+        "fatigue": 4,
+        "happiness": 0,
+        "injuries": 2,
+        "sharpness": 3
+      },
+      "attributes": {
+        "attacking": [
+          "work_rate",
+          "teamwork"
+        ],
+        "midfield": [
+          "positioning",
+          "teamwork",
+          "concentration",
+          "decisions"
+        ],
+        "defending": [
+          "positioning",
+          "concentration",
+          "teamwork",
+          "decisions",
+          "marking"
+        ],
+        "goalkeeping": [
+          "communication",
+          "command_of_area",
+          "positioning"
+        ]
+      }
+    },
+    {
+      "code": "DEF_ENGAGED",
+      "name": "Defending Engaged",
+      "category": "defending",
+      "max_sessions_per_week": 2,
+      "impact": {
+        "condition": -8,
+        "fatigue": 7,
+        "happiness": 0,
+        "injuries": 5,
+        "sharpness": 4
+      },
+      "attributes": {
+        "attacking": [
+          "work_rate",
+          "aggression",
+          "stamina"
+        ],
+        "midfield": [
+          "tackling",
+          "aggression",
+          "work_rate",
+          "anticipation"
+        ],
+        "defending": [
+          "tackling",
+          "aggression",
+          "anticipation",
+          "pace",
+          "bravery"
+        ],
+        "goalkeeping": [
+          "rushing_out",
+          "one_on_ones"
+        ]
+      }
+    },
+    {
+      "code": "DEF_GROUND",
+      "name": "Ground Defense",
+      "category": "defending",
+      "max_sessions_per_week": 3,
+      "impact": {
+        "condition": -6,
+        "fatigue": 5,
+        "happiness": 1,
+        "injuries": 4,
+        "sharpness": 3
+      },
+      "attributes": {
+        "attacking": [
+          "dribbling",
+          "agility"
+        ],
+        "midfield": [
+          "tackling",
+          "marking",
+          "positioning",
+          "agility"
+        ],
+        "defending": [
+          "tackling",
+          "marking",
+          "positioning",
+          "anticipation",
+          "concentration"
+        ],
+        "goalkeeping": [
+          "one_on_ones",
+          "reflexes"
+        ]
+      }
+    },
+    {
+      "code": "DEF_AERIAL",
+      "name": "Aerial Defense",
+      "category": "defending",
+      "max_sessions_per_week": 2,
+      "impact": {
+        "condition": -6,
+        "fatigue": 5,
+        "happiness": 0,
+        "injuries": 4,
+        "sharpness": 2
+      },
+      "attributes": {
+        "attacking": [
+          "crossing",
+          "heading"
+        ],
+        "midfield": [
+          "heading",
+          "jumping_reach",
+          "positioning"
+        ],
+        "defending": [
+          "jumping_reach",
+          "heading",
+          "strength",
+          "bravery",
+          "marking"
+        ],
+        "goalkeeping": [
+          "aerial_reach",
+          "command_of_area",
+          "handling"
+        ]
+      }
+    },
+    {
+      "code": "PLAY_FROM_BACK",
+      "name": "Play From The Back",
+      "category": "possession",
+      "max_sessions_per_week": 3,
+      "impact": {
+        "condition": -5,
+        "fatigue": 4,
+        "happiness": 2,
+        "injuries": 2,
+        "sharpness": 3
+      },
+      "attributes": {
+        "attacking": [
+          "off_the_ball",
+          "first_touch"
+        ],
+        "midfield": [
+          "passing",
+          "first_touch",
+          "composure",
+          "decisions",
+          "vision"
+        ],
+        "defending": [
+          "passing",
+          "first_touch",
+          "composure",
+          "decisions",
+          "technique"
+        ],
+        "goalkeeping": [
+          "kicking",
+          "throwing",
+          "passing",
+          "first_touch",
+          "composure"
+        ]
+      }
+    },
+    {
+      "code": "BALL_RETENTION",
+      "name": "Ball Retention",
+      "category": "possession",
+      "max_sessions_per_week": 3,
+      "impact": {
+        "condition": -5,
+        "fatigue": 4,
+        "happiness": 2,
+        "injuries": 2,
+        "sharpness": 4
+      },
+      "attributes": {
+        "attacking": [
+          "first_touch",
+          "passing",
+          "composure",
+          "technique"
+        ],
+        "midfield": [
+          "passing",
+          "first_touch",
+          "composure",
+          "technique",
+          "vision"
+        ],
+        "defending": [
+          "passing",
+          "composure",
+          "first_touch"
+        ],
+        "goalkeeping": [
+          "passing",
+          "first_touch"
+        ]
+      }
+    },
+    {
+      "code": "BALL_DISTRIBUTION",
+      "name": "Ball Distribution",
+      "category": "possession",
+      "max_sessions_per_week": 3,
+      "impact": {
+        "condition": -5,
+        "fatigue": 4,
+        "happiness": 2,
+        "injuries": 2,
+        "sharpness": 3
+      },
+      "attributes": {
+        "attacking": [
+          "off_the_ball",
+          "anticipation"
+        ],
+        "midfield": [
+          "passing",
+          "vision",
+          "technique",
+          "decisions",
+          "teamwork"
+        ],
+        "defending": [
+          "passing",
+          "vision",
+          "decisions"
+        ],
+        "goalkeeping": [
+          "kicking",
+          "throwing",
+          "vision"
+        ]
+      }
+    },
+    {
+      "code": "TRANSITION_PRESS",
+      "name": "Transition - Press",
+      "category": "tactical",
+      "max_sessions_per_week": 3,
+      "impact": {
+        "condition": -8,
+        "fatigue": 7,
+        "happiness": 1,
+        "injuries": 5,
+        "sharpness": 5
+      },
+      "attributes": {
+        "attacking": [
+          "work_rate",
+          "aggression",
+          "stamina",
+          "acceleration",
+          "anticipation"
+        ],
+        "midfield": [
+          "work_rate",
+          "stamina",
+          "aggression",
+          "teamwork",
+          "anticipation"
+        ],
+        "defending": [
+          "anticipation",
+          "positioning",
+          "pace",
+          "concentration"
+        ],
+        "goalkeeping": [
+          "rushing_out",
+          "communication"
+        ]
+      }
+    },
+    {
+      "code": "TRANSITION_RESTRICT",
+      "name": "Transition - Restrict",
+      "category": "tactical",
+      "max_sessions_per_week": 2,
+      "impact": {
+        "condition": -6,
+        "fatigue": 5,
+        "happiness": 1,
+        "injuries": 3,
+        "sharpness": 3
+      },
+      "attributes": {
+        "attacking": [
+          "pace",
+          "off_the_ball",
+          "dribbling"
+        ],
+        "midfield": [
+          "positioning",
+          "teamwork",
+          "decisions",
+          "work_rate"
+        ],
+        "defending": [
+          "positioning",
+          "concentration",
+          "teamwork",
+          "decisions"
+        ],
+        "goalkeeping": [
+          "positioning",
+          "communication"
+        ]
+      }
+    },
+    {
+      "code": "QUICKNESS",
+      "name": "Quickness",
+      "category": "physical",
+      "max_sessions_per_week": 2,
+      "impact": {
+        "condition": -10,
+        "fatigue": 9,
+        "happiness": -1,
+        "injuries": 8,
+        "sharpness": 5
+      },
+      "attributes": {
+        "attacking": [
+          "pace",
+          "acceleration",
+          "agility"
+        ],
+        "midfield": [
+          "pace",
+          "acceleration",
+          "agility"
+        ],
+        "defending": [
+          "pace",
+          "acceleration",
+          "agility"
+        ],
+        "goalkeeping": [
+          "acceleration",
+          "agility",
+          "reflexes"
+        ]
+      }
+    },
+    {
+      "code": "ENDURANCE",
+      "name": "Endurance",
+      "category": "physical",
+      "max_sessions_per_week": 2,
+      "impact": {
+        "condition": -12,
+        "fatigue": 11,
+        "happiness": -2,
+        "injuries": 7,
+        "sharpness": 4
+      },
+      "attributes": {
+        "attacking": [
+          "stamina",
+          "work_rate",
+          "natural_fitness",
+          "determination"
+        ],
+        "midfield": [
+          "stamina",
+          "work_rate",
+          "natural_fitness",
+          "determination"
+        ],
+        "defending": [
+          "stamina",
+          "work_rate",
+          "natural_fitness",
+          "determination"
+        ],
+        "goalkeeping": [
+          "stamina",
+          "natural_fitness",
+          "concentration"
+        ]
+      }
+    },
+    {
+      "code": "RESISTANCE",
+      "name": "Resistance",
+      "category": "physical",
+      "max_sessions_per_week": 2,
+      "impact": {
+        "condition": -10,
+        "fatigue": 9,
+        "happiness": -1,
+        "injuries": 6,
+        "sharpness": 3
+      },
+      "attributes": {
+        "attacking": [
+          "strength",
+          "balance",
+          "jumping_reach"
+        ],
+        "midfield": [
+          "strength",
+          "balance",
+          "jumping_reach"
+        ],
+        "defending": [
+          "strength",
+          "balance",
+          "jumping_reach",
+          "bravery"
+        ],
+        "goalkeeping": [
+          "strength",
+          "balance",
+          "aerial_reach"
+        ]
+      }
+    },
+    {
+      "code": "GK_SHOT_STOPPING",
+      "name": "GK Shot Stopping",
+      "category": "goalkeeping",
+      "max_sessions_per_week": 3,
+      "impact": {
+        "condition": -5,
+        "fatigue": 4,
+        "happiness": 1,
+        "injuries": 3,
+        "sharpness": 3
+      },
+      "attributes": {
+        "attacking": [
+          "finishing",
+          "long_shots"
+        ],
+        "midfield": [
+          "long_shots"
+        ],
+        "defending": [
+          "positioning"
+        ],
+        "goalkeeping": [
+          "reflexes",
+          "one_on_ones",
+          "positioning",
+          "agility",
+          "concentration"
+        ]
+      }
+    },
+    {
+      "code": "GK_HANDLING_DIST",
+      "name": "GK Handling & Distribution",
+      "category": "goalkeeping",
+      "max_sessions_per_week": 3,
+      "impact": {
+        "condition": -5,
+        "fatigue": 4,
+        "happiness": 1,
+        "injuries": 2,
+        "sharpness": 3
+      },
+      "attributes": {
+        "attacking": [
+          "heading"
+        ],
+        "midfield": [
+          "first_touch"
+        ],
+        "defending": [
+          "first_touch"
+        ],
+        "goalkeeping": [
+          "handling",
+          "aerial_reach",
+          "command_of_area",
+          "kicking",
+          "throwing"
+        ]
+      }
+    },
+    {
+      "code": "SET_PIECES",
+      "name": "Set Pieces Delivery & Routines",
+      "category": "set_pieces",
+      "max_sessions_per_week": 2,
+      "impact": {
+        "condition": -3,
+        "fatigue": 2,
+        "happiness": 1,
+        "injuries": 1,
+        "sharpness": 2
+      },
+      "attributes": {
+        "attacking": [
+          "corners",
+          "free_kick_taking",
+          "penalty_taking",
+          "heading"
+        ],
+        "midfield": [
+          "corners",
+          "free_kick_taking",
+          "long_throws"
+        ],
+        "defending": [
+          "heading",
+          "jumping_reach",
+          "marking",
+          "concentration"
+        ],
+        "goalkeeping": [
+          "aerial_reach",
+          "command_of_area",
+          "communication"
+        ]
+      }
+    },
+    {
+      "code": "MATCH_PRACTICE",
+      "name": "Match Practice",
+      "category": "match_prep",
+      "max_sessions_per_week": 2,
+      "impact": {
+        "condition": -11,
+        "fatigue": 9,
+        "happiness": 3,
+        "injuries": 6,
+        "sharpness": 10
+      },
+      "attributes": {
+        "attacking": [
+          "off_the_ball",
+          "decisions",
+          "teamwork",
+          "finishing"
+        ],
+        "midfield": [
+          "passing",
+          "decisions",
+          "teamwork",
+          "positioning"
+        ],
+        "defending": [
+          "positioning",
+          "marking",
+          "teamwork",
+          "tackling"
+        ],
+        "goalkeeping": [
+          "positioning",
+          "communication",
+          "reflexes"
+        ]
+      }
+    },
+    {
+      "code": "MATCH_TACTICS",
+      "name": "Match Tactics & Preview",
+      "category": "match_prep",
+      "max_sessions_per_week": 3,
+      "impact": {
+        "condition": -2,
+        "fatigue": 2,
+        "happiness": 2,
+        "injuries": 1,
+        "sharpness": 4
+      },
+      "attributes": {
+        "attacking": [
+          "teamwork",
+          "decisions",
+          "off_the_ball"
+        ],
+        "midfield": [
+          "teamwork",
+          "decisions",
+          "positioning",
+          "vision"
+        ],
+        "defending": [
+          "teamwork",
+          "positioning",
+          "concentration"
+        ],
+        "goalkeeping": [
+          "communication",
+          "positioning"
+        ]
+      }
+    }
+  ]
+}

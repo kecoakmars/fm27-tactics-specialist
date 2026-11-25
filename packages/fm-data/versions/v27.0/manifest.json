@@ -1,0 +1,37 @@
+{
+  "patchVersion": "27.0",
+  "game": "FM27",
+  "releasedAt": "2026-11-01",
+  "generatedAt": "2026-11-25T03:24:28.968Z",
+  "sourceMode": "gdrive-rea",
+  "counts": {
+    "positions": 24,
+    "roles": 79,
+    "teamInstructionGroups": 29,
+    "playerInstructionGroups": 17,
+    "conflicts": 7,
+    "coachingSources": 23,
+    "coachingRules": 10,
+    "coachingAdjustments": 3,
+    "roleProfiles": 79,
+    "tacticalStyles": 13,
+    "shapes": 8,
+    "styleShapes": 16,
+    "trainingSessions": 28,
+    "trainingPresets": 4,
+    "staffCategories": 10,
+    "staffSeed": 42,
+    "wonderkidsSeed": 189
+  },
+  "checksums": {
+    "pitch-catalog.json": "66023ad61780cddb3216401bc070d3856e2e6d84ca2d6a31d92ff895a0e43aac",
+    "coaching-knowledge.json": "94463a42d0c404dc96fde6db852c6e1cb4fe1e76a3acd9ebc7264af1d8d7f050",
+    "role-profiles.json": "4d41de1fd9ee63c0e88ad0843f7d4f0bb0a33c477fa0dd6b4c9d993935ddf2a9",
+    "tactical-styles.json": "1c4f85269c6063ef9863743e25d5a7a6d4de5c13c478d14b240552650033afa9",
+    "training-sessions.json": "e0a23895ca34bad88eddfdf1adf4374221569162b08e6518aba51d849601d262",
+    "training-presets.json": "41ab13d73c2d8695e5c3f88f18aef33e45d0acd513d7c7c755f69267565d7fff",
+    "staff-formulas.json": "6c7cbf1d5328bc6f9405d3b2a7427ad5d96a7ccb837f2eac5c57e53a52a40622",
+    "staff-seed.json": "4d5fb6588d32a0e9a0627ffd3f2ab4edc323054dc1b44746d45f9cdabe2c9d62",
+    "wonderkids-seed.json": "3750c07a9be488fcae1b98082db747373a64697f9bbe2f05b94197860fd36949"
+  }
+}

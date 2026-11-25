@@ -1,0 +1,1336 @@
+{
+  "Mentalities": [
+    {
+      "Value": 1,
+      "Id": "VeryDefensive",
+      "Label": "Very Defensive"
+    },
+    {
+      "Value": 2,
+      "Id": "Defensive",
+      "Label": "Defensive"
+    },
+    {
+      "Value": 3,
+      "Id": "Cautious",
+      "Label": "Cautious"
+    },
+    {
+      "Value": 4,
+      "Id": "Balanced",
+      "Label": "Balanced"
+    },
+    {
+      "Value": 5,
+      "Id": "Positive",
+      "Label": "Positive"
+    },
+    {
+      "Value": 6,
+      "Id": "Attacking",
+      "Label": "Attacking"
+    },
+    {
+      "Value": 7,
+      "Id": "VeryAttacking",
+      "Label": "Very Attacking"
+    }
+  ],
+  "TacticalStyles": [
+    {
+      "Id": "Balanced",
+      "Name": "Balanced",
+      "Mentality": 4,
+      "MentalityLabel": "Balanced",
+      "DefensiveBlock": "mid",
+      "HighPress": false,
+      "Attributes": [
+        "decisions",
+        "positioning",
+        "passing",
+        "teamwork",
+        "work_rate",
+        "stamina"
+      ],
+      "Allows": [
+        "shape-01-4231-4411",
+        "shape-02-4231-press",
+        "shape-03-433-4141",
+        "shape-04-433-press",
+        "shape-05-442-block",
+        "shape-06-3421-5221",
+        "shape-07-4312-diamond",
+        "shape-08-352-532",
+        "shape-09-442-press",
+        "shape-10-4231-midblock",
+        "shape-11-433-midblock",
+        "shape-12-3421-541",
+        "shape-13-4312-433",
+        "shape-14-4222-box-press",
+        "shape-15-4222-442",
+        "shape-16-433-442-hybrid"
+      ],
+      "InstructionBits": {
+        "LineOfEngagement": 62
+      },
+      "PreferredRoles": [
+        "CentralMidfielder",
+        "CentreBack",
+        "FullBack",
+        "CentreForward"
+      ]
+    },
+    {
+      "Id": "ControlPossession",
+      "Name": "Control Possession",
+      "Mentality": 5,
+      "MentalityLabel": "Positive",
+      "DefensiveBlock": "high",
+      "HighPress": true,
+      "Attributes": [
+        "passing",
+        "first_touch",
+        "vision",
+        "composure",
+        "decisions",
+        "technique"
+      ],
+      "Allows": [
+        "shape-02-4231-press",
+        "shape-03-433-4141",
+        "shape-04-433-press",
+        "shape-06-3421-5221",
+        "shape-16-433-442-hybrid"
+      ],
+      "InstructionBits": {
+        "PassingDirectness": 3,
+        "Tempo": 48,
+        "Patience": 17,
+        "BuildUpStrategy": 7,
+        "GoalKicks": 44,
+        "GoalkeeperDistributionTarget": 35,
+        "DefensiveTransition": 70,
+        "LineOfEngagement": 61,
+        "DefensiveLine": 57,
+        "TriggerPress": 66
+      },
+      "PreferredRoles": [
+        "BallPlayingGoalkeeper",
+        "BallPlayingCentreBack",
+        "DeepLyingPlaymaker",
+        "InsideWingBack",
+        "AdvancedPlaymaker"
+      ]
+    },
+    {
+      "Id": "Gegenpress",
+      "Name": "Gegenpress",
+      "Mentality": 5,
+      "MentalityLabel": "Positive",
+      "DefensiveBlock": "high",
+      "HighPress": true,
+      "Attributes": [
+        "work_rate",
+        "stamina",
+        "aggression",
+        "acceleration",
+        "anticipation",
+        "pace"
+      ],
+      "Allows": [
+        "shape-02-4231-press",
+        "shape-04-433-press",
+        "shape-09-442-press",
+        "shape-14-4222-box-press"
+      ],
+      "InstructionBits": {
+        "PassingDirectness": 3,
+        "Tempo": 47,
+        "AttackingTransition": 54,
+        "DefensiveTransition": 70,
+        "LineOfEngagement": 61,
+        "DefensiveLine": 57,
+        "TriggerPress": 65,
+        "PreventShortGKDistribution": 69
+      },
+      "PreferredRoles": [
+        "OPTrackingCentreForward",
+        "InsideForward",
+        "BoxToBoxMidfielder",
+        "OPPressingCentralMidfielder",
+        "OPSweeperKeeper"
+      ]
+    },
+    {
+      "Id": "TikiTaka",
+      "Name": "Tiki-Taka",
+      "Mentality": 5,
+      "MentalityLabel": "Positive",
+      "DefensiveBlock": "high",
+      "HighPress": true,
+      "Attributes": [
+        "passing",
+        "first_touch",
+        "technique",
+        "composure",
+        "vision",
+        "agility"
+      ],
+      "Allows": [
+        "shape-03-433-4141",
+        "shape-04-433-press",
+        "shape-02-4231-press",
+        "shape-07-4312-diamond"
+      ],
+      "InstructionBits": {
+        "PassingDirectness": 4,
+        "Tempo": 48,
+        "AttackingWidth": 52,
+        "PassReception": 6,
+        "BuildUpStrategy": 7,
+        "Patience": 17,
+        "Dribbling": 14,
+        "GoalKicks": 44,
+        "GoalkeeperDistributionTarget": 35,
+        "DefensiveTransition": 70,
+        "LineOfEngagement": 61,
+        "DefensiveLine": 57,
+        "TriggerPress": 65
+      },
+      "PreferredRoles": [
+        "BallPlayingGoalkeeper",
+        "BallPlayingCentreBack",
+        "HalfBack",
+        "MidfieldPlaymaker",
+        "FalseNine"
+      ]
+    },
+    {
+      "Id": "VerticalTikiTaka",
+      "Name": "Vertical Tiki-Taka",
+      "Mentality": 5,
+      "MentalityLabel": "Positive",
+      "DefensiveBlock": "high",
+      "HighPress": true,
+      "Attributes": [
+        "passing",
+        "off_the_ball",
+        "first_touch",
+        "decisions",
+        "vision",
+        "acceleration"
+      ],
+      "Allows": [
+        "shape-07-4312-diamond",
+        "shape-13-4312-433",
+        "shape-14-4222-box-press",
+        "shape-04-433-press",
+        "shape-06-3421-5221"
+      ],
+      "InstructionBits": {
+        "PassingDirectness": 3,
+        "Tempo": 47,
+        "AttackingWidth": 52,
+        "ProgressThrough": 23,
+        "SupportingRuns": 28,
+        "BuildUpStrategy": 7,
+        "Patience": 17,
+        "DefensiveTransition": 70,
+        "LineOfEngagement": 61,
+        "DefensiveLine": 57,
+        "TriggerPress": 66
+      },
+      "PreferredRoles": [
+        "DeepLyingPlaymaker",
+        "ChannelMidfielder",
+        "SecondStriker",
+        "InsideWingBack"
+      ]
+    },
+    {
+      "Id": "WingPlay",
+      "Name": "Wing Play",
+      "Mentality": 5,
+      "MentalityLabel": "Positive",
+      "DefensiveBlock": "mid",
+      "HighPress": false,
+      "Attributes": [
+        "crossing",
+        "pace",
+        "acceleration",
+        "dribbling",
+        "stamina",
+        "jumping_reach"
+      ],
+      "Allows": [
+        "shape-05-442-block",
+        "shape-01-4231-4411",
+        "shape-03-433-4141",
+        "shape-08-352-532",
+        "shape-06-3421-5221"
+      ],
+      "InstructionBits": {
+        "PassingDirectness": 2,
+        "Tempo": 47,
+        "AttackingWidth": 51,
+        "ProgressThrough": 24,
+        "SupportingRunsSecondary": 25,
+        "Patience": 9,
+        "Crossing": 0,
+        "LineOfEngagement": 62,
+        "TriggerPress": 66
+      },
+      "PreferredRoles": [
+        "Winger",
+        "AdvancedWingBack",
+        "WingBack",
+        "TargetForward",
+        "BoxToBoxMidfielder"
+      ]
+    },
+    {
+      "Id": "FluidCounterAttack",
+      "Name": "Fluid Counter-Attack",
+      "Mentality": 3,
+      "MentalityLabel": "Cautious",
+      "DefensiveBlock": "mid",
+      "HighPress": false,
+      "Attributes": [
+        "pace",
+        "acceleration",
+        "dribbling",
+        "off_the_ball",
+        "passing",
+        "positioning"
+      ],
+      "Allows": [
+        "shape-01-4231-4411",
+        "shape-03-433-4141",
+        "shape-06-3421-5221",
+        "shape-08-352-532",
+        "shape-15-4222-442"
+      ],
+      "InstructionBits": {
+        "PassingDirectness": 0,
+        "Tempo": 47,
+        "PassReception": 5,
+        "AttackingTransition": 54,
+        "CreativeFreedom": 19,
+        "DefensiveTransition": 71,
+        "LineOfEngagement": 62,
+        "DefensiveLine": 58
+      },
+      "PreferredRoles": [
+        "InsideForward",
+        "ChannelForward",
+        "BoxToBoxPlaymaker",
+        "OPInsideOutletWinger"
+      ]
+    },
+    {
+      "Id": "DirectCounterAttack",
+      "Name": "Direct Counter-Attack",
+      "Mentality": 3,
+      "MentalityLabel": "Cautious",
+      "DefensiveBlock": "low",
+      "HighPress": false,
+      "Attributes": [
+        "pace",
+        "acceleration",
+        "passing",
+        "strength",
+        "positioning",
+        "work_rate"
+      ],
+      "Allows": [
+        "shape-05-442-block",
+        "shape-08-352-532",
+        "shape-12-3421-541",
+        "shape-01-4231-4411",
+        "shape-11-433-midblock"
+      ],
+      "InstructionBits": {
+        "PassingDirectness": 2,
+        "Tempo": 47,
+        "PassReception": 5,
+        "AttackingTransition": 54,
+        "GoalkeeperDistributionSpeed": 42,
+        "DefensiveTransition": 71,
+        "LineOfEngagement": 63,
+        "DefensiveLine": 58
+      },
+      "PreferredRoles": [
+        "ChannelForward",
+        "WideForward",
+        "OPSplittingOutletCentreForward",
+        "OPScreeningDefensiveMidfielder"
+      ]
+    },
+    {
+      "Id": "RouteOne",
+      "Name": "Route One",
+      "Mentality": 4,
+      "MentalityLabel": "Balanced",
+      "DefensiveBlock": "low",
+      "HighPress": false,
+      "Attributes": [
+        "jumping_reach",
+        "heading",
+        "strength",
+        "bravery",
+        "work_rate",
+        "aggression"
+      ],
+      "Allows": [
+        "shape-05-442-block",
+        "shape-08-352-532",
+        "shape-15-4222-442",
+        "shape-01-4231-4411"
+      ],
+      "InstructionBits": {
+        "PassingDirectness": 1,
+        "Tempo": 47,
+        "BuildUpStrategy": 8,
+        "Patience": 9,
+        "Crossing": 10,
+        "GoalKicks": 45,
+        "GoalkeeperDistributionTarget": 40,
+        "DefensiveTransition": 71,
+        "LineOfEngagement": 62,
+        "DefensiveLine": 58
+      },
+      "PreferredRoles": [
+        "TargetForward",
+        "Poacher",
+        "NoNonsenseCentreBack",
+        "WideMidfielder"
+      ]
+    },
+    {
+      "Id": "ParkTheBus",
+      "Name": "Park the Bus",
+      "Mentality": 1,
+      "MentalityLabel": "Very Defensive",
+      "DefensiveBlock": "low",
+      "HighPress": false,
+      "Attributes": [
+        "positioning",
+        "marking",
+        "tackling",
+        "concentration",
+        "strength",
+        "jumping_reach"
+      ],
+      "Allows": [
+        "shape-12-3421-541",
+        "shape-08-352-532",
+        "shape-03-433-4141",
+        "shape-05-442-block"
+      ],
+      "InstructionBits": {
+        "Tempo": 49,
+        "AttackingWidth": 52,
+        "AttackingTransition": 55,
+        "CreativeFreedom": 20,
+        "TimeWasting": 78,
+        "DefensiveTransition": 71,
+        "LineOfEngagement": 63,
+        "DefensiveLine": 59,
+        "TriggerPress": 67,
+        "Tackling": 73
+      },
+      "PreferredRoles": [
+        "NoNonsenseCentreBack",
+        "OPHoldingFullBack",
+        "OPScreeningDefensiveMidfielder",
+        "OPLineKeeper"
+      ]
+    },
+    {
+      "Id": "Catenaccio",
+      "Name": "Catenaccio",
+      "Mentality": 2,
+      "MentalityLabel": "Defensive",
+      "DefensiveBlock": "low",
+      "HighPress": false,
+      "Attributes": [
+        "positioning",
+        "marking",
+        "anticipation",
+        "tackling",
+        "concentration",
+        "decisions"
+      ],
+      "Allows": [
+        "shape-06-3421-5221",
+        "shape-08-352-532",
+        "shape-12-3421-541",
+        "shape-03-433-4141"
+      ],
+      "InstructionBits": {
+        "PassingDirectness": 2,
+        "AttackingTransition": 54,
+        "CreativeFreedom": 20,
+        "DefensiveTransition": 71,
+        "LineOfEngagement": 63,
+        "DefensiveLine": 58,
+        "DefensiveLineBehaviour": 77,
+        "PressingTrap": 81
+      },
+      "PreferredRoles": [
+        "OPCoveringCentreBack",
+        "OPStoppingCentreBack",
+        "OPScreeningDefensiveMidfielder",
+        "OPCentralOutletCentreForward"
+      ]
+    },
+    {
+      "Id": "HighTempoPress",
+      "Name": "High-Tempo Press",
+      "Mentality": 6,
+      "MentalityLabel": "Attacking",
+      "DefensiveBlock": "high",
+      "HighPress": true,
+      "Attributes": [
+        "acceleration",
+        "pace",
+        "stamina",
+        "work_rate",
+        "off_the_ball",
+        "aggression"
+      ],
+      "Allows": [
+        "shape-02-4231-press",
+        "shape-04-433-press",
+        "shape-09-442-press",
+        "shape-14-4222-box-press"
+      ],
+      "InstructionBits": {
+        "Tempo": 46,
+        "PassReception": 5,
+        "AttackingTransition": 54,
+        "DefensiveTransition": 70,
+        "LineOfEngagement": 61,
+        "DefensiveLine": 56,
+        "TriggerPress": 65,
+        "Tackling": 72
+      },
+      "PreferredRoles": [
+        "AdvancedWingBack",
+        "WideForward",
+        "ChannelForward",
+        "OPPressingWingBack"
+      ]
+    },
+    {
+      "Id": "PatientMidBlock",
+      "Name": "Patient Mid-Block",
+      "Mentality": 4,
+      "MentalityLabel": "Balanced",
+      "DefensiveBlock": "mid",
+      "HighPress": false,
+      "Attributes": [
+        "positioning",
+        "decisions",
+        "teamwork",
+        "passing",
+        "composure",
+        "concentration"
+      ],
+      "Allows": [
+        "shape-01-4231-4411",
+        "shape-10-4231-midblock",
+        "shape-11-433-midblock",
+        "shape-05-442-block",
+        "shape-16-433-442-hybrid"
+      ],
+      "InstructionBits": {
+        "PassingDirectness": 3,
+        "Tempo": 48,
+        "AttackingTransition": 55,
+        "DefensiveTransition": 71,
+        "LineOfEngagement": 62,
+        "DefensiveLine": 0,
+        "PressingTrap": 81
+      },
+      "PreferredRoles": [
+        "DefensiveMidfielder",
+        "OPScreeningCentralMidfielder",
+        "DeepLyingPlaymaker",
+        "FullBack"
+      ]
+    }
+  ],
+  "Shapes": [
+    {
+      "Id": "shape-01-4231-4411",
+      "InPossessionName": "4-2-3-1",
+      "OutOfPossessionName": "4-4-1-1",
+      "InSlots": [
+        "ST",
+        "AML",
+        "AMC",
+        "AMR",
+        "DML",
+        "DMR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "OutSlots": [
+        "ST",
+        "ML",
+        "AMC",
+        "MR",
+        "MCL",
+        "MCR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "HighPress": false
+    },
+    {
+      "Id": "shape-02-4231-press",
+      "InPossessionName": "4-2-3-1",
+      "OutOfPossessionName": "4-2-3-1",
+      "InSlots": [
+        "ST",
+        "AML",
+        "AMC",
+        "AMR",
+        "DML",
+        "DMR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "OutSlots": [
+        "ST",
+        "AML",
+        "AMC",
+        "AMR",
+        "DML",
+        "DMR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "HighPress": true
+    },
+    {
+      "Id": "shape-03-433-4141",
+      "InPossessionName": "4-3-3 DM",
+      "OutOfPossessionName": "4-1-4-1",
+      "InSlots": [
+        "AML",
+        "ST",
+        "AMR",
+        "MCL",
+        "MCR",
+        "DMC",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "OutSlots": [
+        "ML",
+        "ST",
+        "MR",
+        "MCL",
+        "MCR",
+        "DMC",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "HighPress": false
+    },
+    {
+      "Id": "shape-04-433-press",
+      "InPossessionName": "4-3-3 DM",
+      "OutOfPossessionName": "4-3-3 DM",
+      "InSlots": [
+        "AML",
+        "ST",
+        "AMR",
+        "MCL",
+        "MCR",
+        "DMC",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "OutSlots": [
+        "AML",
+        "ST",
+        "AMR",
+        "MCL",
+        "MCR",
+        "DMC",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "HighPress": true
+    },
+    {
+      "Id": "shape-05-442-block",
+      "InPossessionName": "4-4-2",
+      "OutOfPossessionName": "4-4-2",
+      "InSlots": [
+        "STL",
+        "STR",
+        "ML",
+        "MCL",
+        "MCR",
+        "MR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "OutSlots": [
+        "STL",
+        "STR",
+        "ML",
+        "MCL",
+        "MCR",
+        "MR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "HighPress": false
+    },
+    {
+      "Id": "shape-06-3421-5221",
+      "InPossessionName": "3-4-2-1",
+      "OutOfPossessionName": "5-2-2-1",
+      "InSlots": [
+        "ST",
+        "AMCL",
+        "AMCR",
+        "WBL",
+        "MCL",
+        "MCR",
+        "WBR",
+        "DCL",
+        "DC",
+        "DCR",
+        "GK"
+      ],
+      "OutSlots": [
+        "ST",
+        "AMCL",
+        "AMCR",
+        "DL",
+        "DML",
+        "DMR",
+        "DR",
+        "DCL",
+        "DC",
+        "DCR",
+        "GK"
+      ],
+      "HighPress": false
+    },
+    {
+      "Id": "shape-07-4312-diamond",
+      "InPossessionName": "4-3-1-2",
+      "OutOfPossessionName": "4-3-1-2",
+      "InSlots": [
+        "STL",
+        "STR",
+        "AMC",
+        "MCL",
+        "DMC",
+        "MCR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "OutSlots": [
+        "STL",
+        "STR",
+        "AMC",
+        "MCL",
+        "DMC",
+        "MCR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "HighPress": false
+    },
+    {
+      "Id": "shape-08-352-532",
+      "InPossessionName": "3-5-2",
+      "OutOfPossessionName": "5-3-2",
+      "InSlots": [
+        "STL",
+        "STR",
+        "WBL",
+        "MCL",
+        "DMC",
+        "MCR",
+        "WBR",
+        "DCL",
+        "DC",
+        "DCR",
+        "GK"
+      ],
+      "OutSlots": [
+        "STL",
+        "STR",
+        "DL",
+        "MCL",
+        "DMC",
+        "MCR",
+        "DR",
+        "DCL",
+        "DC",
+        "DCR",
+        "GK"
+      ],
+      "HighPress": false
+    }
+  ],
+  "StyleShapes": [
+    {
+      "Id": "shape-01-4231-4411",
+      "InPossessionName": "4-2-3-1",
+      "OutOfPossessionName": "4-4-1-1",
+      "InSlots": [
+        "ST",
+        "AML",
+        "AMC",
+        "AMR",
+        "DML",
+        "DMR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "OutSlots": [
+        "ST",
+        "ML",
+        "AMC",
+        "MR",
+        "MCL",
+        "MCR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "HighPress": false
+    },
+    {
+      "Id": "shape-02-4231-press",
+      "InPossessionName": "4-2-3-1",
+      "OutOfPossessionName": "4-2-3-1",
+      "InSlots": [
+        "ST",
+        "AML",
+        "AMC",
+        "AMR",
+        "DML",
+        "DMR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "OutSlots": [
+        "ST",
+        "AML",
+        "AMC",
+        "AMR",
+        "DML",
+        "DMR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "HighPress": true
+    },
+    {
+      "Id": "shape-03-433-4141",
+      "InPossessionName": "4-3-3 DM",
+      "OutOfPossessionName": "4-1-4-1",
+      "InSlots": [
+        "AML",
+        "ST",
+        "AMR",
+        "MCL",
+        "MCR",
+        "DMC",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "OutSlots": [
+        "ML",
+        "ST",
+        "MR",
+        "MCL",
+        "MCR",
+        "DMC",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "HighPress": false
+    },
+    {
+      "Id": "shape-04-433-press",
+      "InPossessionName": "4-3-3 DM",
+      "OutOfPossessionName": "4-3-3 DM",
+      "InSlots": [
+        "AML",
+        "ST",
+        "AMR",
+        "MCL",
+        "MCR",
+        "DMC",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "OutSlots": [
+        "AML",
+        "ST",
+        "AMR",
+        "MCL",
+        "MCR",
+        "DMC",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "HighPress": true
+    },
+    {
+      "Id": "shape-05-442-block",
+      "InPossessionName": "4-4-2",
+      "OutOfPossessionName": "4-4-2",
+      "InSlots": [
+        "STL",
+        "STR",
+        "ML",
+        "MCL",
+        "MCR",
+        "MR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "OutSlots": [
+        "STL",
+        "STR",
+        "ML",
+        "MCL",
+        "MCR",
+        "MR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "HighPress": false
+    },
+    {
+      "Id": "shape-06-3421-5221",
+      "InPossessionName": "3-4-2-1",
+      "OutOfPossessionName": "5-2-2-1",
+      "InSlots": [
+        "ST",
+        "AMCL",
+        "AMCR",
+        "WBL",
+        "MCL",
+        "MCR",
+        "WBR",
+        "DCL",
+        "DC",
+        "DCR",
+        "GK"
+      ],
+      "OutSlots": [
+        "ST",
+        "AMCL",
+        "AMCR",
+        "DL",
+        "DML",
+        "DMR",
+        "DR",
+        "DCL",
+        "DC",
+        "DCR",
+        "GK"
+      ],
+      "HighPress": false
+    },
+    {
+      "Id": "shape-07-4312-diamond",
+      "InPossessionName": "4-3-1-2",
+      "OutOfPossessionName": "4-3-1-2",
+      "InSlots": [
+        "STL",
+        "STR",
+        "AMC",
+        "MCL",
+        "DMC",
+        "MCR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "OutSlots": [
+        "STL",
+        "STR",
+        "AMC",
+        "MCL",
+        "DMC",
+        "MCR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "HighPress": false
+    },
+    {
+      "Id": "shape-08-352-532",
+      "InPossessionName": "3-5-2",
+      "OutOfPossessionName": "5-3-2",
+      "InSlots": [
+        "STL",
+        "STR",
+        "WBL",
+        "MCL",
+        "DMC",
+        "MCR",
+        "WBR",
+        "DCL",
+        "DC",
+        "DCR",
+        "GK"
+      ],
+      "OutSlots": [
+        "STL",
+        "STR",
+        "DL",
+        "MCL",
+        "DMC",
+        "MCR",
+        "DR",
+        "DCL",
+        "DC",
+        "DCR",
+        "GK"
+      ],
+      "HighPress": false
+    },
+    {
+      "Id": "shape-09-442-press",
+      "InPossessionName": "4-4-2",
+      "OutOfPossessionName": "4-4-2",
+      "InSlots": [
+        "STL",
+        "STR",
+        "ML",
+        "MCL",
+        "MCR",
+        "MR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "OutSlots": [
+        "STL",
+        "STR",
+        "ML",
+        "MCL",
+        "MCR",
+        "MR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "HighPress": true
+    },
+    {
+      "Id": "shape-10-4231-midblock",
+      "InPossessionName": "4-2-3-1",
+      "OutOfPossessionName": "4-2-3-1",
+      "InSlots": [
+        "ST",
+        "AML",
+        "AMC",
+        "AMR",
+        "DML",
+        "DMR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "OutSlots": [
+        "ST",
+        "AML",
+        "AMC",
+        "AMR",
+        "DML",
+        "DMR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "HighPress": false
+    },
+    {
+      "Id": "shape-11-433-midblock",
+      "InPossessionName": "4-3-3 DM",
+      "OutOfPossessionName": "4-3-3 DM",
+      "InSlots": [
+        "AML",
+        "ST",
+        "AMR",
+        "MCL",
+        "MCR",
+        "DMC",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "OutSlots": [
+        "AML",
+        "ST",
+        "AMR",
+        "MCL",
+        "MCR",
+        "DMC",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "HighPress": false
+    },
+    {
+      "Id": "shape-12-3421-541",
+      "InPossessionName": "3-4-2-1",
+      "OutOfPossessionName": "5-4-1",
+      "InSlots": [
+        "ST",
+        "AMCL",
+        "AMCR",
+        "WBL",
+        "MCL",
+        "MCR",
+        "WBR",
+        "DCL",
+        "DC",
+        "DCR",
+        "GK"
+      ],
+      "OutSlots": [
+        "ST",
+        "ML",
+        "MR",
+        "DL",
+        "MCL",
+        "MCR",
+        "DR",
+        "DCL",
+        "DC",
+        "DCR",
+        "GK"
+      ],
+      "HighPress": false
+    },
+    {
+      "Id": "shape-13-4312-433",
+      "InPossessionName": "4-3-1-2",
+      "OutOfPossessionName": "4-3-3 DM",
+      "InSlots": [
+        "STL",
+        "STR",
+        "AMC",
+        "MCL",
+        "DMC",
+        "MCR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "OutSlots": [
+        "AML",
+        "ST",
+        "AMR",
+        "MCL",
+        "DMC",
+        "MCR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "HighPress": false
+    },
+    {
+      "Id": "shape-14-4222-box-press",
+      "InPossessionName": "4-2-2-2",
+      "OutOfPossessionName": "4-2-2-2",
+      "InSlots": [
+        "STL",
+        "STR",
+        "AMCL",
+        "AMCR",
+        "DML",
+        "DMR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "OutSlots": [
+        "STL",
+        "STR",
+        "AMCL",
+        "AMCR",
+        "DML",
+        "DMR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "HighPress": true
+    },
+    {
+      "Id": "shape-15-4222-442",
+      "InPossessionName": "4-2-2-2",
+      "OutOfPossessionName": "4-4-2",
+      "InSlots": [
+        "STL",
+        "STR",
+        "AMCL",
+        "AMCR",
+        "DML",
+        "DMR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "OutSlots": [
+        "STL",
+        "STR",
+        "ML",
+        "MR",
+        "MCL",
+        "MCR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "HighPress": false
+    },
+    {
+      "Id": "shape-16-433-442-hybrid",
+      "InPossessionName": "4-3-3 DM",
+      "OutOfPossessionName": "4-4-2",
+      "InSlots": [
+        "AML",
+        "ST",
+        "AMR",
+        "MCL",
+        "MCR",
+        "DMC",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "OutSlots": [
+        "ML",
+        "STL",
+        "STR",
+        "MCL",
+        "MR",
+        "MCR",
+        "DL",
+        "DCL",
+        "DCR",
+        "DR",
+        "GK"
+      ],
+      "HighPress": false
+    }
+  ]
+}

@@ -1,0 +1,546 @@
+{
+  "ddmAttributes": [
+    "determination",
+    "level_of_discipline",
+    "motivating"
+  ],
+  "categories": [
+    {
+      "id": "defending_tactical",
+      "label": "Defending Tactical",
+      "group": "outfield",
+      "ddmWeight": 2,
+      "primaryWeights": {
+        "defending": 6,
+        "tactical": 3
+      },
+      "secondaryWeights": {},
+      "maxRawScore": 300,
+      "thresholds": [
+        {
+          "minScore": 0,
+          "stars": 0.5
+        },
+        {
+          "minScore": 48.6,
+          "stars": 1
+        },
+        {
+          "minScore": 81,
+          "stars": 1.5
+        },
+        {
+          "minScore": 113.4,
+          "stars": 2
+        },
+        {
+          "minScore": 140.4,
+          "stars": 2.5
+        },
+        {
+          "minScore": 167.4,
+          "stars": 3
+        },
+        {
+          "minScore": 194.4,
+          "stars": 3.5
+        },
+        {
+          "minScore": 216,
+          "stars": 4
+        },
+        {
+          "minScore": 237.6,
+          "stars": 4.5
+        },
+        {
+          "minScore": 253.8,
+          "stars": 5
+        }
+      ]
+    },
+    {
+      "id": "defending_technical",
+      "label": "Defending Technical",
+      "group": "outfield",
+      "ddmWeight": 2,
+      "primaryWeights": {
+        "defending": 6,
+        "technical": 3
+      },
+      "secondaryWeights": {},
+      "maxRawScore": 300,
+      "thresholds": [
+        {
+          "minScore": 0,
+          "stars": 0.5
+        },
+        {
+          "minScore": 48.6,
+          "stars": 1
+        },
+        {
+          "minScore": 81,
+          "stars": 1.5
+        },
+        {
+          "minScore": 113.4,
+          "stars": 2
+        },
+        {
+          "minScore": 140.4,
+          "stars": 2.5
+        },
+        {
+          "minScore": 167.4,
+          "stars": 3
+        },
+        {
+          "minScore": 194.4,
+          "stars": 3.5
+        },
+        {
+          "minScore": 216,
+          "stars": 4
+        },
+        {
+          "minScore": 237.6,
+          "stars": 4.5
+        },
+        {
+          "minScore": 253.8,
+          "stars": 5
+        }
+      ]
+    },
+    {
+      "id": "attacking_tactical",
+      "label": "Attacking Tactical",
+      "group": "outfield",
+      "ddmWeight": 2,
+      "primaryWeights": {
+        "attacking": 6,
+        "tactical": 3
+      },
+      "secondaryWeights": {},
+      "maxRawScore": 300,
+      "thresholds": [
+        {
+          "minScore": 0,
+          "stars": 0.5
+        },
+        {
+          "minScore": 48.6,
+          "stars": 1
+        },
+        {
+          "minScore": 81,
+          "stars": 1.5
+        },
+        {
+          "minScore": 113.4,
+          "stars": 2
+        },
+        {
+          "minScore": 140.4,
+          "stars": 2.5
+        },
+        {
+          "minScore": 167.4,
+          "stars": 3
+        },
+        {
+          "minScore": 194.4,
+          "stars": 3.5
+        },
+        {
+          "minScore": 216,
+          "stars": 4
+        },
+        {
+          "minScore": 237.6,
+          "stars": 4.5
+        },
+        {
+          "minScore": 253.8,
+          "stars": 5
+        }
+      ]
+    },
+    {
+      "id": "attacking_technical",
+      "label": "Attacking Technical",
+      "group": "outfield",
+      "ddmWeight": 2,
+      "primaryWeights": {
+        "attacking": 6,
+        "technical": 3
+      },
+      "secondaryWeights": {},
+      "maxRawScore": 300,
+      "thresholds": [
+        {
+          "minScore": 0,
+          "stars": 0.5
+        },
+        {
+          "minScore": 48.6,
+          "stars": 1
+        },
+        {
+          "minScore": 81,
+          "stars": 1.5
+        },
+        {
+          "minScore": 113.4,
+          "stars": 2
+        },
+        {
+          "minScore": 140.4,
+          "stars": 2.5
+        },
+        {
+          "minScore": 167.4,
+          "stars": 3
+        },
+        {
+          "minScore": 194.4,
+          "stars": 3.5
+        },
+        {
+          "minScore": 216,
+          "stars": 4
+        },
+        {
+          "minScore": 237.6,
+          "stars": 4.5
+        },
+        {
+          "minScore": 253.8,
+          "stars": 5
+        }
+      ]
+    },
+    {
+      "id": "possession_tactical",
+      "label": "Possession Tactical",
+      "group": "outfield",
+      "ddmWeight": 2,
+      "primaryWeights": {
+        "mental": 6,
+        "tactical": 3
+      },
+      "secondaryWeights": {},
+      "maxRawScore": 300,
+      "thresholds": [
+        {
+          "minScore": 0,
+          "stars": 0.5
+        },
+        {
+          "minScore": 48.6,
+          "stars": 1
+        },
+        {
+          "minScore": 81,
+          "stars": 1.5
+        },
+        {
+          "minScore": 113.4,
+          "stars": 2
+        },
+        {
+          "minScore": 140.4,
+          "stars": 2.5
+        },
+        {
+          "minScore": 167.4,
+          "stars": 3
+        },
+        {
+          "minScore": 194.4,
+          "stars": 3.5
+        },
+        {
+          "minScore": 216,
+          "stars": 4
+        },
+        {
+          "minScore": 237.6,
+          "stars": 4.5
+        },
+        {
+          "minScore": 253.8,
+          "stars": 5
+        }
+      ]
+    },
+    {
+      "id": "possession_technical",
+      "label": "Possession Technical",
+      "group": "outfield",
+      "ddmWeight": 2,
+      "primaryWeights": {
+        "mental": 3,
+        "technical": 6
+      },
+      "secondaryWeights": {},
+      "maxRawScore": 300,
+      "thresholds": [
+        {
+          "minScore": 0,
+          "stars": 0.5
+        },
+        {
+          "minScore": 48.6,
+          "stars": 1
+        },
+        {
+          "minScore": 81,
+          "stars": 1.5
+        },
+        {
+          "minScore": 113.4,
+          "stars": 2
+        },
+        {
+          "minScore": 140.4,
+          "stars": 2.5
+        },
+        {
+          "minScore": 167.4,
+          "stars": 3
+        },
+        {
+          "minScore": 194.4,
+          "stars": 3.5
+        },
+        {
+          "minScore": 216,
+          "stars": 4
+        },
+        {
+          "minScore": 237.6,
+          "stars": 4.5
+        },
+        {
+          "minScore": 253.8,
+          "stars": 5
+        }
+      ]
+    },
+    {
+      "id": "gk_shot_stopping",
+      "label": "GK Shot Stopping",
+      "group": "goalkeeping",
+      "ddmWeight": 2,
+      "primaryWeights": {
+        "gk_shot_stopping": 9
+      },
+      "secondaryWeights": {},
+      "maxRawScore": 300,
+      "thresholds": [
+        {
+          "minScore": 0,
+          "stars": 0.5
+        },
+        {
+          "minScore": 48.6,
+          "stars": 1
+        },
+        {
+          "minScore": 81,
+          "stars": 1.5
+        },
+        {
+          "minScore": 113.4,
+          "stars": 2
+        },
+        {
+          "minScore": 140.4,
+          "stars": 2.5
+        },
+        {
+          "minScore": 167.4,
+          "stars": 3
+        },
+        {
+          "minScore": 194.4,
+          "stars": 3.5
+        },
+        {
+          "minScore": 216,
+          "stars": 4
+        },
+        {
+          "minScore": 237.6,
+          "stars": 4.5
+        },
+        {
+          "minScore": 253.8,
+          "stars": 5
+        }
+      ]
+    },
+    {
+      "id": "gk_handling",
+      "label": "GK Handling & Distribution",
+      "group": "goalkeeping",
+      "ddmWeight": 2,
+      "primaryWeights": {
+        "gk_handling": 6,
+        "gk_distribution": 3
+      },
+      "secondaryWeights": {},
+      "maxRawScore": 300,
+      "thresholds": [
+        {
+          "minScore": 0,
+          "stars": 0.5
+        },
+        {
+          "minScore": 48.6,
+          "stars": 1
+        },
+        {
+          "minScore": 81,
+          "stars": 1.5
+        },
+        {
+          "minScore": 113.4,
+          "stars": 2
+        },
+        {
+          "minScore": 140.4,
+          "stars": 2.5
+        },
+        {
+          "minScore": 167.4,
+          "stars": 3
+        },
+        {
+          "minScore": 194.4,
+          "stars": 3.5
+        },
+        {
+          "minScore": 216,
+          "stars": 4
+        },
+        {
+          "minScore": 237.6,
+          "stars": 4.5
+        },
+        {
+          "minScore": 253.8,
+          "stars": 5
+        }
+      ]
+    },
+    {
+      "id": "fitness_strength",
+      "label": "Fitness (Strength)",
+      "group": "fitness",
+      "ddmWeight": 2,
+      "primaryWeights": {
+        "fitness": 9
+      },
+      "secondaryWeights": {},
+      "maxRawScore": 300,
+      "thresholds": [
+        {
+          "minScore": 0,
+          "stars": 0.5
+        },
+        {
+          "minScore": 48.6,
+          "stars": 1
+        },
+        {
+          "minScore": 81,
+          "stars": 1.5
+        },
+        {
+          "minScore": 113.4,
+          "stars": 2
+        },
+        {
+          "minScore": 140.4,
+          "stars": 2.5
+        },
+        {
+          "minScore": 167.4,
+          "stars": 3
+        },
+        {
+          "minScore": 194.4,
+          "stars": 3.5
+        },
+        {
+          "minScore": 216,
+          "stars": 4
+        },
+        {
+          "minScore": 237.6,
+          "stars": 4.5
+        },
+        {
+          "minScore": 253.8,
+          "stars": 5
+        }
+      ]
+    },
+    {
+      "id": "fitness_quickness",
+      "label": "Fitness (Quickness)",
+      "group": "fitness",
+      "ddmWeight": 2,
+      "primaryWeights": {
+        "fitness": 9
+      },
+      "secondaryWeights": {},
+      "maxRawScore": 300,
+      "thresholds": [
+        {
+          "minScore": 0,
+          "stars": 0.5
+        },
+        {
+          "minScore": 48.6,
+          "stars": 1
+        },
+        {
+          "minScore": 81,
+          "stars": 1.5
+        },
+        {
+          "minScore": 113.4,
+          "stars": 2
+        },
+        {
+          "minScore": 140.4,
+          "stars": 2.5
+        },
+        {
+          "minScore": 167.4,
+          "stars": 3
+        },
+        {
+          "minScore": 194.4,
+          "stars": 3.5
+        },
+        {
+          "minScore": 216,
+          "stars": 4
+        },
+        {
+          "minScore": 237.6,
+          "stars": 4.5
+        },
+        {
+          "minScore": 253.8,
+          "stars": 5
+        }
+      ]
+    }
+  ]
+}

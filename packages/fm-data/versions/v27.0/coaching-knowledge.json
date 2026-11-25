@@ -1,0 +1,435 @@
+{
+  "Schema": 1,
+  "Game": "FM27",
+  "Sources": [
+    {
+      "Id": "uefa-city-bayern",
+      "Publisher": "UEFA",
+      "Title": "In the Zone: Manchester City 3–0 Bayern",
+      "Date": "2023-04-12",
+      "Kind": "match observation",
+      "Coach": "Pep Guardiola",
+      "Context": "Champions League quarter-final, first leg",
+      "Url": "https://www.uefa.com/uefachampionsleague/news/0280-17c6b1ac9a53-0dc7fbd642da-1000--in-the-zone-city-slickers/",
+      "Observation": "City added a midfielder from the back line to build with two central links behind its front five."
+    },
+    {
+      "Id": "uefa-city-inter",
+      "Publisher": "UEFA",
+      "Title": "In the Zone: Manchester City 1–0 Inter",
+      "Date": "2023-06-13",
+      "Kind": "match observation",
+      "Coach": "Pep Guardiola; Simone Inzaghi",
+      "Context": "2023 Champions League final",
+      "Url": "https://www.uefa.com/uefachampionsleague/news/0282-183fa8a707c0-4056c043e3d1-1000--in-the-zone-city-s-winning-formula/",
+      "Observation": "Inter disrupted the pivot and stepping defenders opened spaces behind them. City found a goal through a delayed midfield arrival and a cutback."
+    },
+    {
+      "Id": "uefa-ancelotti",
+      "Publisher": "UEFA",
+      "Title": "The importance of in-game management",
+      "Date": "2024-04-19",
+      "Kind": "match observation",
+      "Coach": "Carlo Ancelotti; Pep Guardiola",
+      "Context": "Manchester City–Real Madrid, 2024 Champions League quarter-final",
+      "Url": "https://www.uefa.com/uefachampionsleague/news/028c-1ab88d1dbff7-a3a7970115ff-1000--insights-in-game-management/",
+      "Observation": "City moved the ball across a back three to draw a striker from Madrid’s 4-4-2 and create space for a central receiver."
+    },
+    {
+      "Id": "uefa-conte",
+      "Publisher": "UEFA",
+      "Title": "Europa League final: How Antonio Conte upgraded Inter",
+      "Date": "2020-08-21",
+      "Kind": "case study",
+      "Coach": "Antonio Conte",
+      "Context": "Inter, 2019/20 Europa League campaign",
+      "Url": "https://www.uefa.com/uefaeuropaleague/news/0260-102ac106cb33-724a5b4a4061-1000--europa-league-final-how-antonio-conte-has-upgraded-inter/",
+      "Observation": "The three-centre-back structure supported advanced wing-backs, a holding midfielder, and forwards with complementary strengths."
+    },
+    {
+      "Id": "uefa-alonso",
+      "Publisher": "UEFA",
+      "Title": "Match analysis: Roma 0–2 Leverkusen",
+      "Date": "2024-05-03",
+      "Kind": "match observation",
+      "Coach": "Xabi Alonso",
+      "Context": "Europa League semi-final, first leg",
+      "Url": "https://www.uefa.com/uefaeuropaleague/news/028d-1accfa931ee3-38e36dfbf67e-1000--analysis-roma-0-2-leverkusen/",
+      "Observation": "The deep midfield pair found central passing lanes. Wing-backs changed lanes and attacked gaps created by the striker and attacking midfielders."
+    },
+    {
+      "Id": "uefa-leverkusen-loss",
+      "Publisher": "UEFA",
+      "Title": "Technical reports: 2023/24 club competitions",
+      "Date": "2024-08-28",
+      "Kind": "tournament review",
+      "Coach": "Xabi Alonso; Gian Piero Gasperini",
+      "Context": "Atalanta–Leverkusen, Europa League final",
+      "Url": "https://www.uefa.com/uefaeuropaleague/news/0290-1bb668af762e-7df3ad2e2d47-1000--technical-reports-read-the-2023-24-reports-for-the-champions/",
+      "Observation": "Atalanta denied Leverkusen’s build-up options with aggressive player-to-player pressure. The approach depended on defenders capable of handling isolated duels."
+    },
+    {
+      "Id": "uefa-klopp",
+      "Publisher": "UEFA",
+      "Title": "In the Zone: Benfica 1–3 Liverpool",
+      "Date": "2022-04-07",
+      "Kind": "match observation",
+      "Coach": "Jürgen Klopp",
+      "Context": "Champions League quarter-final, first leg",
+      "Url": "https://www.uefa.com/uefachampionsleague/news/0274-14dc4a196f80-f1a91d173185-1000--in-the-zone-benfica-1-3-liverpool/",
+      "Observation": "A compact counter-press and a high line helped Liverpool recover possession. The centre-backs needed to protect substantial space behind them."
+    },
+    {
+      "Id": "uefa-klopp-final",
+      "Publisher": "UEFA",
+      "Title": "2015/16 Europa League technical report",
+      "Date": "2016",
+      "Kind": "tournament review",
+      "Coach": "Jürgen Klopp; Unai Emery; Sir Alex Ferguson (technical observer)",
+      "Context": "Liverpool–Sevilla final and sustainability of pressing",
+      "Url": "https://www.uefa.com/MultimediaFiles/Download/Publications/uefaorg/General/02/40/05/26/2400526_DOWNLOAD.pdf",
+      "Observation": "Liverpool’s early pressure in the final became harder to sustain. UEFA’s observers examined the spacing and physical demands that followed."
+    },
+    {
+      "Id": "uefa-arteta",
+      "Publisher": "UEFA",
+      "Title": "Arsenal’s aggressive pressing against Paris",
+      "Date": "2024-10-03",
+      "Kind": "match observation",
+      "Coach": "Mikel Arteta; Luis Enrique",
+      "Context": "2024/25 Champions League league phase",
+      "Url": "https://www.uefa.com/uefachampionsleague/news/0292-1c02f40dbe61-2f1cf9f30c1f-1000--champions-league-performance-insights-arsenals-aggressive-pressing-against-paris/",
+      "Observation": "Arsenal pressed as a unit from a compact block, directing play towards one flank. The line behind the first press supported the move."
+    },
+    {
+      "Id": "fifa-block",
+      "Publisher": "FIFA Technical Study Group",
+      "Title": "Controlling the game without the ball",
+      "Date": "2023",
+      "Kind": "tournament review",
+      "Context": "Qatar 2022 knockout rounds",
+      "Url": "https://www.fifatrainingcentre.com/en/fwc2022/technical-and-tactical-analysis/controlling-the-game-without-the-ball--the-mid-block-and-compactness.php",
+      "Observation": "A connected mid-block can close central lanes while conceding some width. Counter-attacks become available as the attacking side commits more players."
+    },
+    {
+      "Id": "fifa-rest-defence",
+      "Publisher": "FIFA Technical Study Group",
+      "Title": "Group-stage review: Counter-pressing and goalkeeper distribution",
+      "Date": "2026-06-30",
+      "Kind": "tournament review",
+      "Context": "2026 World Cup group stage",
+      "Url": "https://www.fifatrainingcentre.com/en/fifa-world-cup-2026/group-stage-review.php",
+      "Observation": "Short collective pressing distances and cover behind the press helped teams contain transitions. FIFA highlighted the use of three defenders with two players screening ahead."
+    },
+    {
+      "Id": "fifa-france",
+      "Publisher": "FIFA Training Centre",
+      "Title": "France: Rest attack and counter-attacking efficiency",
+      "Date": "2026",
+      "Kind": "case study",
+      "Coach": "Didier Deschamps",
+      "Context": "France at Qatar 2022",
+      "Url": "https://www.fifatrainingcentre.com/en/game/game-analysis/world-class-tactics/france-rest-attack-enhances-counter-attacking-efficiency.php",
+      "Observation": "France kept an advanced outlet available before winning the ball. The position of that outlet shaped the first pass after the regain."
+    },
+    {
+      "Id": "fifa-wing",
+      "Publisher": "FIFA Training Centre",
+      "Title": "Wing play with Aidy Boothroyd",
+      "Date": "2022",
+      "Kind": "coaching session",
+      "Coach": "Aidy Boothroyd",
+      "Context": "Elite coaching practice",
+      "Url": "https://www.fifatrainingcentre.com/en/practice/elite-sessions/in-possession/wing-play.php",
+      "Observation": "Wide progression depends on supporting movements and timing as well as the ability of the player providing width."
+    },
+    {
+      "Id": "fa-transition",
+      "Publisher": "The FA",
+      "Title": "How to coach transition",
+      "Date": "2020-03-11",
+      "Kind": "coach education",
+      "Coach": "Marieanne Spacey; John Peacock",
+      "Context": "England coaching practice",
+      "Url": "https://www.thefa.com/bootroom/resources/coaching/how-to-coach-transition",
+      "Observation": "The first presser or runner needs support. A defender can adjust to cover a full-back who advances."
+    },
+    {
+      "Id": "fa-compact",
+      "Publisher": "The FA",
+      "Title": "How to defend like England: transition",
+      "Date": "2021-03-05",
+      "Kind": "coach education",
+      "Context": "England national-team analysis",
+      "Url": "https://www.thefa.com/bootroom/resources/coaching/how-to-defend-like-england-transition",
+      "Observation": "Recovering defenders protect the central space and delay the attack until teammates can recover."
+    },
+    {
+      "Id": "uefa-wide",
+      "Publisher": "UEFA",
+      "Title": "2022/23 Champions League tactical talking points",
+      "Date": "2023",
+      "Kind": "tournament review",
+      "Context": "Manchester City, Bayern and Chelsea in the Champions League",
+      "Url": "https://www.uefa.com/uefachampionsleague/news/0282-1839121e5648-4e3e6286e1b8-1000--2022-23-champions-league-tactical-talking-points/",
+      "Observation": "Bayern used one wide player to provide delivery and the opposite side to attack the box. City used central connections to open the far side."
+    },
+    {
+      "Id": "fm-phases",
+      "Publisher": "Sports Interactive",
+      "Title": "In Possession, Out of Possession: FM’s tactical evolution",
+      "Date": "2025",
+      "Kind": "game documentation",
+      "Context": "Dual shapes and phase-specific roles",
+      "Url": "https://www.footballmanager.com/fm26/features/possession-out-possession-fm26s-new-tactical-evolution",
+      "Observation": "FM represents the two phases as separate shapes and roles. The same player can occupy different locations across those phases."
+    },
+    {
+      "Id": "fifa-michels",
+      "Publisher": "FIFA",
+      "Title": "The watchmaker behind the Clockwork Oranje",
+      "Date": "2020",
+      "Kind": "historical case study",
+      "Coach": "Rinus Michels",
+      "Context": "Netherlands, 1974 World Cup",
+      "Url": "https://inside.fifa.com/en/news/the-watchmaker-behind-the-clockwork-oranje",
+      "Observation": "Wingers and overlapping full-backs stretched the pitch while Johan Cruyff moved to find openings. Position changes depended on movement, fitness and understanding."
+    },
+    {
+      "Id": "barca-cruyff",
+      "Publisher": "FC Barcelona",
+      "Title": "FC Barcelona commemorates Johan Cruyff’s legacy",
+      "Date": "2026",
+      "Kind": "club archive",
+      "Coach": "Johan Cruyff",
+      "Context": "Barcelona’s Dream Team and four consecutive league titles",
+      "Url": "https://www.fcbarcelona.com/en/club/news/4475611/fc-barcelona-marks-10th-anniversary-of-johan-cruyffs-death-with-campaign-reaffirming-his-legacy-as-a-language-of-the-future",
+      "Observation": "Barcelona describes Cruyff’s coaching model in terms of keeping the ball, finding space and creating numerical superiority."
+    },
+    {
+      "Id": "uefa-sacchi",
+      "Publisher": "UEFA",
+      "Title": "Coach profile: Arrigo Sacchi",
+      "Date": "2016",
+      "Kind": "historical case study",
+      "Coach": "Arrigo Sacchi",
+      "Context": "AC Milan’s European Cup-winning sides",
+      "Url": "https://it.uefa.com/uefachampionsleague/news/022f-0e94dc2f89cf-79a3d9f5abd7-1000--profilo-arrigo-sacchi/",
+      "Observation": "Sacchi’s high line and zonal 4-4-2 required coordinated pressure and movements across the whole team."
+    },
+    {
+      "Id": "uefa-ferguson",
+      "Publisher": "UEFA",
+      "Title": "2008/09 Champions League technical report",
+      "Date": "2009",
+      "Kind": "tournament review",
+      "Coach": "Sir Alex Ferguson",
+      "Context": "Manchester United team profile",
+      "Url": "https://www.uefa.com/MultimediaFiles/Download/Publications/uefa/UEFAMedia/88/42/23/884223_DOWNLOAD.pdf",
+      "Observation": "United combined screening midfielders, overlapping full-backs and quick counters from different starting depths."
+    },
+    {
+      "Id": "uefa-wenger",
+      "Publisher": "UEFA",
+      "Title": "2006/07 Champions League technical report",
+      "Date": "2007",
+      "Kind": "tournament review",
+      "Coach": "Arsène Wenger",
+      "Context": "Arsenal team profile",
+      "Url": "https://www.uefa.com/newsfiles/618436.pdf",
+      "Observation": "Arsenal used a holding player in midfield and quick transitions. The team could move between 4-4-2 and 4-5-1."
+    },
+    {
+      "Id": "uefa-simeone",
+      "Publisher": "UEFA",
+      "Title": "Inter’s effective pressing against Atlético de Madrid",
+      "Date": "2024-02-23",
+      "Kind": "match observation",
+      "Coach": "Diego Simeone; Simone Inzaghi",
+      "Context": "Champions League round of 16, first leg",
+      "Url": "https://www.uefa.com/uefachampionsleague/news/028a-1a3ff4bbce0b-2e94fa110758-1000--champions-league-performance-insights-inter-s-effective-/",
+      "Observation": "Atlético alternated an advanced block with a compact mid-block and chose when to apply pressure."
+    }
+  ],
+  "Rules": [
+    {
+      "Id": "rest-defence",
+      "Title": "Cover behind the attack",
+      "When": "all",
+      "Metric": "cover",
+      "Target": 13,
+      "Weight": 1.35,
+      "Sources": [
+        "fifa-rest-defence",
+        "fa-transition",
+        "fa-compact"
+      ],
+      "Detail": "Checks the central defenders, a holding player and the cover left when a full-back or wing-back advances."
+    },
+    {
+      "Id": "width",
+      "Title": "Width and wide support",
+      "When": "all",
+      "Metric": "width",
+      "Target": 12.5,
+      "Weight": 0.85,
+      "Sources": [
+        "fifa-wing",
+        "fifa-michels",
+        "uefa-wide",
+        "uefa-ferguson"
+      ],
+      "Detail": "Checks both flanks and gives extra importance to the weaker outlet. Wide slots, winger roles and overlapping players can provide width."
+    },
+    {
+      "Id": "press",
+      "Title": "First press and supporting line",
+      "When": "high",
+      "Metric": "press",
+      "Target": 13,
+      "Weight": 1.3,
+      "Sources": [
+        "uefa-klopp",
+        "uefa-sacchi",
+        "uefa-klopp-final",
+        "uefa-arteta",
+        "uefa-leverkusen-loss"
+      ],
+      "Detail": "Checks the front players and midfield support separately, with extra weight on the weakest recovery defender. The engine can moderate the pressing frequency."
+    },
+    {
+      "Id": "block",
+      "Title": "Midfield screen and compact block",
+      "When": "block",
+      "Metric": "screen",
+      "Target": 12.5,
+      "Weight": 1.15,
+      "Sources": [
+        "fifa-block",
+        "uefa-simeone",
+        "fa-compact",
+        "uefa-wenger"
+      ],
+      "Detail": "Looks for players able to screen central lanes in front of the defensive line."
+    },
+    {
+      "Id": "build-up",
+      "Title": "Build-up connections",
+      "When": "short",
+      "Metric": "build",
+      "Target": 13,
+      "Weight": 1.1,
+      "Sources": [
+        "uefa-city-bayern",
+        "barca-cruyff",
+        "uefa-city-inter",
+        "uefa-ancelotti",
+        "uefa-leverkusen-loss",
+        "fm-phases"
+      ],
+      "Detail": "Checks the defenders who start moves and the midfielders who receive under pressure. A strong average gives limited reassurance when one link struggles."
+    },
+    {
+      "Id": "wing-backs",
+      "Title": "Wing-backs and recovery",
+      "When": "wingbacks",
+      "Metric": "wingbacks",
+      "Target": 13,
+      "Weight": 1.35,
+      "Sources": [
+        "uefa-conte",
+        "uefa-alonso",
+        "fifa-wing"
+      ],
+      "Detail": "Tests both wing-backs for delivery, stamina, positioning and recovery to their defensive slots."
+    },
+    {
+      "Id": "forwards",
+      "Title": "Forward partnership",
+      "When": "two-forwards",
+      "Metric": "partnership",
+      "Target": 12.5,
+      "Weight": 0.9,
+      "Sources": [
+        "uefa-conte",
+        "fa-transition"
+      ],
+      "Detail": "Checks whether the pair offers both a player to link attacks and a runner who can stretch the back line."
+    },
+    {
+      "Id": "transition",
+      "Title": "Counter-attack outlet",
+      "When": "counter",
+      "Metric": "counter",
+      "Target": 13,
+      "Weight": 1.05,
+      "Sources": [
+        "fifa-france",
+        "uefa-ferguson",
+        "fa-transition",
+        "uefa-alonso",
+        "uefa-wenger"
+      ],
+      "Detail": "Checks the threat that stays available in the defensive shape and the supporting players who can supply the first forward pass."
+    },
+    {
+      "Id": "direct",
+      "Title": "First ball and second ball",
+      "When": "direct",
+      "Metric": "direct",
+      "Target": 13,
+      "Weight": 1.1,
+      "Sources": [
+        "uefa-conte",
+        "uefa-leverkusen-loss"
+      ],
+      "Detail": "Checks that the direct outlet can contest the first pass and that nearby players can collect the second ball."
+    },
+    {
+      "Id": "delivery",
+      "Title": "Wide delivery and box presence",
+      "When": "wide",
+      "Metric": "delivery",
+      "Target": 13,
+      "Weight": 1,
+      "Sources": [
+        "uefa-wide",
+        "fifa-wing",
+        "uefa-city-inter"
+      ],
+      "Detail": "Pairs the quality of wide service with movement and aerial presence in the box."
+    }
+  ],
+  "Adjustments": [
+    {
+      "Metric": "press",
+      "Style": "Gegenpress",
+      "Group": "TriggerPress",
+      "From": 65,
+      "To": 66,
+      "Below": 12.5,
+      "Prefix": "Trigger Press",
+      "Text": "More Often. Keep the high press and use more selective pressing triggers."
+    },
+    {
+      "Metric": "build",
+      "Style": "Control Possession",
+      "Group": "BuildUpStrategy",
+      "From": 7,
+      "To": 0,
+      "Below": 11,
+      "Prefix": "Build-up strategy",
+      "Text": "Standard. Use a safe outlet when the central build-up is under pressure."
+    },
+    {
+      "Metric": "aerial",
+      "Style": "Wing Play",
+      "Group": "Crossing",
+      "From": 0,
+      "To": 12,
+      "Below": 12.5,
+      "Prefix": "Crossing",
+      "Text": "Low Crosses. Look for cutbacks when the XI lacks a strong aerial target."
+    }
+  ]
+}

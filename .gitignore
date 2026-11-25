@@ -1,0 +1,32 @@
+# Dependencies & Build Artifacts
+node_modules/
+.pnp/
+.pnp.js
+dist/
+build/
+out/
+.next/
+.turbo/
+coverage/
+*.tsbuildinfo
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# Anti-Leak REA & Ephemeral Reference Guards (NON-NEGOTIABLE)
+_reference/
+/tmp/
+tmp/
+fm-refs/
+extracted-runtime/
+07-rea-evidence/
+
+# OS & Logs
+.DS_Store
+Thumbs.db
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

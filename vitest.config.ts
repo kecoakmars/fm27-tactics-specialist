@@ -1,0 +1,15 @@
+import { defineConfig } from "vitest/config";
+import path from "node:path";
+
+export default defineConfig({
+  resolve: {
+    alias: {
+      "@fm27/shared-types": path.resolve(__dirname, "packages/shared-types/src/index.ts"),
+      "@fm27/fm-data": path.resolve(__dirname, "packages/fm-data/src/index.ts"),
+    },
+  },
+  test: {
+    include: ["tests/**/*.spec.ts", "packages/**/*.spec.ts"],
+    environment: "node",
+  },
+});

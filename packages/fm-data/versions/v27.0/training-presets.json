@@ -1,0 +1,224 @@
+{
+  "Presets": [
+    {
+      "id": "pre-season-conditioning",
+      "name": "Pre-Season Conditioning & Tactical Cohesion",
+      "description": "Builds match sharpness, endurance, quickness, and dual-phase tactical familiarity before competitive fixtures.",
+      "focus_tags": [
+        "pre-season",
+        "physical",
+        "sharpness"
+      ],
+      "patchVersion": "27.0",
+      "days": [
+        {
+          "day": "Mon",
+          "s1": "ENDURANCE",
+          "s2": "QUICKNESS",
+          "extra": "BALL_RETENTION"
+        },
+        {
+          "day": "Tue",
+          "s1": "RESISTANCE",
+          "s2": "PLAY_FROM_BACK",
+          "extra": "MATCH_TACTICS"
+        },
+        {
+          "day": "Wed",
+          "s1": "MATCH_PRACTICE",
+          "s2": "RECOVERY",
+          "extra": "REST"
+        },
+        {
+          "day": "Thu",
+          "s1": "TRANSITION_PRESS",
+          "s2": "ATT_MOVEMENT",
+          "extra": "DEF_SHAPE"
+        },
+        {
+          "day": "Fri",
+          "s1": "QUICKNESS",
+          "s2": "CHANCE_CONVERSION",
+          "extra": "SET_PIECES"
+        },
+        {
+          "day": "Sat",
+          "s1": "MATCH_DAY",
+          "s2": "REST",
+          "extra": "REST"
+        },
+        {
+          "day": "Sun",
+          "s1": "RECOVERY",
+          "s2": "REST",
+          "extra": "REST"
+        }
+      ]
+    },
+    {
+      "id": "normal-1-match-week",
+      "name": "Standard 1-Match Balanced Development",
+      "description": "High attribute growth across attacking, possession, and pressing units while keeping fatigue low ahead of Saturday kickoff.",
+      "focus_tags": [
+        "1-match",
+        "balanced",
+        "growth"
+      ],
+      "patchVersion": "27.0",
+      "days": [
+        {
+          "day": "Mon",
+          "s1": "OVERALL",
+          "s2": "BALL_RETENTION",
+          "extra": "PLAY_FROM_BACK"
+        },
+        {
+          "day": "Tue",
+          "s1": "ATT_MOVEMENT",
+          "s2": "DEF_GROUND",
+          "extra": "CHANCE_CREATION"
+        },
+        {
+          "day": "Wed",
+          "s1": "TRANSITION_PRESS",
+          "s2": "QUICKNESS",
+          "extra": "REST"
+        },
+        {
+          "day": "Thu",
+          "s1": "CHANCE_CONVERSION",
+          "s2": "DEF_SHAPE",
+          "extra": "GK_SHOT_STOPPING"
+        },
+        {
+          "day": "Fri",
+          "s1": "MATCH_TACTICS",
+          "s2": "SET_PIECES",
+          "extra": "REST"
+        },
+        {
+          "day": "Sat",
+          "s1": "MATCH_DAY",
+          "s2": "REST",
+          "extra": "REST"
+        },
+        {
+          "day": "Sun",
+          "s1": "RECOVERY",
+          "s2": "REST",
+          "extra": "REST"
+        }
+      ]
+    },
+    {
+      "id": "congested-2-match-week",
+      "name": "Congested 2-Match Recovery & Prep",
+      "description": "Minimizes muscular injury risk during midweek Champions League / Cup weeks while preserving sharpness and tactical readiness.",
+      "focus_tags": [
+        "2-match",
+        "recovery",
+        "low-injury"
+      ],
+      "patchVersion": "27.0",
+      "days": [
+        {
+          "day": "Mon",
+          "s1": "RECOVERY",
+          "s2": "MATCH_TACTICS",
+          "extra": "SET_PIECES"
+        },
+        {
+          "day": "Tue",
+          "s1": "MATCH_DAY",
+          "s2": "REST",
+          "extra": "REST"
+        },
+        {
+          "day": "Wed",
+          "s1": "RECOVERY",
+          "s2": "REST",
+          "extra": "REST"
+        },
+        {
+          "day": "Thu",
+          "s1": "BALL_RETENTION",
+          "s2": "ATT_MOVEMENT",
+          "extra": "REST"
+        },
+        {
+          "day": "Fri",
+          "s1": "MATCH_TACTICS",
+          "s2": "DEF_SHAPE",
+          "extra": "REST"
+        },
+        {
+          "day": "Sat",
+          "s1": "MATCH_DAY",
+          "s2": "REST",
+          "extra": "REST"
+        },
+        {
+          "day": "Sun",
+          "s1": "RECOVERY",
+          "s2": "REST",
+          "extra": "REST"
+        }
+      ]
+    },
+    {
+      "id": "wonderkid-accelerated-growth",
+      "name": "Wonderkid Technical & Physical Accelerator",
+      "description": "Maximizes high-ceiling U-21 technical, mental, and explosive physical progression with controlled recovery windows.",
+      "focus_tags": [
+        "wonderkids",
+        "technical",
+        "quickness"
+      ],
+      "patchVersion": "27.0",
+      "days": [
+        {
+          "day": "Mon",
+          "s1": "QUICKNESS",
+          "s2": "BALL_RETENTION",
+          "extra": "CHANCE_CREATION"
+        },
+        {
+          "day": "Tue",
+          "s1": "PLAY_FROM_BACK",
+          "s2": "ATT_MOVEMENT",
+          "extra": "CHANCE_CONVERSION"
+        },
+        {
+          "day": "Wed",
+          "s1": "RESISTANCE",
+          "s2": "BALL_DISTRIBUTION",
+          "extra": "REST"
+        },
+        {
+          "day": "Thu",
+          "s1": "TRANSITION_PRESS",
+          "s2": "DEF_GROUND",
+          "extra": "OUTFIELD"
+        },
+        {
+          "day": "Fri",
+          "s1": "MATCH_TACTICS",
+          "s2": "CHANCE_CONVERSION",
+          "extra": "REST"
+        },
+        {
+          "day": "Sat",
+          "s1": "MATCH_DAY",
+          "s2": "REST",
+          "extra": "REST"
+        },
+        {
+          "day": "Sun",
+          "s1": "RECOVERY",
+          "s2": "REST",
+          "extra": "REST"
+        }
+      ]
+    }
+  ]
+}

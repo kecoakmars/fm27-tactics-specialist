@@ -1,0 +1,1068 @@
+{
+  "AllAttributes": [
+    "corners",
+    "crossing",
+    "dribbling",
+    "finishing",
+    "first_touch",
+    "free_kick_taking",
+    "heading",
+    "long_shots",
+    "long_throws",
+    "marking",
+    "passing",
+    "penalty_taking",
+    "tackling",
+    "technique",
+    "aggression",
+    "anticipation",
+    "bravery",
+    "composure",
+    "concentration",
+    "decisions",
+    "determination",
+    "flair",
+    "leadership",
+    "off_the_ball",
+    "positioning",
+    "teamwork",
+    "vision",
+    "work_rate",
+    "acceleration",
+    "agility",
+    "balance",
+    "jumping_reach",
+    "natural_fitness",
+    "pace",
+    "stamina",
+    "strength",
+    "aerial_reach",
+    "command_of_area",
+    "communication",
+    "eccentricity",
+    "handling",
+    "kicking",
+    "one_on_ones",
+    "punching",
+    "reflexes",
+    "rushing_out",
+    "throwing",
+    "dirtiness",
+    "injury_proneness"
+  ],
+  "Goalkeeping": [
+    "aerial_reach",
+    "command_of_area",
+    "communication",
+    "eccentricity",
+    "handling",
+    "kicking",
+    "one_on_ones",
+    "punching",
+    "reflexes",
+    "rushing_out",
+    "throwing"
+  ],
+  "LowerIsBetter": [
+    "dirtiness",
+    "injury_proneness",
+    "eccentricity",
+    "controversy"
+  ],
+  "PersonalityKeys": [
+    "adaptability",
+    "ambition",
+    "loyalty",
+    "pressure",
+    "professionalism",
+    "sportsmanship",
+    "temperament",
+    "controversy"
+  ],
+  "PositionKeys": [
+    "GK",
+    "DL",
+    "DC",
+    "DR",
+    "DM",
+    "ML",
+    "MC",
+    "MR",
+    "AML",
+    "AMC",
+    "AMR",
+    "STC",
+    "WBL",
+    "WBR"
+  ],
+  "SpecialistRoles": [
+    "BallPlayingGoalkeeper",
+    "BallPlayingCentreBack",
+    "WingBack",
+    "MidfieldPlaymaker",
+    "DeepLyingPlaymaker",
+    "AdvancedPlaymaker"
+  ],
+  "Roles": [
+    {
+      "Id": "OPWideCentreBack",
+      "Name": "Wide Centre-Back",
+      "Phase": "OOP",
+      "Keys": [
+        "marking",
+        "tackling",
+        "positioning",
+        "pace",
+        "stamina"
+      ]
+    },
+    {
+      "Id": "OPTrackingWideMidfielder",
+      "Name": "Tracking Wide Midfielder",
+      "Phase": "OOP",
+      "Keys": [
+        "work_rate",
+        "stamina",
+        "tackling",
+        "positioning",
+        "teamwork"
+      ]
+    },
+    {
+      "Id": "OPCoveringCentreBack",
+      "Name": "Covering Centre-Back",
+      "Phase": "OOP",
+      "Keys": [
+        "pace",
+        "acceleration",
+        "anticipation",
+        "positioning",
+        "decisions"
+      ]
+    },
+    {
+      "Id": "OPAttackingMidfielder",
+      "Name": "Attacking Midfielder",
+      "Phase": "OOP",
+      "Keys": [
+        "work_rate",
+        "teamwork",
+        "positioning",
+        "stamina",
+        "anticipation"
+      ]
+    },
+    {
+      "Id": "AdvancedWingBack",
+      "Name": "Advanced Wing-Back",
+      "Phase": "IP",
+      "Keys": [
+        "crossing",
+        "dribbling",
+        "acceleration",
+        "stamina",
+        "off_the_ball"
+      ]
+    },
+    {
+      "Id": "PlaymakingWinger",
+      "Name": "Playmaking Winger",
+      "Phase": "IP",
+      "Keys": [
+        "passing",
+        "vision",
+        "technique",
+        "flair",
+        "first_touch"
+      ]
+    },
+    {
+      "Id": "PlaymakingWingBack",
+      "Name": "Playmaking Wing-Back",
+      "Phase": "IP",
+      "Keys": [
+        "passing",
+        "vision",
+        "decisions",
+        "technique",
+        "first_touch"
+      ]
+    },
+    {
+      "Id": "NoNonsenseCentreBack",
+      "Name": "No-Nonsense Centre-Back",
+      "Phase": "IP",
+      "Keys": [
+        "heading",
+        "jumping_reach",
+        "strength",
+        "tackling",
+        "bravery"
+      ]
+    },
+    {
+      "Id": "OPCoveringWideCentreBack",
+      "Name": "Covering Wide Centre-Back",
+      "Phase": "OOP",
+      "Keys": [
+        "pace",
+        "acceleration",
+        "positioning",
+        "anticipation",
+        "marking"
+      ]
+    },
+    {
+      "Id": "OPScreeningDefensiveMidfielder",
+      "Name": "Screening Defensive Midfielder",
+      "Phase": "OOP",
+      "Keys": [
+        "positioning",
+        "anticipation",
+        "concentration",
+        "decisions",
+        "teamwork"
+      ]
+    },
+    {
+      "Id": "OverlappingCentreBack",
+      "Name": "Overlapping Centre-Back",
+      "Phase": "IP",
+      "Keys": [
+        "crossing",
+        "stamina",
+        "work_rate",
+        "pace",
+        "tackling"
+      ]
+    },
+    {
+      "Id": "MidfieldPlaymaker",
+      "Name": "Midfield Playmaker",
+      "Phase": "IP",
+      "Keys": [
+        "passing",
+        "vision",
+        "technique",
+        "decisions",
+        "composure"
+      ],
+      "Aliases": [
+        "MidPlaymaker"
+      ]
+    },
+    {
+      "Id": "OPHoldingFullBack",
+      "Name": "Holding Full-Back",
+      "Phase": "OOP",
+      "Keys": [
+        "positioning",
+        "marking",
+        "concentration",
+        "tackling",
+        "decisions"
+      ]
+    },
+    {
+      "Id": "OPDefensiveMidfielder",
+      "Name": "Defensive Midfielder",
+      "Phase": "OOP",
+      "Keys": [
+        "positioning",
+        "tackling",
+        "anticipation",
+        "teamwork",
+        "concentration"
+      ]
+    },
+    {
+      "Id": "OPDroppingDefensiveMidfielder",
+      "Name": "Dropping Defensive Midfielder",
+      "Phase": "OOP",
+      "Keys": [
+        "positioning",
+        "marking",
+        "jumping_reach",
+        "tackling",
+        "decisions"
+      ]
+    },
+    {
+      "Id": "NoNonsenseGoalkeeper",
+      "Name": "No-Nonsense Goalkeeper",
+      "Phase": "IP",
+      "Keys": [
+        "reflexes",
+        "handling",
+        "aerial_reach",
+        "command_of_area",
+        "strength"
+      ]
+    },
+    {
+      "Id": "AttackingMidfielder",
+      "Name": "Attacking Midfielder",
+      "Phase": "IP",
+      "Keys": [
+        "passing",
+        "off_the_ball",
+        "technique",
+        "first_touch",
+        "decisions"
+      ]
+    },
+    {
+      "Id": "OPWideOutletWinger",
+      "Name": "Wide Outlet Winger",
+      "Phase": "OOP",
+      "Keys": [
+        "pace",
+        "acceleration",
+        "dribbling",
+        "off_the_ball",
+        "crossing"
+      ]
+    },
+    {
+      "Id": "OPWinger",
+      "Name": "Winger",
+      "Phase": "OOP",
+      "Keys": [
+        "work_rate",
+        "stamina",
+        "positioning",
+        "acceleration",
+        "teamwork"
+      ]
+    },
+    {
+      "Id": "OPSplittingOutletCentreForward",
+      "Name": "Splitting Outlet Centre Forward",
+      "Phase": "OOP",
+      "Keys": [
+        "pace",
+        "acceleration",
+        "off_the_ball",
+        "dribbling",
+        "anticipation"
+      ]
+    },
+    {
+      "Id": "WideCentreBack",
+      "Name": "Wide Centre-Back",
+      "Phase": "IP",
+      "Keys": [
+        "pace",
+        "tackling",
+        "positioning",
+        "passing",
+        "stamina"
+      ]
+    },
+    {
+      "Id": "OPHoldingWingBack",
+      "Name": "Holding Wing-Back",
+      "Phase": "OOP",
+      "Keys": [
+        "positioning",
+        "marking",
+        "tackling",
+        "concentration",
+        "teamwork"
+      ]
+    },
+    {
+      "Id": "TargetForward",
+      "Name": "Target Forward",
+      "Phase": "IP",
+      "Keys": [
+        "jumping_reach",
+        "heading",
+        "strength",
+        "bravery",
+        "balance"
+      ]
+    },
+    {
+      "Id": "DeepLyingForward",
+      "Name": "Deep-Lying Forward",
+      "Phase": "IP",
+      "Keys": [
+        "first_touch",
+        "passing",
+        "vision",
+        "strength",
+        "teamwork"
+      ]
+    },
+    {
+      "Id": "OPStoppingWideCentreBack",
+      "Name": "Stopping Wide Centre-Back",
+      "Phase": "OOP",
+      "Keys": [
+        "aggression",
+        "tackling",
+        "bravery",
+        "strength",
+        "anticipation"
+      ]
+    },
+    {
+      "Id": "InsideFullBack",
+      "Name": "Inside Full-Back",
+      "Phase": "IP",
+      "Keys": [
+        "marking",
+        "positioning",
+        "tackling",
+        "passing",
+        "composure"
+      ]
+    },
+    {
+      "Id": "BallPlayingGoalkeeper",
+      "Name": "Ball-Playing Goalkeeper",
+      "Phase": "IP",
+      "Keys": [
+        "kicking",
+        "passing",
+        "first_touch",
+        "composure",
+        "reflexes"
+      ],
+      "Aliases": [
+        "BallKeeper"
+      ]
+    },
+    {
+      "Id": "OPCentralOutletAttackingMidfielder",
+      "Name": "Central Outlet Attacking Midfielder",
+      "Phase": "OOP",
+      "Keys": [
+        "off_the_ball",
+        "first_touch",
+        "vision",
+        "passing",
+        "acceleration"
+      ]
+    },
+    {
+      "Id": "FalseNine",
+      "Name": "False Nine",
+      "Phase": "IP",
+      "Keys": [
+        "dribbling",
+        "passing",
+        "vision",
+        "first_touch",
+        "agility"
+      ]
+    },
+    {
+      "Id": "WideCentralMidfielder",
+      "Name": "Wide Central Midfielder",
+      "Phase": "IP",
+      "Keys": [
+        "crossing",
+        "stamina",
+        "work_rate",
+        "passing",
+        "off_the_ball"
+      ]
+    },
+    {
+      "Id": "OPCentralMidfielder",
+      "Name": "Central Midfielder",
+      "Phase": "OOP",
+      "Keys": [
+        "positioning",
+        "tackling",
+        "work_rate",
+        "teamwork",
+        "stamina"
+      ]
+    },
+    {
+      "Id": "OPWideOutletWideMidfielder",
+      "Name": "Wide Outlet Wide Midfielder",
+      "Phase": "OOP",
+      "Keys": [
+        "pace",
+        "acceleration",
+        "off_the_ball",
+        "dribbling",
+        "crossing"
+      ]
+    },
+    {
+      "Id": "BoxToBoxPlaymaker",
+      "Name": "Box-To-Box Playmaker",
+      "Phase": "IP",
+      "Keys": [
+        "passing",
+        "vision",
+        "stamina",
+        "work_rate",
+        "decisions"
+      ]
+    },
+    {
+      "Id": "InsideForward",
+      "Name": "Inside Forward",
+      "Phase": "IP",
+      "Keys": [
+        "dribbling",
+        "off_the_ball",
+        "acceleration",
+        "finishing",
+        "composure"
+      ]
+    },
+    {
+      "Id": "OPPressingFullBack",
+      "Name": "Pressing Full-Back",
+      "Phase": "OOP",
+      "Keys": [
+        "work_rate",
+        "aggression",
+        "tackling",
+        "stamina",
+        "acceleration"
+      ]
+    },
+    {
+      "Id": "OPWingBack",
+      "Name": "Wing-Back",
+      "Phase": "OOP",
+      "Keys": [
+        "positioning",
+        "tackling",
+        "stamina",
+        "work_rate",
+        "pace"
+      ]
+    },
+    {
+      "Id": "OPPressingWingBack",
+      "Name": "Pressing Wing-Back",
+      "Phase": "OOP",
+      "Keys": [
+        "work_rate",
+        "stamina",
+        "aggression",
+        "acceleration",
+        "tackling"
+      ]
+    },
+    {
+      "Id": "CentralMidfielder",
+      "Name": "Central Midfielder",
+      "Phase": "IP",
+      "Keys": [
+        "passing",
+        "first_touch",
+        "decisions",
+        "teamwork",
+        "work_rate"
+      ]
+    },
+    {
+      "Id": "OPTrackingCentreForward",
+      "Name": "Tracking Centre Forward",
+      "Phase": "OOP",
+      "Keys": [
+        "work_rate",
+        "stamina",
+        "aggression",
+        "teamwork",
+        "positioning"
+      ]
+    },
+    {
+      "Id": "OPPressingCentralMidfielder",
+      "Name": "Pressing Central Midfielder",
+      "Phase": "OOP",
+      "Keys": [
+        "work_rate",
+        "stamina",
+        "aggression",
+        "acceleration",
+        "tackling"
+      ]
+    },
+    {
+      "Id": "SecondStriker",
+      "Name": "Second Striker",
+      "Phase": "IP",
+      "Keys": [
+        "finishing",
+        "off_the_ball",
+        "acceleration",
+        "anticipation",
+        "composure"
+      ]
+    },
+    {
+      "Id": "Goalkeeper",
+      "Name": "Goalkeeper",
+      "Phase": "IP",
+      "Keys": [
+        "reflexes",
+        "handling",
+        "positioning",
+        "command_of_area",
+        "concentration"
+      ]
+    },
+    {
+      "Id": "FreeRole",
+      "Name": "Free Role",
+      "Phase": "IP",
+      "Keys": [
+        "flair",
+        "vision",
+        "off_the_ball",
+        "dribbling",
+        "decisions"
+      ]
+    },
+    {
+      "Id": "OPCentreBack",
+      "Name": "Centre-Back",
+      "Phase": "OOP",
+      "Keys": [
+        "marking",
+        "tackling",
+        "positioning",
+        "jumping_reach",
+        "concentration"
+      ]
+    },
+    {
+      "Id": "HalfBack",
+      "Name": "Half Back",
+      "Phase": "IP",
+      "Keys": [
+        "positioning",
+        "decisions",
+        "composure",
+        "passing",
+        "marking"
+      ]
+    },
+    {
+      "Id": "InsideWinger",
+      "Name": "Inside Winger",
+      "Phase": "IP",
+      "Keys": [
+        "dribbling",
+        "passing",
+        "crossing",
+        "agility",
+        "acceleration"
+      ]
+    },
+    {
+      "Id": "CentreForward",
+      "Name": "Centre Forward",
+      "Phase": "IP",
+      "Keys": [
+        "finishing",
+        "off_the_ball",
+        "first_touch",
+        "composure",
+        "pace"
+      ]
+    },
+    {
+      "Id": "BallPlayingCentreBack",
+      "Name": "Ball-Playing Centre-Back",
+      "Phase": "IP",
+      "Keys": [
+        "passing",
+        "composure",
+        "vision",
+        "marking",
+        "positioning"
+      ],
+      "Aliases": [
+        "BallBack"
+      ]
+    },
+    {
+      "Id": "OPFullBack",
+      "Name": "Full-Back",
+      "Phase": "OOP",
+      "Keys": [
+        "tackling",
+        "marking",
+        "positioning",
+        "concentration",
+        "pace"
+      ]
+    },
+    {
+      "Id": "InsideWingBack",
+      "Name": "Inside Wing-Back",
+      "Phase": "IP",
+      "Keys": [
+        "passing",
+        "decisions",
+        "positioning",
+        "first_touch",
+        "teamwork"
+      ]
+    },
+    {
+      "Id": "OPGoalkeeper",
+      "Name": "Goalkeeper",
+      "Phase": "OOP",
+      "Keys": [
+        "reflexes",
+        "positioning",
+        "handling",
+        "command_of_area",
+        "concentration"
+      ]
+    },
+    {
+      "Id": "BoxToBoxMidfielder",
+      "Name": "Box-To-Box Midfielder",
+      "Phase": "IP",
+      "Keys": [
+        "stamina",
+        "work_rate",
+        "off_the_ball",
+        "tackling",
+        "passing"
+      ]
+    },
+    {
+      "Id": "WingBack",
+      "Name": "Wing-Back",
+      "Phase": "IP",
+      "Keys": [
+        "crossing",
+        "stamina",
+        "work_rate",
+        "pace",
+        "tackling"
+      ]
+    },
+    {
+      "Id": "OPStoppingCentreBack",
+      "Name": "Stopping Centre-Back",
+      "Phase": "OOP",
+      "Keys": [
+        "aggression",
+        "bravery",
+        "tackling",
+        "strength",
+        "jumping_reach"
+      ]
+    },
+    {
+      "Id": "OPCentreForward",
+      "Name": "Centre Forward",
+      "Phase": "OOP",
+      "Keys": [
+        "work_rate",
+        "off_the_ball",
+        "anticipation",
+        "stamina",
+        "teamwork"
+      ]
+    },
+    {
+      "Id": "ChannelForward",
+      "Name": "Channel Forward",
+      "Phase": "IP",
+      "Keys": [
+        "pace",
+        "acceleration",
+        "off_the_ball",
+        "dribbling",
+        "finishing"
+      ]
+    },
+    {
+      "Id": "Winger",
+      "Name": "Winger",
+      "Phase": "IP",
+      "Keys": [
+        "crossing",
+        "dribbling",
+        "pace",
+        "acceleration",
+        "agility"
+      ]
+    },
+    {
+      "Id": "DeepLyingPlaymaker",
+      "Name": "Deep-Lying Playmaker",
+      "Phase": "IP",
+      "Keys": [
+        "passing",
+        "vision",
+        "decisions",
+        "first_touch",
+        "composure"
+      ],
+      "Aliases": [
+        "DeepPlaymaker"
+      ]
+    },
+    {
+      "Id": "OPInsideOutletWinger",
+      "Name": "Inside Outlet Winger",
+      "Phase": "OOP",
+      "Keys": [
+        "acceleration",
+        "pace",
+        "off_the_ball",
+        "dribbling",
+        "finishing"
+      ]
+    },
+    {
+      "Id": "OPWideCoverDefensiveMidfielder",
+      "Name": "Wide Covering Defensive Midfielder",
+      "Phase": "OOP",
+      "Keys": [
+        "pace",
+        "stamina",
+        "positioning",
+        "work_rate",
+        "tackling"
+      ]
+    },
+    {
+      "Id": "AdvancedPlaymaker",
+      "Name": "Advanced Playmaker",
+      "Phase": "IP",
+      "Keys": [
+        "passing",
+        "vision",
+        "technique",
+        "decisions",
+        "flair"
+      ]
+    },
+    {
+      "Id": "OPTrackingAttackingMidfielder",
+      "Name": "Tracking Attacking Midfielder",
+      "Phase": "OOP",
+      "Keys": [
+        "work_rate",
+        "stamina",
+        "teamwork",
+        "positioning",
+        "tackling"
+      ]
+    },
+    {
+      "Id": "DefensiveMidfielder",
+      "Name": "Defensive Midfielder",
+      "Phase": "IP",
+      "Keys": [
+        "tackling",
+        "positioning",
+        "anticipation",
+        "teamwork",
+        "stamina"
+      ]
+    },
+    {
+      "Id": "OPWideMidfielder",
+      "Name": "Wide Midfielder",
+      "Phase": "OOP",
+      "Keys": [
+        "positioning",
+        "work_rate",
+        "stamina",
+        "teamwork",
+        "tackling"
+      ]
+    },
+    {
+      "Id": "OPWideCoverCentralMidfielder",
+      "Name": "Wide Covering Central Midfielder",
+      "Phase": "OOP",
+      "Keys": [
+        "stamina",
+        "work_rate",
+        "pace",
+        "positioning",
+        "tackling"
+      ]
+    },
+    {
+      "Id": "OPSplittingOutletAttackingMidfielder",
+      "Name": "Splitting Outlet Attacking Midfielder",
+      "Phase": "OOP",
+      "Keys": [
+        "pace",
+        "acceleration",
+        "off_the_ball",
+        "dribbling",
+        "anticipation"
+      ]
+    },
+    {
+      "Id": "OPPressingDefensiveMidfielder",
+      "Name": "Pressing Defensive Midfielder",
+      "Phase": "OOP",
+      "Keys": [
+        "work_rate",
+        "aggression",
+        "stamina",
+        "tackling",
+        "anticipation"
+      ]
+    },
+    {
+      "Id": "CentreBack",
+      "Name": "Centre-Back",
+      "Phase": "IP",
+      "Keys": [
+        "marking",
+        "tackling",
+        "positioning",
+        "jumping_reach",
+        "strength"
+      ]
+    },
+    {
+      "Id": "AdvancedCentreBack",
+      "Name": "Advanced Centre-Back",
+      "Phase": "IP",
+      "Keys": [
+        "dribbling",
+        "passing",
+        "anticipation",
+        "positioning",
+        "pace"
+      ]
+    },
+    {
+      "Id": "FullBack",
+      "Name": "Full-Back",
+      "Phase": "IP",
+      "Keys": [
+        "tackling",
+        "positioning",
+        "marking",
+        "stamina",
+        "teamwork"
+      ]
+    },
+    {
+      "Id": "OPLineKeeper",
+      "Name": "Line-Holding Goalkeeper",
+      "Phase": "OOP",
+      "Keys": [
+        "reflexes",
+        "handling",
+        "aerial_reach",
+        "positioning",
+        "concentration"
+      ]
+    },
+    {
+      "Id": "OPScreeningCentralMidfielder",
+      "Name": "Screening Central Midfielder",
+      "Phase": "OOP",
+      "Keys": [
+        "positioning",
+        "anticipation",
+        "concentration",
+        "decisions",
+        "teamwork"
+      ]
+    },
+    {
+      "Id": "OPCentralOutletCentreForward",
+      "Name": "Central Outlet Centre Forward",
+      "Phase": "OOP",
+      "Keys": [
+        "strength",
+        "first_touch",
+        "off_the_ball",
+        "pace",
+        "balance"
+      ]
+    },
+    {
+      "Id": "WideMidfielder",
+      "Name": "Wide Midfielder",
+      "Phase": "IP",
+      "Keys": [
+        "crossing",
+        "stamina",
+        "work_rate",
+        "teamwork",
+        "passing"
+      ]
+    },
+    {
+      "Id": "ChannelMidfielder",
+      "Name": "Channel Midfielder",
+      "Phase": "IP",
+      "Keys": [
+        "off_the_ball",
+        "acceleration",
+        "passing",
+        "first_touch",
+        "stamina"
+      ]
+    },
+    {
+      "Id": "OPSweeperKeeper",
+      "Name": "Sweeper Keeper",
+      "Phase": "OOP",
+      "Keys": [
+        "rushing_out",
+        "one_on_ones",
+        "anticipation",
+        "acceleration",
+        "reflexes"
+      ]
+    },
+    {
+      "Id": "Poacher",
+      "Name": "Poacher",
+      "Phase": "IP",
+      "Keys": [
+        "finishing",
+        "anticipation",
+        "off_the_ball",
+        "composure",
+        "acceleration"
+      ]
+    },
+    {
+      "Id": "OPTrackingWinger",
+      "Name": "Tracking Winger",
+      "Phase": "OOP",
+      "Keys": [
+        "work_rate",
+        "stamina",
+        "tackling",
+        "positioning",
+        "teamwork"
+      ]
+    },
+    {
+      "Id": "WideForward",
+      "Name": "Wide Forward",
+      "Phase": "IP",
+      "Keys": [
+        "pace",
+        "off_the_ball",
+        "finishing",
+        "dribbling",
+        "acceleration"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowJs": true,
+    "paths": {
+      "@fm27/shared-types": ["./packages/shared-types/src/index.ts"],
+      "@fm27/fm-data": ["./packages/fm-data/src/index.ts"]
+    }
+  },
+  "include": ["tests/**/*.ts", "vitest.config.ts"]
+}
