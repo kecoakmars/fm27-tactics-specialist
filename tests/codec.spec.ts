@@ -402,6 +402,61 @@ describe("Phase 1 — @fm27/fm-codec Binary & Serialization Suite", () => {
     expect(parsedShortlist.playerUids).toEqual([2700001, 2700005, 2700099]);
   });
 
+  it("parses .fmf archives with 0-based (dataStart-relative) TOC member offsets", async () => {
+    const original = createSampleDualPhaseTactic();
+    const tacRaw = encodeTacPayload(original);
+    const detailsRaw = encodeDetailsAom({
+      handler: "TACTICS_TYPE_HANDLER",
+      title: original.title,
+      description: original.description,
+      author: original.author,
+    });
+    const tacFrame = encodeZstdRawFrame(tacRaw);
+    const detailsFrame = encodeZstdRawFrame(detailsRaw);
+
+    // Build TOC using 0-based relOffset relative to dataStart (byte 26), as seen in game-exported .fmf files
+    const tocWriter = new BinaryWriter(512);
+    tocWriter.writeLengthPrefixedUtf8(original.title);
+    tocWriter.writeInt32(1);
+    tocWriter.writeLengthPrefixedUtf8(original.title);
+    tocWriter.writeLengthPrefixedUtf8(".tac");
+    tocWriter.writeInt64(0n);
+    tocWriter.writeInt64(BigInt(tacFrame.byteLength));
+    tocWriter.writeInt64(BigInt(tacRaw.byteLength));
+    tocWriter.writeInt64(0n);
+    tocWriter.writeInt64(0n);
+
+    tocWriter.writeInt32(1);
+    tocWriter.writeLengthPrefixedUtf8("_data");
+    tocWriter.writeInt32(1);
+    tocWriter.writeLengthPrefixedUtf8("details");
+    tocWriter.writeLengthPrefixedUtf8(".aom");
+    tocWriter.writeInt64(BigInt(tacFrame.byteLength));
+    tocWriter.writeInt64(BigInt(detailsFrame.byteLength));
+    tocWriter.writeInt64(BigInt(detailsRaw.byteLength));
+    tocWriter.writeInt64(0n);
+    tocWriter.writeInt64(0n);
+    tocWriter.writeInt32(0);
+
+    const tocFrame = encodeZstdRawFrame(tocWriter.toUint8Array());
+    const archiveWriter = new BinaryWriter(
+      26 + tacFrame.byteLength + detailsFrame.byteLength + 9 + tocFrame.byteLength,
+    );
+    archiveWriter.writeBytes(FMF_ARCHIVE_HEADER);
+    archiveWriter.writeInt64(BigInt(17 + tacFrame.byteLength + detailsFrame.byteLength));
+    archiveWriter.writeInt64(17n);
+    archiveWriter.writeUint8(0x03);
+    archiveWriter.writeBytes(tacFrame);
+    archiveWriter.writeBytes(detailsFrame);
+    archiveWriter.writeBytes(FMF_ARCHIVE_HEADER);
+    archiveWriter.writeBytes(tocFrame);
+
+    const parsed = await parseFmf(archiveWriter.toUint8Array());
+    expect(parsed.title).toBe(original.title);
+    expect(parsed.mentality).toBe(original.mentality);
+    expect(parsed.slots).toHaveLength(11);
+  });
+
   it("verifies golden-gegenpress.fmf fixture round-trip when present", async () => {
     const fixturePath = path.resolve(process.cwd(), "tests/fixtures/golden-gegenpress.fmf");
     if (fs.existsSync(fixturePath)) {

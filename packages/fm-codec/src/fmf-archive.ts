@@ -123,9 +123,45 @@ export function packFmfArchive(input: {
   return archiveWriter.toUint8Array();
 }
 
+function hasZstdMagicAt(bytes: Uint8Array, offset: number): boolean {
+  return (
+    offset >= 0 &&
+    offset + 4 <= bytes.byteLength &&
+    bytes[offset] === 0x28 &&
+    bytes[offset + 1] === 0xb5 &&
+    bytes[offset + 2] === 0x2f &&
+    bytes[offset + 3] === 0xfd
+  );
+}
+
+function resolveTocMemberOffset(
+  archiveBytes: Uint8Array,
+  relOffset: number,
+  packedLen: number,
+  dataStart: number,
+): number | null {
+  if (packedLen < 0) return null;
+  const candidates = [9 + relOffset, dataStart + relOffset, relOffset];
+  const validCandidates: number[] = [];
+
+  for (const off of candidates) {
+    if (off >= dataStart && off + packedLen <= archiveBytes.byteLength) {
+      if (!validCandidates.includes(off)) {
+        validCandidates.push(off);
+      }
+    }
+  }
+
+  if (validCandidates.length === 0) return null;
+  // Prefer the candidate that points directly at a Zstandard frame header (28 B5 2F FD)
+  const zstdMatch = validCandidates.find((off) => hasZstdMagicAt(archiveBytes, off));
+  return zstdMatch ?? validCandidates[0]!;
+}
+
 function readTocDirectory(
   tocReader: BinaryReader,
   archiveBytes: Uint8Array,
+  dataStart: number,
   prefix: string,
   outFiles: Map<string, Uint8Array>,
   depth = 0,
@@ -149,12 +185,18 @@ function readTocDirectory(
     if (rawLen < 0 || rawLen > 16 * 1024 * 1024) {
       throw new RangeError(`TOC entry "${name}${ext}" rawLen out of safety bounds: ${rawLen}`);
     }
-    const absOffset = 9 + relOffset;
-    if (absOffset < 26 || absOffset + packedLen > archiveBytes.byteLength) {
-      throw new RangeError(`TOC entry "${name}${ext}" points outside archive bounds`);
+    const absOffset = resolveTocMemberOffset(archiveBytes, relOffset, packedLen, dataStart);
+    if (absOffset === null) {
+      throw new RangeError(
+        `TOC entry "${name}${ext}" points outside archive bounds (relOffset=${relOffset}, packedLen=${packedLen}, rawLen=${rawLen}, dataStart=${dataStart}, archiveLen=${archiveBytes.byteLength})`,
+      );
     }
     const frameSlice = archiveBytes.subarray(absOffset, absOffset + packedLen);
-    const decompressed = decodeZstdFrame(frameSlice);
+    const decompressed = hasZstdMagicAt(archiveBytes, absOffset)
+      ? decodeZstdFrame(frameSlice)
+      : packedLen === rawLen
+        ? frameSlice.slice()
+        : decodeZstdFrame(frameSlice);
     if (rawLen > 0 && decompressed.byteLength !== rawLen) {
       throw new Error(
         `Decompressed size mismatch for "${name}${ext}": expected ${rawLen}, got ${decompressed.byteLength}`,
@@ -171,7 +213,7 @@ function readTocDirectory(
   for (let d = 0; d < subDirCount; d++) {
     const dirName = tocReader.readLengthPrefixedUtf8();
     const nextPrefix = prefix ? `${prefix}/${dirName}` : dirName;
-    readTocDirectory(tocReader, archiveBytes, nextPrefix, outFiles, depth + 1);
+    readTocDirectory(tocReader, archiveBytes, dataStart, nextPrefix, outFiles, depth + 1);
   }
 }
 
@@ -189,8 +231,9 @@ export function unpackPlainFmfArchive(archiveBytes: Uint8Array): UnpackedFmfArch
   }
   reader.skip(1); // container version byte
 
+  const dataStart = 9 + firstMemberRelOffset;
   const secondHeaderAbsOffset = 9 + tocRelOffset;
-  if (secondHeaderAbsOffset < 26 || secondHeaderAbsOffset + 9 > archiveBytes.byteLength) {
+  if (secondHeaderAbsOffset < dataStart || secondHeaderAbsOffset + 9 > archiveBytes.byteLength) {
     throw new RangeError(`Invalid TOC offset in FMF header: ${secondHeaderAbsOffset}`);
   }
 
@@ -202,7 +245,7 @@ export function unpackPlainFmfArchive(archiveBytes: Uint8Array): UnpackedFmfArch
   const tocReader = new BinaryReader(tocRaw);
   const rootTitle = tocReader.readLengthPrefixedUtf8();
   const files = new Map<string, Uint8Array>();
-  readTocDirectory(tocReader, archiveBytes, "", files);
+  readTocDirectory(tocReader, archiveBytes, dataStart, "", files);
 
   const detailsBytes = files.get("_data/details.aom");
   const details = detailsBytes ? decodeDetailsAom(detailsBytes) : undefined;
