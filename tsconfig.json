@@ -9,6 +9,7 @@
       "@fm27/fm-data": ["./packages/fm-data/src/index.ts"],
       "@fm27/fm-codec": ["./packages/fm-codec/src/index.ts"],
       "@fm27/fm-engine": ["./packages/fm-engine/src/index.ts"],
+      "@fm27/ai-analyst": ["./packages/ai-analyst/src/index.ts"],
       "@/*": ["./apps/web/src/*"]
     }
   },

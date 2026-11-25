@@ -11,6 +11,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@fm27/ai-analyst": "workspace:*",
     "@fm27/fm-codec": "workspace:*",
     "@fm27/fm-data": "workspace:*",
     "@fm27/fm-engine": "workspace:*",

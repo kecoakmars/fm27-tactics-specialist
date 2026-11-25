@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
     "@fm27/fm-data",
     "@fm27/fm-codec",
     "@fm27/fm-engine",
+    "@fm27/ai-analyst",
   ],
   eslint: {
     ignoreDuringBuilds: true,

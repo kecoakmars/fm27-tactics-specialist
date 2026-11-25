@@ -9,11 +9,19 @@ import {
   parseFm27Json,
 } from "@fm27/fm-codec";
 import { getPitchCatalog, getTacticalStyles } from "@fm27/fm-data";
+import { computeTacticalBalance } from "@fm27/fm-engine";
+import { AiAdvisorDrawer } from "@/components/analytics/AiAdvisorDrawer";
+import { BalanceRadar } from "@/components/analytics/BalanceRadar";
+import { CoachingFindingsList } from "@/components/analytics/CoachingFindingsList";
+import {
+  Heatmap18Zone,
+  type HeatmapOverlayMode,
+} from "@/components/analytics/Heatmap18Zone";
+import { MentalityBar } from "@/components/instructions/MentalityBar";
+import { PlayerInstructionModal } from "@/components/instructions/PlayerInstructionModal";
+import { TeamInstructionPanel } from "@/components/instructions/TeamInstructionPanel";
 import { DualPhasePitch } from "@/components/pitch/DualPhasePitch";
 import { SplitViewPitch } from "@/components/pitch/SplitViewPitch";
-import { MentalityBar } from "@/components/instructions/MentalityBar";
-import { TeamInstructionPanel } from "@/components/instructions/TeamInstructionPanel";
-import { PlayerInstructionModal } from "@/components/instructions/PlayerInstructionModal";
 import { sanitizeFileName, triggerBrowserDownload } from "@/lib/local-folder-sync";
 import { exportDualPhasePngCard } from "@/lib/svg-card-exporter";
 import { exportFmfInWorker, parseFmfInWorker } from "@/lib/worker-client";
@@ -49,6 +57,9 @@ export default function TacticalBoardWorkspacePage() {
     refreshTacticFiles,
   } = useFolderSyncStore();
 
+  const [heatmapMode, setHeatmapMode] = useState<HeatmapOverlayMode>("off");
+  const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
+  const [inspectorTab, setInspectorTab] = useState<"instructions" | "analytics">("analytics");
   const [statusBanner, setStatusBanner] = useState<{
     tone: "ok" | "error";
     text: string;
@@ -69,11 +80,13 @@ export default function TacticalBoardWorkspacePage() {
     [pitchCatalog.Roles],
   );
 
+  // Real-time 18-zone Heatmap & 6-pillar Tactical Balance evaluation
+  const balanceReport = useMemo(() => computeTacticalBalance(tactic), [tactic]);
+
   const notify = useCallback((tone: "ok" | "error", text: string) => {
     setStatusBanner({ tone, text });
   }, []);
 
-  // Hydrate tactic from `#t=...` URL hash on mount or hashchange
   useEffect(() => {
     const tryHydrateFromHash = () => {
       if (typeof window === "undefined") return;
@@ -95,7 +108,6 @@ export default function TacticalBoardWorkspacePage() {
     return () => window.removeEventListener("hashchange", tryHydrateFromHash);
   }, [loadTactic, notify]);
 
-  // Global Ctrl+Z / Ctrl+Y / Cmd+Shift+Z Undo-Redo shortcuts
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -214,6 +226,25 @@ export default function TacticalBoardWorkspacePage() {
   const selectedSlot =
     selectedSlotIndex !== null ? tactic.slots[selectedSlotIndex] ?? null : null;
 
+  const buildOverlayForBoard = (boardPhase: "ip" | "oop") => {
+    if (heatmapMode === "off") return undefined;
+    if (heatmapMode === "transition") {
+      return <Heatmap18Zone cells={balanceReport.heatmap.transition} mode="transition" />;
+    }
+    if (viewMode === "split") {
+      const cells =
+        boardPhase === "ip"
+          ? balanceReport.heatmap.inPossession
+          : balanceReport.heatmap.outOfPossession;
+      return <Heatmap18Zone cells={cells} mode={boardPhase} />;
+    }
+    const cells =
+      heatmapMode === "ip"
+        ? balanceReport.heatmap.inPossession
+        : balanceReport.heatmap.outOfPossession;
+    return <Heatmap18Zone cells={cells} mode={heatmapMode} />;
+  };
+
   return (
     <main
       onDragOver={(e) => {
@@ -230,7 +261,6 @@ export default function TacticalBoardWorkspacePage() {
       }}
       className="flex flex-col gap-4 relative"
     >
-      {/* Drag & Drop Overlay */}
       {isDraggingFile && (
         <div className="fixed inset-4 z-50 rounded-2xl bg-emerald-950/80 border-2 border-dashed border-emerald-400 flex items-center justify-center pointer-events-none">
           <div className="text-center">
@@ -262,11 +292,15 @@ export default function TacticalBoardWorkspacePage() {
                 <span className="text-cyan-400 font-bold">IP {tactic.inFormation}</span>
                 <span className="text-slate-500">→</span>
                 <span className="text-amber-400 font-bold">OOP {tactic.outFormation}</span>
+                <span className="text-slate-600">|</span>
+                <span className="text-emerald-400 font-bold">
+                  Balance {balanceReport.overallScore.toFixed(0)}/100
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Undo / Redo + Import / Export Actions */}
+          {/* Undo/Redo + Import/Export + AI Advisor */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center rounded-lg bg-[#0B0F19] border border-white/10 p-0.5">
               <button
@@ -311,7 +345,7 @@ export default function TacticalBoardWorkspacePage() {
               onClick={() => fileInputRef.current?.click()}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#0B0F19] hover:bg-slate-800 text-slate-200 border border-white/12 cursor-pointer"
             >
-              Import .fmf / JSON
+              Import .fmf
             </button>
 
             {folderStatus === "connected" && (
@@ -359,22 +393,28 @@ export default function TacticalBoardWorkspacePage() {
               id="copy-share-url-btn"
               type="button"
               onClick={() => void handleCopyShareLink()}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-500/16 text-cyan-300 border border-cyan-500/35 hover:bg-cyan-500/26 transition cursor-pointer"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-[#0B0F19] hover:bg-slate-800 text-cyan-300 border border-cyan-500/30 cursor-pointer"
             >
-              Copy Share Link
+              Share URL
+            </button>
+
+            <button
+              id="open-ai-advisor-btn"
+              type="button"
+              onClick={() => setAiDrawerOpen(true)}
+              className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition cursor-pointer"
+            >
+              AI Tactical Advisor
             </button>
           </div>
         </div>
 
-        {/* Preset Style (13) + Dual-Phase Shape (16) + View Switcher Bar */}
+        {/* Presets + 18-Zone Heatmap Toggle + View Mode Switcher */}
         <div className="pt-2.5 border-t border-white/8 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2.5">
-            <div className="flex items-center gap-2">
-              <label
-                htmlFor="preset-style-select"
-                className="text-xs font-semibold text-slate-400"
-              >
-                Tactical Style:
+            <div className="flex items-center gap-1.5">
+              <label htmlFor="preset-style-select" className="text-xs font-semibold text-slate-400">
+                Style:
               </label>
               <select
                 id="preset-style-select"
@@ -384,18 +424,15 @@ export default function TacticalBoardWorkspacePage() {
               >
                 {stylesCatalog.TacticalStyles.map((st) => (
                   <option key={st.Id} value={st.Id}>
-                    {st.Name} ({st.MentalityLabel})
+                    {st.Name}
                   </option>
                 ))}
               </select>
             </div>
 
-            <div className="flex items-center gap-2">
-              <label
-                htmlFor="dual-shape-select"
-                className="text-xs font-semibold text-slate-400"
-              >
-                Dual-Phase Shape:
+            <div className="flex items-center gap-1.5">
+              <label htmlFor="dual-shape-select" className="text-xs font-semibold text-slate-400">
+                Shape:
               </label>
               <select
                 id="dual-shape-select"
@@ -406,14 +443,30 @@ export default function TacticalBoardWorkspacePage() {
                 {stylesCatalog.StyleShapes.map((sh) => (
                   <option key={sh.Id} value={sh.Id}>
                     IP {sh.InPossessionName} → OOP {sh.OutOfPossessionName}
-                    {sh.HighPress ? " (High Press)" : ""}
+                    {sh.HighPress ? " (Press)" : ""}
                   </option>
                 ))}
               </select>
             </div>
+
+            <div className="flex items-center gap-1.5">
+              <label htmlFor="heatmap-mode-select" className="text-xs font-semibold text-slate-400">
+                18-Zone Heatmap:
+              </label>
+              <select
+                id="heatmap-mode-select"
+                value={heatmapMode}
+                onChange={(e) => setHeatmapMode(e.target.value as HeatmapOverlayMode)}
+                className="px-2.5 py-1.5 rounded-lg bg-[#0B0F19] border border-white/12 text-xs font-semibold text-emerald-300 cursor-pointer"
+              >
+                <option value="off">Off</option>
+                <option value="ip">Phase Density (IP / OOP)</option>
+                <option value="oop">Out-of-Possession Block</option>
+                <option value="transition">Transition Exposure</option>
+              </select>
+            </div>
           </div>
 
-          {/* 3-Mode View Switcher + Transition Vector Toggle */}
           <div className="flex flex-wrap items-center gap-2">
             <label className="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer select-none mr-1">
               <input
@@ -423,7 +476,7 @@ export default function TacticalBoardWorkspacePage() {
                 onChange={(e) => setShowTransitionVectors(e.target.checked)}
                 className="accent-emerald-400 rounded cursor-pointer"
               />
-              <span>Transition Vectors</span>
+              <span>Vectors</span>
             </label>
 
             <div className="flex items-center p-1 rounded-lg bg-[#0B0F19] border border-white/10">
@@ -456,7 +509,6 @@ export default function TacticalBoardWorkspacePage() {
           </div>
         </div>
 
-        {/* Status Toast Banner */}
         {statusBanner && (
           <div
             role="status"
@@ -478,27 +530,32 @@ export default function TacticalBoardWorkspacePage() {
         )}
       </section>
 
-      {/* Main Tactical Grid: Pitch Stage (Left/Center) + Inspector Sidebar (Right) */}
+      {/* Main Tactical Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         <div className="lg:col-span-8 flex flex-col gap-3">
           {viewMode === "split" ? (
-            <SplitViewPitch />
+            <SplitViewPitch
+              ipOverlayNode={buildOverlayForBoard("ip")}
+              oopOverlayNode={buildOverlayForBoard("oop")}
+            />
           ) : (
             <div className="max-w-[640px] w-full mx-auto">
-              <DualPhasePitch phase={viewMode} />
+              <DualPhasePitch
+                phase={viewMode}
+                overlayNode={buildOverlayForBoard(viewMode)}
+              />
             </div>
           )}
 
           <p className="text-xs text-slate-400 px-1">
-            Tip: Drag any outfield player onto one of the 24 official snap positions (or click a
-            dashed snap marker while a player is selected) to reshape IP and OOP independently.
-            Double-click any player token to configure Role, Duty, and 43-bit Player Instructions.
+            Drag tokens across the 24 official snap points (or click a dashed marker while a player
+            is selected). Double-click any player token to edit Role, Duty, and 43-bit Player
+            Instructions.
           </p>
         </div>
 
-        {/* Right Tactical Inspector */}
-        <aside className="lg:col-span-4 flex flex-col gap-4">
-          {/* Selected Player Quick Card */}
+        {/* Right Inspector: Selected Slot + Analytics / Instructions Tabs */}
+        <aside className="lg:col-span-4 flex flex-col gap-3.5">
           {selectedSlot && (
             <section className="tactical-surface rounded-xl p-3.5 flex flex-col gap-2.5">
               <div className="flex items-center justify-between">
@@ -516,7 +573,7 @@ export default function TacticalBoardWorkspacePage() {
                   onClick={() => setPlayerModalOpen(true)}
                   className="px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-500/18 text-cyan-300 border border-cyan-500/35 hover:bg-cyan-500/28 transition cursor-pointer"
                 >
-                  Edit Role & PI
+                  Edit Role &amp; PI
                 </button>
               </div>
 
@@ -543,10 +600,46 @@ export default function TacticalBoardWorkspacePage() {
             </section>
           )}
 
-          <MentalityBar />
-          <TeamInstructionPanel />
+          {/* Inspector Switcher */}
+          <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-[#111827] border border-white/10">
+            <button
+              id="inspector-tab-analytics"
+              type="button"
+              onClick={() => setInspectorTab("analytics")}
+              className={`py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                inspectorTab === "analytics"
+                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/35"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              Balance &amp; Gaps ({balanceReport.alerts.length})
+            </button>
+            <button
+              id="inspector-tab-instructions"
+              type="button"
+              onClick={() => setInspectorTab("instructions")}
+              className={`py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                inspectorTab === "instructions"
+                  ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/35"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              Mentality &amp; 29 TI
+            </button>
+          </div>
 
-          {/* Local /tactics/ Folder Browser when Connected */}
+          {inspectorTab === "analytics" ? (
+            <>
+              <BalanceRadar report={balanceReport} />
+              <CoachingFindingsList alerts={balanceReport.alerts} />
+            </>
+          ) : (
+            <>
+              <MentalityBar />
+              <TeamInstructionPanel />
+            </>
+          )}
+
           {folderStatus === "connected" && (
             <section className="tactical-surface rounded-xl p-3.5 flex flex-col gap-2.5">
               <div className="flex items-center justify-between">
@@ -565,11 +658,10 @@ export default function TacticalBoardWorkspacePage() {
 
               {tacticFiles.length === 0 ? (
                 <p className="text-xs text-slate-400">
-                  No .fmf files found in /tactics yet. Click &ldquo;Save to FM27 /tactics&rdquo; to
-                  write directly.
+                  No .fmf files in /tactics yet. Click &ldquo;Save to FM27 /tactics&rdquo; above.
                 </p>
               ) : (
-                <div className="flex flex-col gap-1.5 max-h-44 overflow-y-auto">
+                <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto">
                   {tacticFiles.map((f) => (
                     <button
                       key={f.name}
@@ -603,6 +695,7 @@ export default function TacticalBoardWorkspacePage() {
       </div>
 
       <PlayerInstructionModal />
+      <AiAdvisorDrawer open={aiDrawerOpen} onClose={() => setAiDrawerOpen(false)} />
     </main>
   );
 }

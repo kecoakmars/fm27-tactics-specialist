@@ -8,6 +8,7 @@ export default defineConfig({
       "@fm27/fm-data": path.resolve(__dirname, "packages/fm-data/src/index.ts"),
       "@fm27/fm-codec": path.resolve(__dirname, "packages/fm-codec/src/index.ts"),
       "@fm27/fm-engine": path.resolve(__dirname, "packages/fm-engine/src/index.ts"),
+      "@fm27/ai-analyst": path.resolve(__dirname, "packages/ai-analyst/src/index.ts"),
       "@": path.resolve(__dirname, "apps/web/src"),
     },
   },
