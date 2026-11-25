@@ -1,0 +1,285 @@
+{
+  "schemaVersion": 1,
+  "game": "FM27",
+  "patchVersion": "27.0",
+  "exportedAt": "2026-11-25T03:49:08.461Z",
+  "tactic": {
+    "title": "Gegenpress 4-2-3-1 -> 4-2-3-1",
+    "description": "Generated deterministic FM27 dual-phase tactic (4-2-3-1 IP / 4-2-3-1 OOP).",
+    "author": "FM27 Engine",
+    "patchVersion": "27.0",
+    "styleId": "Gegenpress",
+    "mentality": 5,
+    "inFormation": "4-2-3-1",
+    "outFormation": "4-2-3-1",
+    "teamInstructions": {
+      "LineOfEngagement": 61,
+      "PassingDirectness": 3,
+      "DefensiveLine": 57,
+      "Crossing": 10,
+      "Tempo": 47,
+      "AttackingTransition": 54,
+      "DefensiveTransition": 70,
+      "TriggerPress": 65,
+      "PreventShortGKDistribution": 69,
+      "GoalKicks": 44,
+      "GoalkeeperDistributionTarget": 35,
+      "DefensiveLineBehaviour": 76
+    },
+    "slots": [
+      {
+        "slotIndex": 0,
+        "playerUid": 1012,
+        "playerName": "Kai Havertz",
+        "inPossession": {
+          "positionId": "ST",
+          "roleId": "CentreForward",
+          "duty": "Attack",
+          "playerInstructionBits": [
+            3,
+            13
+          ],
+          "markingPositionMask": 0
+        },
+        "outOfPossession": {
+          "positionId": "ST",
+          "roleId": "OPCentreForward",
+          "duty": "Defend",
+          "playerInstructionBits": [
+            29
+          ],
+          "markingPositionMask": 0
+        }
+      },
+      {
+        "slotIndex": 1,
+        "playerUid": 1011,
+        "playerName": "Gabriel Martinelli",
+        "inPossession": {
+          "positionId": "AML",
+          "roleId": "WideForward",
+          "duty": "Attack",
+          "playerInstructionBits": [
+            1,
+            13,
+            22,
+            41
+          ],
+          "markingPositionMask": 0
+        },
+        "outOfPossession": {
+          "positionId": "AML",
+          "roleId": "OPInsideOutletWinger",
+          "duty": "Defend",
+          "playerInstructionBits": [
+            29
+          ],
+          "markingPositionMask": 0
+        }
+      },
+      {
+        "slotIndex": 2,
+        "playerUid": 1008,
+        "playerName": "Martin Odegaard",
+        "inPossession": {
+          "positionId": "AMC",
+          "roleId": "AttackingMidfielder",
+          "duty": "Support",
+          "playerInstructionBits": [
+            3,
+            13
+          ],
+          "markingPositionMask": 0
+        },
+        "outOfPossession": {
+          "positionId": "AMC",
+          "roleId": "OPCentralOutletAttackingMidfielder",
+          "duty": "Defend",
+          "playerInstructionBits": [
+            29
+          ],
+          "markingPositionMask": 0
+        }
+      },
+      {
+        "slotIndex": 3,
+        "playerUid": 1010,
+        "playerName": "Bukayo Saka",
+        "inPossession": {
+          "positionId": "AMR",
+          "roleId": "InsideForward",
+          "duty": "Attack",
+          "playerInstructionBits": [
+            3,
+            13,
+            22,
+            41
+          ],
+          "markingPositionMask": 0
+        },
+        "outOfPossession": {
+          "positionId": "AMR",
+          "roleId": "OPWideOutletWinger",
+          "duty": "Defend",
+          "playerInstructionBits": [
+            29
+          ],
+          "markingPositionMask": 0
+        }
+      },
+      {
+        "slotIndex": 4,
+        "playerUid": 1007,
+        "playerName": "Declan Rice",
+        "inPossession": {
+          "positionId": "DML",
+          "roleId": "DefensiveMidfielder",
+          "duty": "Defend",
+          "playerInstructionBits": [
+            3,
+            14
+          ],
+          "markingPositionMask": 0
+        },
+        "outOfPossession": {
+          "positionId": "DML",
+          "roleId": "OPPressingDefensiveMidfielder",
+          "duty": "Defend",
+          "playerInstructionBits": [
+            29
+          ],
+          "markingPositionMask": 0
+        }
+      },
+      {
+        "slotIndex": 5,
+        "playerUid": 1018,
+        "playerName": "Thomas Anchor",
+        "inPossession": {
+          "positionId": "DMR",
+          "roleId": "DeepLyingPlaymaker",
+          "duty": "Support",
+          "playerInstructionBits": [
+            3,
+            23
+          ],
+          "markingPositionMask": 0
+        },
+        "outOfPossession": {
+          "positionId": "DMR",
+          "roleId": "OPDefensiveMidfielder",
+          "duty": "Defend",
+          "playerInstructionBits": [],
+          "markingPositionMask": 0
+        }
+      },
+      {
+        "slotIndex": 6,
+        "playerUid": 1013,
+        "playerName": "Riccardo Calafiori",
+        "inPossession": {
+          "positionId": "DL",
+          "roleId": "FullBack",
+          "duty": "Support",
+          "playerInstructionBits": [],
+          "markingPositionMask": 0
+        },
+        "outOfPossession": {
+          "positionId": "DL",
+          "roleId": "OPPressingFullBack",
+          "duty": "Defend",
+          "playerInstructionBits": [
+            29
+          ],
+          "markingPositionMask": 0
+        }
+      },
+      {
+        "slotIndex": 7,
+        "playerUid": 1004,
+        "playerName": "William Saliba",
+        "inPossession": {
+          "positionId": "DCL",
+          "roleId": "CentreBack",
+          "duty": "Support",
+          "playerInstructionBits": [],
+          "markingPositionMask": 0
+        },
+        "outOfPossession": {
+          "positionId": "DCL",
+          "roleId": "OPStoppingCentreBack",
+          "duty": "Defend",
+          "playerInstructionBits": [
+            29
+          ],
+          "markingPositionMask": 0
+        }
+      },
+      {
+        "slotIndex": 8,
+        "playerUid": 1005,
+        "playerName": "Gabriel Magalhaes",
+        "inPossession": {
+          "positionId": "DCR",
+          "roleId": "CentreBack",
+          "duty": "Support",
+          "playerInstructionBits": [],
+          "markingPositionMask": 0
+        },
+        "outOfPossession": {
+          "positionId": "DCR",
+          "roleId": "OPStoppingCentreBack",
+          "duty": "Defend",
+          "playerInstructionBits": [
+            29
+          ],
+          "markingPositionMask": 0
+        }
+      },
+      {
+        "slotIndex": 9,
+        "playerUid": 1003,
+        "playerName": "Ben White",
+        "inPossession": {
+          "positionId": "DR",
+          "roleId": "FullBack",
+          "duty": "Support",
+          "playerInstructionBits": [],
+          "markingPositionMask": 0
+        },
+        "outOfPossession": {
+          "positionId": "DR",
+          "roleId": "OPPressingFullBack",
+          "duty": "Defend",
+          "playerInstructionBits": [
+            29
+          ],
+          "markingPositionMask": 0
+        }
+      },
+      {
+        "slotIndex": 10,
+        "playerUid": 1001,
+        "playerName": "David Raya",
+        "inPossession": {
+          "positionId": "GK",
+          "roleId": "Goalkeeper",
+          "duty": "Defend",
+          "playerInstructionBits": [
+            14
+          ],
+          "markingPositionMask": 0
+        },
+        "outOfPossession": {
+          "positionId": "GK",
+          "roleId": "OPGoalkeeper",
+          "duty": "Defend",
+          "playerInstructionBits": [
+            32
+          ],
+          "markingPositionMask": 0
+        }
+      }
+    ]
+  }
+}

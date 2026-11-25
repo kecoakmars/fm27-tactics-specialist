@@ -194,8 +194,49 @@ importers:
         specifier: ^3.24.2
         version: 3.25.76
 
+  packages/fm-codec:
+    dependencies:
+      '@fm27/fm-data':
+        specifier: workspace:*
+        version: link:../fm-data
+      '@fm27/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      fzstd:
+        specifier: ^0.1.1
+        version: 0.1.1
+      lz-string:
+        specifier: ^1.5.0
+        version: 1.5.0
+      zod:
+        specifier: ^3.24.2
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^22.13.0
+        version: 22.20.5
+      typescript:
+        specifier: ^5.8.2
+        version: 5.9.3
+
   packages/fm-data:
     dependencies:
+      '@fm27/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      zod:
+        specifier: ^3.24.2
+        version: 3.25.76
+    devDependencies:
+      typescript:
+        specifier: ^5.8.2
+        version: 5.9.3
+
+  packages/fm-engine:
+    dependencies:
+      '@fm27/fm-data':
+        specifier: workspace:*
+        version: link:../fm-data
       '@fm27/shared-types':
         specifier: workspace:*
         version: link:../shared-types
@@ -650,11 +691,18 @@ packages:
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
 
+  fzstd@0.1.1:
+    resolution: {integrity: sha512-dkuVSOKKwh3eas5VkJy1AW1vFpet8TA/fGmVA5krThl8YcOVE/8ZIoEA1+U1vEn5ckxxhLirSdY837azmbaNHA==}
+
   js-tokens@9.0.1:
     resolution: {integrity: sha512-mxa9E9ITFOt0ban3j6L5MpjwegGz6lBQmM1IJkWeBZGcMxto50+eWdjC/52xDbS2vy0k7vIMK0Fe2wfL9OQSpQ==}
 
   loupe@3.2.1:
     resolution: {integrity: sha512-CdzqowRJCeLU72bHvWqwRBBlLcMEtIvGrlvef74kMnV2AolS9Y8xUv1I0U/MNAWMhBlKIoyuEgoJ0t/bbwHbLQ==}
+
+  lz-string@1.5.0:
+    resolution: {integrity: sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==}
+    hasBin: true
 
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
@@ -1123,9 +1171,13 @@ snapshots:
   fsevents@2.3.3:
     optional: true
 
+  fzstd@0.1.1: {}
+
   js-tokens@9.0.1: {}
 
   loupe@3.2.1: {}
+
+  lz-string@1.5.0: {}
 
   magic-string@0.30.21:
     dependencies:

@@ -2,6 +2,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { exportFm27Json, exportFmf } from "../packages/fm-codec/src/index.js";
+import {
+  analyzeSquadAndGenerateTactics,
+  parseSquadCsv,
+} from "../packages/fm-engine/src/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -82,9 +87,25 @@ function buildSampleSquadCsv() {
 
 function main() {
   fs.mkdirSync(FIXTURES_DIR, { recursive: true });
+  const squadCsv = buildSampleSquadCsv();
   const squadCsvPath = path.join(FIXTURES_DIR, "sample-squad.csv");
-  fs.writeFileSync(squadCsvPath, buildSampleSquadCsv(), "utf8");
-  console.log(`[generate-golden-fixtures] Wrote ${path.relative(REPO_ROOT, squadCsvPath)}`);
+  fs.writeFileSync(squadCsvPath, squadCsv, "utf8");
+
+  const parsedPlayers = parseSquadCsv(squadCsv);
+  const plans = analyzeSquadAndGenerateTactics(parsedPlayers, { styleId: "Gegenpress" });
+  const topPlan = plans[0];
+
+  const fmfBytes = exportFmf(topPlan.tactic);
+  const fmfPath = path.join(FIXTURES_DIR, "golden-gegenpress.fmf");
+  fs.writeFileSync(fmfPath, fmfBytes);
+
+  const jsonText = exportFm27Json(topPlan.tactic);
+  const jsonPath = path.join(FIXTURES_DIR, "golden-gegenpress.fm27.json");
+  fs.writeFileSync(jsonPath, jsonText, "utf8");
+
+  console.log(
+    `[generate-golden-fixtures] Wrote sample-squad.csv, golden-gegenpress.fmf (${fmfBytes.byteLength} B), and golden-gegenpress.fm27.json`,
+  );
 }
 
 main();

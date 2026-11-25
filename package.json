@@ -16,7 +16,7 @@
     "data:extract": "node scripts/extract-legacy-data.mjs",
     "data:validate": "tsx scripts/validate-data.mjs",
     "data:new-patch": "node scripts/new-patch-version.mjs",
-    "data:fixtures": "node scripts/generate-golden-fixtures.mjs",
+    "data:fixtures": "tsx scripts/generate-golden-fixtures.mjs",
     "db:seed": "node scripts/seed-db.mjs"
   },
   "devDependencies": {
