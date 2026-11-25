@@ -10,7 +10,9 @@ const UNSAFE_TERMS_REGEX =
   /\b(casino|viagra|crypto\s*airdrop|telegram\s*pump|hate\s*speech|malware)\b/i;
 
 function inferLocalPlaystyleTag(tactic?: DualPhaseTactic, text = ""): PlaystyleTag {
-  const combined = `${tactic?.styleId ?? ""} ${tactic?.title ?? ""} ${text}`.toLowerCase();
+  const combined = `${tactic?.styleId ?? ""} ${tactic?.title ?? ""} ${text}`
+    .toLowerCase()
+    .replace(/\b(out[- ]of[- ]possession|in[- ]possession)\b/g, " ");
   const ti = tactic?.teamInstructions ?? {};
 
   if (
