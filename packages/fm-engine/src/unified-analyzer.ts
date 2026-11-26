@@ -1048,28 +1048,157 @@ function buildUnifiedWonderkidPlan(params: {
   };
 }
 
+function selectPrimarySolverSquad(squad: readonly Player[]): readonly Player[] {
+  const firstTeam = squad.filter((p) => p.teamSlot === "First Team");
+  if (firstTeam.length >= 11) {
+    const gks = firstTeam.filter((p) => (p.positions.GK ?? 0) >= 15);
+    const outfielders = firstTeam.filter(
+      (p) =>
+        (p.positions.GK ?? 0) < 15 &&
+        Math.max(
+          ...Object.entries(p.positions)
+            .filter(([k]) => k !== "GK")
+            .map(([, v]) => v),
+        ) >= 10,
+    );
+    if (gks.length >= 1 && outfielders.length >= 10) {
+      return firstTeam;
+    }
+  }
+  return squad;
+}
+
+const UNDERDOG_REACTIVE_STYLE_IDS = new Set<string>([
+  "ParkTheBus",
+  "RouteOne",
+  "Catenaccio",
+  "DirectCounterAttack",
+]);
+
 function solveAll13StylesBy16Shapes(
   squad: readonly Player[],
   dataset: PatchBundle,
   patchVersion: string,
-): Array<{ styleId: string; styleName: string; plan: TacticPlanResult }> {
-  const allCandidates: Array<{ styleId: string; styleName: string; plan: TacticPlanResult }> = [];
+): Array<{
+  styleId: string;
+  styleName: string;
+  plan: TacticPlanResult;
+  selectionScore: number;
+  rationale: string;
+}> {
+  const normalized = squad.map((p) => normalizePlayer(p, patchVersion));
+  const sortedByAbility = [...normalized].sort((a, b) => b.ability - a.ability);
+  const top11 = sortedByAbility.slice(0, 11);
+  const top6Outfield = sortedByAbility.filter((p) => !p.isGoalkeeper).slice(0, 6);
+  const avgTop11Ability =
+    top11.length > 0
+      ? top11.reduce((acc, p) => acc + p.ability, 0) / top11.length
+      : 12;
+
+  const starWideAttackers = top6Outfield.filter(
+    (p) => (p.positions.AML ?? 0) >= 16 || (p.positions.AMR ?? 0) >= 16,
+  ).length;
+  const starPlaymaker10s = top6Outfield.filter(
+    (p) => (p.positions.AMC ?? 0) >= 18,
+  ).length;
+  const naturalStrikers = normalized.filter(
+    (p) => !p.isGoalkeeper && (p.positions.STC ?? 0) >= 17 && p.ability >= avgTop11Ability - 1.5,
+  ).length;
+  const naturalWingbacks = normalized.filter(
+    (p) => ((p.positions.WBL ?? 0) >= 16 || (p.positions.WBR ?? 0) >= 16) && p.ability >= avgTop11Ability - 1.5,
+  ).length;
+
+  const allCandidates: Array<{
+    styleId: string;
+    styleName: string;
+    plan: TacticPlanResult;
+    selectionScore: number;
+    rationale: string;
+  }> = [];
+
   for (const style of dataset.tacticalStyles.TacticalStyles) {
     const plans = analyzeSquadAndGenerateTactics(squad, {
       styleId: style.Id,
       patchVersion,
     });
     for (const plan of plans) {
+      let alignment = 0;
+      const notes: string[] = [];
+
+      // 1. Club quality vs tactical ambition alignment
+      if (avgTop11Ability >= 14.2) {
+        if (UNDERDOG_REACTIVE_STYLE_IDS.has(style.Id)) {
+          alignment -= 4.5;
+        } else if (style.Id === "Balanced" || style.Id === "PatientMidBlock") {
+          alignment -= 1.6;
+        } else if (style.Id === "HighTempoPress") {
+          alignment -= 1.4;
+        } else if (style.Id === "ControlPossession" || style.Id === "Gegenpress") {
+          alignment += 1.1;
+        } else if (
+          style.Id === "VerticalTikiTaka" ||
+          style.Id === "FluidCounterAttack"
+        ) {
+          alignment += 0.6;
+        } else if (style.Id === "TikiTaka") {
+          alignment += 0.2;
+        }
+      } else if (avgTop11Ability < 11.5) {
+        if (style.Id === "TikiTaka" || style.Id === "ControlPossession") {
+          alignment -= 2.0;
+        }
+      }
+
+      const inSlots = plan.tactic.slots.map((s) => s.inPossession.positionId);
+      const hasWingers = inSlots.includes("AML") && inSlots.includes("AMR");
+      const hasCentral10 = inSlots.includes("AMC") || inSlots.includes("AMCL");
+      const strikerCount = inSlots.filter((s) => s.startsWith("ST")).length;
+      const cbCount = inSlots.filter((s) => s.startsWith("DC")).length;
+
+      // 2. Natural star roster structure synergy (prevent benching elite wingers / #10s or forcing 2-ST with 1 striker)
+      if (starWideAttackers >= 2) {
+        if (hasWingers) {
+          alignment += 1.2;
+          notes.push("memaksimalkan winger/inside-forward bintang");
+        } else {
+          alignment -= 1.8;
+        }
+      }
+      if (starPlaymaker10s >= 1 && hasCentral10) {
+        alignment += 0.9;
+        notes.push("mengakomodasi No. 10 kreatif utama");
+      }
+      if (strikerCount >= 2 && naturalStrikers < 2) {
+        alignment -= 1.6;
+      }
+      if (cbCount >= 3 && naturalWingbacks < 2) {
+        alignment -= 1.2;
+      }
+
+      // 3. Reward starters' average CA retention (prevent benching top stars)
+      const starterUids = new Set(plan.tactic.slots.map((s) => s.playerUid));
+      const starterAvgAbility =
+        normalized
+          .filter((p) => starterUids.has(p.uid))
+          .reduce((acc, p) => acc + p.ability, 0) / 11;
+      alignment += (starterAvgAbility - avgTop11Ability) * 1.8;
+
+      notes.push(`StartFit ${plan.startingFit.toFixed(1)}`);
+      notes.push(`Cover ${plan.coverFit.toFixed(1)}`);
+
       allCandidates.push({
         styleId: style.Id,
         styleName: style.Name,
         plan,
+        selectionScore: round2(plan.rankingFit + alignment),
+        rationale: `${style.Name} · ${notes.join(" · ")}`,
       });
     }
   }
 
   allCandidates.sort(
     (a, b) =>
+      b.selectionScore - a.selectionScore ||
       b.plan.rankingFit - a.plan.rankingFit ||
       b.plan.squadFit - a.plan.squadFit ||
       a.plan.tactic.title.localeCompare(b.plan.tactic.title),
@@ -1099,6 +1228,7 @@ export function analyzeUnified(params: AnalyzeUnifiedParams): UnifiedReport {
 
   const mode: UnifiedAnalysisMode =
     hasTactic && hasSquad ? "combined" : hasTactic ? "fmf-only" : "squad-only";
+  const effectiveSquad = hasSquad ? selectPrimarySolverSquad(params.squad!) : undefined;
 
   let activeTactic: DualPhaseTactic;
   let recommendedTactic: DualPhaseTactic;
@@ -1111,7 +1241,7 @@ export function analyzeUnified(params: AnalyzeUnifiedParams): UnifiedReport {
     recommendedTactic = params.tactic!;
     alternativeShapes = rankAlternativeStyleShapesForTactic(activeTactic, dataset);
   } else if (mode === "squad-only") {
-    const squad = params.squad!;
+    const squad = effectiveSquad!;
     const allEvaluated = solveAll13StylesBy16Shapes(squad, dataset, patchVersion);
     const winner = allEvaluated[0]!;
     activeTactic = winner.plan.tactic;
@@ -1142,14 +1272,14 @@ export function analyzeUnified(params: AnalyzeUnifiedParams): UnifiedReport {
           matchedShape?.HighPress ??
           (item.plan.tactic.teamInstructions.LineOfEngagement ?? 62) === 61,
         compatibilityScore: item.plan.rankingFit,
-        rationale: `${item.styleName} · StartFit ${item.plan.startingFit.toFixed(1)} · Cover ${item.plan.coverFit.toFixed(1)}`,
+        rationale: item.rationale,
         tactic: item.plan.tactic,
       });
       if (alternativeShapes.length >= 3) break;
     }
   } else {
     // Mode C: Combined (.fmf tactic + real club squad)
-    const squad = params.squad!;
+    const squad = effectiveSquad!;
     const baseline = gradeImportedTactic(params.tactic!, squad, {
       improve: false,
       patchVersion,
@@ -1204,10 +1334,7 @@ export function analyzeUnified(params: AnalyzeUnifiedParams): UnifiedReport {
   }
 
   const heatmap = computeHeatmap18Zones(activeTactic, { catalog: dataset.pitchCatalog });
-  const rawBalance = computeTacticalBalance(
-    activeTactic,
-    hasSquad ? params.squad! : undefined,
-  );
+  const rawBalance = computeTacticalBalance(activeTactic, effectiveSquad);
   const structuralAdjustments =
     mode === "fmf-only"
       ? buildModeACoachingAlerts(activeTactic, dataset, rawBalance.alerts)
@@ -1218,7 +1345,7 @@ export function analyzeUnified(params: AnalyzeUnifiedParams): UnifiedReport {
   };
 
   const blueprint = buildSquadBlueprint(activeTactic, dataset);
-  const audit = hasSquad ? auditSquadAgainstTactic(activeTactic, params.squad!) : null;
+  const audit = effectiveSquad ? auditSquadAgainstTactic(activeTactic, effectiveSquad) : null;
 
   const squadBlueprintOrAudit: UnifiedSquadSection = hasSquad
     ? {

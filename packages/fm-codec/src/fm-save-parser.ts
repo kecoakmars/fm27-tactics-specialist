@@ -982,11 +982,23 @@ function scanClubsAndTeams(
   return { clubs: rawClubs, clubByUid, teamToClubUid };
 }
 
+const PERSONALITY_BINARY_KEYS = [
+  "adaptability",
+  "ambition",
+  "loyalty",
+  "pressure",
+  "professionalism",
+  "sportsmanship",
+  "temperament",
+  "controversy",
+] as const;
+
 interface DecodedPerson {
   name: string;
   age: number;
   nationId: number;
   adaptability: number;
+  personality: Record<string, number>;
   blockStart: number;
 }
 
@@ -1113,13 +1125,18 @@ function decodePersonBlockInWindow(
 
     const age = computeAge(birth, clock);
     const nationId = readU16LE(gameDb, birthAt + nationOffset);
-    const adaptability = gameDb[birthAt + personalityOffset]!;
+    const personality: Record<string, number> = {};
+    for (let k = 0; k < PERSONALITY_BINARY_KEYS.length; k++) {
+      personality[PERSONALITY_BINARY_KEYS[k]!] = gameDb[birthAt + personalityOffset + k]!;
+    }
+    const adaptability = personality.adaptability ?? 10;
 
     return {
       name: displayName,
       age,
       nationId,
       adaptability,
+      personality,
       blockStart,
     };
   }
@@ -1591,6 +1608,7 @@ export function parseFmSave(
         potentialAbility: paResolved,
         attributes: attributes as PlayerAttributes,
         positions: positions as PositionFamiliarity,
+        ...(person?.personality ? { personality: person.personality } : {}),
       };
       let list = playersByClub[clubObj.uid];
       if (!list) {

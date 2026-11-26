@@ -1,5 +1,9 @@
 import type { LineupPreference } from "@fm27/shared-types";
-import { averagePlayerAttributes, type NormalizedPlayerProfile } from "./normalizer.js";
+import {
+  averagePlayerAttributes,
+  getPlayerSlotFamiliarity,
+  type NormalizedPlayerProfile,
+} from "./normalizer.js";
 
 export const LOCKED_STARTER_BONUS = 10_000;
 export const FORBIDDEN_SLOT_SCORE = -1_000_000;
@@ -95,8 +99,23 @@ export function computePlayerStyleRating(
  * Builds the 11 x N assignment matrix blending `0.90 * Fit + 0.10 * styleRating`
  * on outfield slots when a tactical style is active, and adding `+10_000` for locked starters.
  */
+export function computeCentralPairFootBias(
+  slotId: string,
+  player: NormalizedPlayerProfile,
+): number {
+  const footDelta = player.leftFoot - player.rightFoot;
+  if (slotId === "DCL" || slotId === "DML" || slotId === "MCL" || slotId === "STL") {
+    return 0.025 * footDelta;
+  }
+  if (slotId === "DCR" || slotId === "DMR" || slotId === "MCR" || slotId === "STR") {
+    return -0.025 * footDelta;
+  }
+  return 0;
+}
+
 export function buildAssignmentMatrix(params: {
   inSlots: readonly string[];
+  outSlots?: readonly string[];
   rawFits: readonly (readonly (number | null)[])[];
   players: readonly NormalizedPlayerProfile[];
   styleAttributes?: readonly string[];
@@ -108,12 +127,28 @@ export function buildAssignmentMatrix(params: {
   );
 
   return params.inSlots.map((slotId, slotIdx) => {
+    const outSlotId = params.outSlots?.[slotIdx] ?? slotId;
     const rowFits = params.rawFits[slotIdx]!;
     return params.players.map((player, playerIdx) => {
       const fit = rowFits[playerIdx];
       if (fit === null || fit === undefined) return FORBIDDEN_SLOT_SCORE;
 
-      let val = fit;
+      let val = fit + computeCentralPairFootBias(slotId, player);
+
+      // In FM27 match engine, familiarity 17..20 is Accomplished/Natural (~98-100% effectiveness).
+      // Compensate part of the linear 17..19 gap and weight proven senior ability so high-CA stars
+      // (e.g. Tielemans CA 159 at DM:18) aren't benched for low-CA backups solely over 18 vs 20 familiarity.
+      if (slotId !== "GK" && player.fullProfile && params.outSlots) {
+        const inFam = getPlayerSlotFamiliarity(player, slotId);
+        const outFam = getPlayerSlotFamiliarity(player, outSlotId);
+        const minFam = Math.min(inFam, outFam);
+        if (minFam >= 16) {
+          const famComp = Math.min(2.2, (20 - (inFam + outFam) * 0.5) * 0.9);
+          const abilityBonus = Math.max(-1.5, (player.ability - 14.0) * 1.15);
+          val += famComp + abilityBonus;
+        }
+      }
+
       if (slotId !== "GK" && val > 0 && hasStyle) {
         val = 0.9 * val + 0.1 * (styleRatings[playerIdx] ?? 0);
       }

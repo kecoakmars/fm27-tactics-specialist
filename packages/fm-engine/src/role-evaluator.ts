@@ -116,12 +116,129 @@ export interface BestRoleSelection {
  * - -0.45 specialist complexity threshold
  * - +0.20 * |role.Keys ∩ styleAttributes| tie-breaker (excluded from returned `roleQuality`!)
  */
+const NICHE_IP_SOLVER_ROLES = new Set<string>([
+  "NoNonsenseGoalkeeper",
+  "NoNonsenseCentreBack",
+  "OverlappingCentreBack",
+  "PlaymakingWingBack",
+  "PlaymakingWinger",
+  "WideCentralMidfielder",
+  "ChannelMidfielder",
+  "BoxToBoxPlaymaker",
+  "FreeRole",
+]);
+
+const DIRECT_DEFENSIVE_STYLE_IDS = new Set<string>([
+  "RouteOne",
+  "ParkTheBus",
+  "Catenaccio",
+  "DirectCounterAttack",
+]);
+
+const COUNTER_OUTLET_STYLE_IDS = new Set<string>([
+  "FluidCounterAttack",
+  "DirectCounterAttack",
+  "RouteOne",
+  "Catenaccio",
+  "ParkTheBus",
+]);
+
+const AERIAL_TARGET_STYLE_IDS = new Set<string>([
+  "RouteOne",
+  "DirectCounterAttack",
+  "WingPlay",
+  "FluidCounterAttack",
+  "ParkTheBus",
+  "Catenaccio",
+]);
+
+export function isOopOutletRole(roleId: string): boolean {
+  return roleId.startsWith("OP") && roleId.includes("Outlet");
+}
+
+export interface SolverRoleFilterOptions {
+  styleId?: string;
+  preferredRoles?: readonly string[];
+  highPress?: boolean;
+  player?: NormalizedPlayerProfile;
+  patchVersion?: string;
+}
+
+/**
+ * Returns curated tactical role candidates for automatic formation/role recommendation,
+ * matching Doctor W's ~30 core `SquadAnalysis.Roles` discipline:
+ * - Prevents OOP `Outlet` roles from turning all forwards/wingers into non-pressing passengers
+ *   in High-Press / Balanced / Possession systems.
+ * - Prevents niche hoofball/gimmick IP roles (`NoNonsenseCentreBack`, `ChannelMidfielder`, etc.)
+ *   from overriding standard roles unless suited to the active style or player archetype.
+ */
+export function getSolverCandidateRolesForSlot(
+  slotId: string,
+  phase: 0 | 1,
+  shapeSlots: readonly string[],
+  options: SolverRoleFilterOptions = {},
+): RoleProfileEntry[] {
+  const patchVersion = options.patchVersion ?? "27.0";
+  const all = getCandidateRolesForSlot(slotId, phase, shapeSlots, patchVersion);
+  if (all.length <= 1) return all;
+
+  const preferredSet = new Set(options.preferredRoles ?? []);
+  const styleId = options.styleId ?? "";
+  const isDirectDefensive = DIRECT_DEFENSIVE_STYLE_IDS.has(styleId);
+  const allowsCounterOutlet =
+    !options.highPress && COUNTER_OUTLET_STYLE_IDS.has(styleId);
+
+  const filtered = all.filter((role) => {
+    if (preferredSet.has(role.Id)) return true;
+
+    if (phase === 1) {
+      if (isOopOutletRole(role.Id) && !allowsCounterOutlet) {
+        return false;
+      }
+      return true;
+    }
+
+    if (
+      (role.Id === "NoNonsenseCentreBack" || role.Id === "NoNonsenseGoalkeeper") &&
+      !isDirectDefensive
+    ) {
+      return false;
+    }
+
+    if (NICHE_IP_SOLVER_ROLES.has(role.Id)) {
+      return false;
+    }
+
+    if (role.Id === "TargetForward") {
+      if (styleId && !AERIAL_TARGET_STYLE_IDS.has(styleId) && !preferredSet.has("TargetForward")) {
+        return false;
+      }
+      if (options.player) {
+        const jr = options.player.attributes.jumping_reach ?? options.player.ability;
+        const hd = options.player.attributes.heading ?? options.player.ability;
+        if (jr < 15 || hd < 15) return false;
+      }
+    }
+
+    if (role.Id === "FalseNine" && options.player) {
+      const vis = options.player.attributes.vision ?? options.player.ability;
+      const pas = options.player.attributes.passing ?? options.player.ability;
+      if (vis < 15 || pas < 15) return false;
+    }
+
+    return true;
+  });
+
+  return filtered.length > 0 ? filtered : all;
+}
+
 export function selectBestRole(
   player: NormalizedPlayerProfile,
   slotId: string,
   candidateRoles: readonly RoleProfileEntry[],
   styleAttributes?: ReadonlySet<string>,
   patchVersion = "27.0",
+  preferredRoles?: ReadonlySet<string>,
 ): BestRoleSelection {
   if (candidateRoles.length === 0) {
     throw new Error(`No candidate roles available for slot "${slotId}"`);
@@ -141,7 +258,19 @@ export function selectBestRole(
         if (styleAttributes.has(k)) overlap++;
       }
     }
-    const selectionScore = q + 0.2 * overlap;
+    let selectionBonus = 0.2 * overlap;
+    if (preferredRoles && preferredRoles.has(role.Id)) {
+      selectionBonus += 0.25;
+    }
+    if (preferredRoles && (slotId === "AML" || slotId === "AMR")) {
+      const footDelta = player.leftFoot - player.rightFoot;
+      if (role.Id === "Winger") {
+        selectionBonus += (slotId === "AML" ? 0.08 : -0.08) * footDelta;
+      } else if (role.Id === "InsideWinger") {
+        selectionBonus += (slotId === "AML" ? -0.1 : 0.1) * footDelta;
+      }
+    }
+    const selectionScore = q + selectionBonus;
     if (selectionScore > bestSelectionScore) {
       bestSelectionScore = selectionScore;
       bestRole = role;

@@ -63,8 +63,8 @@ export function computeLineMetric(
     case "width": {
       const wide = outfield.filter(
         (s) =>
-          s.inSlot === "DL" ||
-          s.inSlot === "DR" ||
+          (s.inSlot === "DL" && s.inRoleId !== "InsideFullBack" && s.inRoleId !== "InsideWingBack") ||
+          (s.inSlot === "DR" && s.inRoleId !== "InsideFullBack" && s.inRoleId !== "InsideWingBack") ||
           s.inSlot === "WBL" ||
           s.inSlot === "WBR" ||
           s.inSlot === "ML" ||
@@ -72,7 +72,7 @@ export function computeLineMetric(
           s.inSlot === "AML" ||
           s.inSlot === "AMR" ||
           s.inRoleId.includes("Wide") ||
-          s.inRoleId.includes("Wing"),
+          (s.inRoleId.includes("Wing") && s.inRoleId !== "InsideWingBack"),
       );
       const scores = wide.map((m) =>
         averagePlayerAttributes(m.player, [
@@ -83,7 +83,8 @@ export function computeLineMetric(
           "dribbling",
         ]),
       );
-      return clamp20(weakLink(scores));
+      const widthCountPenalty = wide.length < 2 ? -2.0 : wide.length === 2 ? -0.6 : 0;
+      return clamp20(weakLink(scores) + widthCountPenalty);
     }
 
     case "press": {

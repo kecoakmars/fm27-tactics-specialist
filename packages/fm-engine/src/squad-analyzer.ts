@@ -34,7 +34,9 @@ import {
 } from "./normalizer.js";
 import {
   getCandidateRolesForSlot,
+  getSolverCandidateRolesForSlot,
   inferDutyForRole,
+  isOopOutletRole,
   scoreSingleRoleQuality,
   selectBestRole,
 } from "./role-evaluator.js";
@@ -51,6 +53,9 @@ function computeBenchCoverFit(params: {
   players: readonly NormalizedPlayerProfile[];
   inSlots: readonly string[];
   outSlots: readonly string[];
+  styleId?: string;
+  preferredRoles?: readonly string[];
+  highPress: boolean;
   styleAttrSet: ReadonlySet<string>;
   patchVersion: string;
 }): number {
@@ -62,36 +67,139 @@ function computeBenchCoverFit(params: {
     );
   }
 
-  const slotCovers: number[] = [];
-  for (let sIdx = 0; sIdx < params.slotStates.length; sIdx++) {
-    const inSlot = params.inSlots[sIdx]!;
-    const outSlot = params.outSlots[sIdx]!;
-    const inCandidates = getCandidateRolesForSlot(inSlot, 0, params.inSlots, params.patchVersion);
-    const outCandidates = getCandidateRolesForSlot(
-      outSlot,
-      1,
-      params.outSlots,
-      params.patchVersion,
-    );
+  const preferredRoleSet = new Set(params.preferredRoles ?? []);
+  const benchGks = benchPlayers.filter((bp) => bp.isGoalkeeper);
+  const benchOutfielders = benchPlayers.filter((bp) => !bp.isGoalkeeper);
 
-    let bestCover = 0;
-    for (const bp of benchPlayers) {
-      if ((inSlot === "GK") !== bp.isGoalkeeper) continue;
-      const bIn = selectBestRole(bp, inSlot, inCandidates, params.styleAttrSet, params.patchVersion);
+  let gkCover = 45;
+  const gkSlotIdx = params.inSlots.findIndex((s) => s === "GK");
+  if (gkSlotIdx >= 0 && benchGks.length > 0) {
+    const inSlot = params.inSlots[gkSlotIdx]!;
+    const outSlot = params.outSlots[gkSlotIdx]!;
+    let bestGk = 0;
+    for (const bp of benchGks) {
+      const inCandidates = getSolverCandidateRolesForSlot(inSlot, 0, params.inSlots, {
+        styleId: params.styleId,
+        preferredRoles: params.preferredRoles,
+        highPress: params.highPress,
+        player: bp,
+        patchVersion: params.patchVersion,
+      });
+      const outCandidates = getSolverCandidateRolesForSlot(outSlot, 1, params.outSlots, {
+        styleId: params.styleId,
+        preferredRoles: params.preferredRoles,
+        highPress: params.highPress,
+        player: bp,
+        patchVersion: params.patchVersion,
+      });
+      const bIn = selectBestRole(
+        bp,
+        inSlot,
+        inCandidates,
+        params.styleAttrSet,
+        params.patchVersion,
+        preferredRoleSet,
+      );
       const bOut = selectBestRole(
         bp,
         outSlot,
         outCandidates,
         params.styleAttrSet,
         params.patchVersion,
+        preferredRoleSet,
       );
       const fit = computeSlotFit(bp, inSlot, outSlot, bIn.roleQuality, bOut.roleQuality);
-      if (fit > bestCover) bestCover = fit;
+      if (fit > bestGk) bestGk = fit;
     }
-    slotCovers.push(bestCover);
+    gkCover = bestGk;
   }
 
-  return slotCovers.reduce((a, b) => a + b, 0) / slotCovers.length;
+  // Evaluate unique 1-to-1 outfield bench cover (SetAssignment RVA 0x026EA8 — no cloning 1 player across 4 slots)
+  const outfieldSlotIndices = params.inSlots
+    .map((s, idx) => ({ s, idx }))
+    .filter((x) => x.s !== "GK")
+    .map((x) => x.idx);
+
+  if (benchOutfielders.length === 0) {
+    return (gkCover + 10 * 45) / 11;
+  }
+
+  const benchFitMatrix: number[][] = outfieldSlotIndices.map((sIdx) => {
+    const inSlot = params.inSlots[sIdx]!;
+    const outSlot = params.outSlots[sIdx]!;
+    return benchOutfielders.map((bp) => {
+      const inCandidates = getSolverCandidateRolesForSlot(inSlot, 0, params.inSlots, {
+        styleId: params.styleId,
+        preferredRoles: params.preferredRoles,
+        highPress: params.highPress,
+        player: bp,
+        patchVersion: params.patchVersion,
+      });
+      const outCandidates = getSolverCandidateRolesForSlot(outSlot, 1, params.outSlots, {
+        styleId: params.styleId,
+        preferredRoles: params.preferredRoles,
+        highPress: params.highPress,
+        player: bp,
+        patchVersion: params.patchVersion,
+      });
+      const bIn = selectBestRole(
+        bp,
+        inSlot,
+        inCandidates,
+        params.styleAttrSet,
+        params.patchVersion,
+        preferredRoleSet,
+      );
+      const bOut = selectBestRole(
+        bp,
+        outSlot,
+        outCandidates,
+        params.styleAttrSet,
+        params.patchVersion,
+        preferredRoleSet,
+      );
+      return Math.max(0, computeSlotFit(bp, inSlot, outSlot, bIn.roleQuality, bOut.roleQuality));
+    });
+  });
+
+  let outfieldCoverSum = 0;
+  if (benchOutfielders.length >= outfieldSlotIndices.length) {
+    const assigned = solveHungarianMax(benchFitMatrix);
+    for (let r = 0; r < outfieldSlotIndices.length; r++) {
+      const bIdx = assigned[r]!;
+      outfieldCoverSum += benchFitMatrix[r]?.[bIdx] ?? 45;
+    }
+  } else {
+    // Fewer than 10 bench outfielders: assign each bench player to at most 1 slot first (optimal subset),
+    // then score remaining uncovered slots conservatively (45.0) to reflect thin positional depth.
+    const usedBench = new Set<number>();
+    const usedRow = new Set<number>();
+    while (usedBench.size < benchOutfielders.length && usedRow.size < outfieldSlotIndices.length) {
+      let bestVal = -1;
+      let bestR = -1;
+      let bestB = -1;
+      for (let r = 0; r < outfieldSlotIndices.length; r++) {
+        if (usedRow.has(r)) continue;
+        for (let b = 0; b < benchOutfielders.length; b++) {
+          if (usedBench.has(b)) continue;
+          const v = benchFitMatrix[r]![b]!;
+          if (v > bestVal) {
+            bestVal = v;
+            bestR = r;
+            bestB = b;
+          }
+        }
+      }
+      if (bestR < 0 || bestB < 0) break;
+      usedRow.add(bestR);
+      usedBench.add(bestB);
+      outfieldCoverSum += bestVal;
+    }
+    const uncoveredCount = outfieldSlotIndices.length - usedRow.size;
+    outfieldCoverSum += uncoveredCount * 45;
+  }
+
+  return (gkCover + outfieldCoverSum) / 11;
 }
 
 function evaluateSingleShape(params: {
@@ -105,7 +213,9 @@ function evaluateSingleShape(params: {
 }): TacticPlanResult {
   const { shape, players, patchVersion } = params;
   const styleAttrSet = new Set(params.combinedStyleAttributes);
+  const preferredRoleSet = new Set(params.style?.PreferredRoles ?? []);
   const hasStyleOrPriorities = params.combinedStyleAttributes.length > 0;
+  const effectiveHighPress = shape.HighPress || Boolean(params.style?.HighPress);
 
   // Build candidate roles & best role/fit matrix (11 x N)
   const rawFits: (number | null)[][] = [];
@@ -115,8 +225,8 @@ function evaluateSingleShape(params: {
   for (let sIdx = 0; sIdx < 11; sIdx++) {
     const inSlot = shape.InSlots[sIdx]!;
     const outSlot = shape.OutSlots[sIdx]!;
-    const inCandidates = getCandidateRolesForSlot(inSlot, 0, shape.InSlots, patchVersion);
-    const outCandidates = getCandidateRolesForSlot(outSlot, 1, shape.OutSlots, patchVersion);
+    const allInCandidates = getCandidateRolesForSlot(inSlot, 0, shape.InSlots, patchVersion);
+    const allOutCandidates = getCandidateRolesForSlot(outSlot, 1, shape.OutSlots, patchVersion);
 
     const fitRow: (number | null)[] = [];
     const inRoleRow: (ReturnType<typeof selectBestRole> | null)[] = [];
@@ -131,12 +241,27 @@ function evaluateSingleShape(params: {
         continue;
       }
 
+      const solverIn = getSolverCandidateRolesForSlot(inSlot, 0, shape.InSlots, {
+        styleId: params.style?.Id,
+        preferredRoles: params.style?.PreferredRoles,
+        highPress: effectiveHighPress,
+        player,
+        patchVersion,
+      });
+      const solverOut = getSolverCandidateRolesForSlot(outSlot, 1, shape.OutSlots, {
+        styleId: params.style?.Id,
+        preferredRoles: params.style?.PreferredRoles,
+        highPress: effectiveHighPress,
+        player,
+        patchVersion,
+      });
+
       const filteredIn = pref?.lockedInRole
-        ? inCandidates.filter((r) => r.Id === pref.lockedInRole)
-        : inCandidates;
+        ? allInCandidates.filter((r) => r.Id === pref.lockedInRole)
+        : solverIn;
       const filteredOut = pref?.lockedOutRole
-        ? outCandidates.filter((r) => r.Id === pref.lockedOutRole)
-        : outCandidates;
+        ? allOutCandidates.filter((r) => r.Id === pref.lockedOutRole)
+        : solverOut;
 
       if (filteredIn.length === 0 || filteredOut.length === 0) {
         fitRow.push(null);
@@ -145,8 +270,22 @@ function evaluateSingleShape(params: {
         continue;
       }
 
-      const bestIn = selectBestRole(player, inSlot, filteredIn, styleAttrSet, patchVersion);
-      const bestOut = selectBestRole(player, outSlot, filteredOut, styleAttrSet, patchVersion);
+      const bestIn = selectBestRole(
+        player,
+        inSlot,
+        filteredIn,
+        styleAttrSet,
+        patchVersion,
+        preferredRoleSet,
+      );
+      const bestOut = selectBestRole(
+        player,
+        outSlot,
+        filteredOut,
+        styleAttrSet,
+        patchVersion,
+        preferredRoleSet,
+      );
       const fit = computeSlotFit(
         player,
         inSlot,
@@ -168,6 +307,7 @@ function evaluateSingleShape(params: {
   // Global optimal Starting XI via Kuhn-Munkres (Hungarian)
   const matrix = buildAssignmentMatrix({
     inSlots: shape.InSlots,
+    outSlots: shape.OutSlots,
     rawFits,
     players,
     styleAttributes: hasStyleOrPriorities ? params.combinedStyleAttributes : undefined,
@@ -184,16 +324,30 @@ function evaluateSingleShape(params: {
       const fallbackIn = selectBestRole(
         player,
         shape.InSlots[sIdx]!,
-        getCandidateRolesForSlot(shape.InSlots[sIdx]!, 0, shape.InSlots, patchVersion),
+        getSolverCandidateRolesForSlot(shape.InSlots[sIdx]!, 0, shape.InSlots, {
+          styleId: params.style?.Id,
+          preferredRoles: params.style?.PreferredRoles,
+          highPress: effectiveHighPress,
+          player,
+          patchVersion,
+        }),
         styleAttrSet,
         patchVersion,
+        preferredRoleSet,
       );
       const fallbackOut = selectBestRole(
         player,
         shape.OutSlots[sIdx]!,
-        getCandidateRolesForSlot(shape.OutSlots[sIdx]!, 1, shape.OutSlots, patchVersion),
+        getSolverCandidateRolesForSlot(shape.OutSlots[sIdx]!, 1, shape.OutSlots, {
+          styleId: params.style?.Id,
+          preferredRoles: params.style?.PreferredRoles,
+          highPress: effectiveHighPress,
+          player,
+          patchVersion,
+        }),
         styleAttrSet,
         patchVersion,
+        preferredRoleSet,
       );
       return {
         slotIndex: sIdx,
@@ -227,6 +381,41 @@ function evaluateSingleShape(params: {
     };
   });
 
+  // Cap OOP Outlet roles across XI to at most 1 counter-outlet player
+  const outletSlots = slotStates
+    .filter((s) => isOopOutletRole(s.outRole.Id))
+    .sort((a, b) => b.outRoleQuality - a.outRoleQuality);
+  if (outletSlots.length > 1) {
+    for (const extra of outletSlots.slice(1)) {
+      const p = players[extra.playerIndex]!;
+      const nonOutletOut = getCandidateRolesForSlot(
+        extra.outSlot,
+        1,
+        shape.OutSlots,
+        patchVersion,
+      ).filter((r) => !isOopOutletRole(r.Id));
+      if (nonOutletOut.length > 0) {
+        const nextOut = selectBestRole(
+          p,
+          extra.outSlot,
+          nonOutletOut,
+          styleAttrSet,
+          patchVersion,
+          preferredRoleSet,
+        );
+        extra.outRole = nextOut.role;
+        extra.outRoleQuality = nextOut.roleQuality;
+        extra.fit = computeSlotFit(
+          p,
+          extra.inSlot,
+          extra.outSlot,
+          extra.inRoleQuality,
+          extra.outRoleQuality,
+        );
+      }
+    }
+  }
+
   const initialStarters: CoachingUnitStarter[] = slotStates.map((s) => ({
     player: players[s.playerIndex]!,
     inSlot: s.inSlot,
@@ -237,26 +426,26 @@ function evaluateSingleShape(params: {
 
   const planned = planTeamInstructions({
     starters: initialStarters,
-    highPress: shape.HighPress || Boolean(params.style?.HighPress),
+    highPress: effectiveHighPress,
     style: params.style,
     priorities: params.priorities,
     patchVersion,
   });
 
-  // Local Coaching-Aware Refinement when style/priorities active
-  if (hasStyleOrPriorities) {
-    slotStates = refineAssignment({
-      initialStates: slotStates,
-      players,
-      inSlots: shape.InSlots,
-      outSlots: shape.OutSlots,
-      teamInstructions: planned.teamInstructions,
-      highPress: shape.HighPress || Boolean(params.style?.HighPress),
-      styleAttributes: params.combinedStyleAttributes,
-      preferencesByUid: params.preferencesByUid,
-      patchVersion,
-    });
-  }
+  // Local Coaching-Aware Refinement across both Style and Auto modes
+  slotStates = refineAssignment({
+    initialStates: slotStates,
+    players,
+    inSlots: shape.InSlots,
+    outSlots: shape.OutSlots,
+    teamInstructions: planned.teamInstructions,
+    highPress: effectiveHighPress,
+    styleId: params.style?.Id,
+    preferredRoles: params.style?.PreferredRoles,
+    styleAttributes: params.combinedStyleAttributes,
+    preferencesByUid: params.preferencesByUid,
+    patchVersion,
+  });
 
   const finalStarters: CoachingUnitStarter[] = slotStates.map((s) => ({
     player: players[s.playerIndex]!,
@@ -268,7 +457,7 @@ function evaluateSingleShape(params: {
 
   const finalPlanned = planTeamInstructions({
     starters: finalStarters,
-    highPress: shape.HighPress || Boolean(params.style?.HighPress),
+    highPress: effectiveHighPress,
     style: params.style,
     priorities: params.priorities,
     patchVersion,
@@ -280,7 +469,7 @@ function evaluateSingleShape(params: {
     outSlots: shape.OutSlots,
     teamInstructions: finalPlanned.teamInstructions,
     styleName: params.style?.Name,
-    highPress: shape.HighPress || Boolean(params.style?.HighPress),
+    highPress: effectiveHighPress,
     finalize: true,
     patchVersion,
   });
@@ -288,7 +477,7 @@ function evaluateSingleShape(params: {
   const { instructionPenalty, pressCost } = scoreInstructionDemands(
     coaching.adjustedTeamInstructions,
     finalStarters,
-    shape.HighPress || Boolean(params.style?.HighPress),
+    effectiveHighPress,
   );
 
   const startingFit =
@@ -298,6 +487,9 @@ function evaluateSingleShape(params: {
     players,
     inSlots: shape.InSlots,
     outSlots: shape.OutSlots,
+    styleId: params.style?.Id,
+    preferredRoles: params.style?.PreferredRoles,
+    highPress: effectiveHighPress,
     styleAttrSet,
     patchVersion,
   });
@@ -317,10 +509,30 @@ function evaluateSingleShape(params: {
       ) / outfieldStarters.length
     : null;
 
+  // Roster star-utilization adjustment: prevent narrow/asymmetric shapes from benching top-CA natural stars
+  const top6Outfield = [...players]
+    .filter((p) => !p.isGoalkeeper)
+    .sort((a, b) => b.ability - a.ability)
+    .slice(0, 6);
+  const topWideStars = top6Outfield.filter(
+    (p) => (p.positions.AML ?? 0) >= 16 || (p.positions.AMR ?? 0) >= 16,
+  ).length;
+  const hasWideAttackSlots =
+    shape.InSlots.includes("AML") && shape.InSlots.includes("AMR");
+  const rosterShapeSynergy =
+    topWideStars >= 2 ? (hasWideAttackSlots ? 0.6 : -0.9) : 0;
+
   const rankingFit =
     styleFit !== null
-      ? 0.9 * squadFit + 0.1 * styleFit + coaching.coachingAdjustment - instructionPenalty
-      : squadFit;
+      ? 0.9 * squadFit +
+        0.1 * styleFit +
+        coaching.coachingAdjustment -
+        instructionPenalty +
+        rosterShapeSynergy
+      : squadFit +
+        0.25 * coaching.coachingAdjustment -
+        instructionPenalty +
+        rosterShapeSynergy;
 
   const slots: SlotAssignment[] = slotStates.map((s, idx) => {
     const p = players[s.playerIndex]!;
@@ -390,6 +602,45 @@ function evaluateSingleShape(params: {
  * 16 StyleShapes (with TacticalStyle / TacticalPriorities), sorting descending by `rankingFit`,
  * and marking `nearTieWithNext` when `#1 - #2 < 0.1`.
  */
+export function selectPrimarySquadPlayers<
+  T extends
+    | Player
+    | {
+        uid: number;
+        name: string;
+        clubUid?: number;
+        clubName?: string;
+        age?: number;
+        nationality?: string;
+        rawNumbers: Record<string, number | undefined>;
+      },
+>(squadPlayers: readonly T[], lineupPreferences?: readonly LineupPreference[]): readonly T[] {
+  const lockedUids = new Set((lineupPreferences ?? []).map((p) => p.playerUid));
+  const firstTeam = squadPlayers.filter(
+    (p) => ("teamSlot" in p && p.teamSlot === "First Team") || lockedUids.has(p.uid),
+  );
+  if (firstTeam.length >= 11 && firstTeam.length < squadPlayers.length) {
+    let gkCount = 0;
+    let outfieldCount = 0;
+    for (const p of firstTeam) {
+      if ("positions" in p) {
+        const gkFam = p.positions.GK ?? 0;
+        if (gkFam >= 15) {
+          gkCount++;
+        } else {
+          outfieldCount++;
+        }
+      } else {
+        outfieldCount++;
+      }
+    }
+    if (gkCount >= 1 && outfieldCount >= 10) {
+      return firstTeam;
+    }
+  }
+  return squadPlayers;
+}
+
 export function analyzeSquadAndGenerateTactics(
   squadPlayers: ReadonlyArray<
     | Player
@@ -406,8 +657,9 @@ export function analyzeSquadAndGenerateTactics(
   options: SquadAnalysisOptions = {},
 ): TacticPlanResult[] {
   const patchVersion = options.patchVersion ?? "27.0";
+  const primaryPlayers = selectPrimarySquadPlayers(squadPlayers, options.lineupPreferences);
   const normalizedPlayers = normalizeAndValidateSquad(
-    squadPlayers,
+    primaryPlayers,
     options.lineupPreferences ?? [],
     patchVersion,
   );
@@ -476,7 +728,8 @@ export function gradeImportedTactic(
   options?: { improve?: boolean; patchVersion?: string },
 ): TacticPlanResult {
   const patchVersion = options?.patchVersion ?? tactic.patchVersion ?? "27.0";
-  const normalized = normalizeAndValidateSquad(squadPlayers, [], patchVersion);
+  const primaryPlayers = selectPrimarySquadPlayers(squadPlayers);
+  const normalized = normalizeAndValidateSquad(primaryPlayers, [], patchVersion);
   const rp = getRoleProfiles(patchVersion);
   const profileById = new Map(rp.Roles.map((r) => [r.Id, r]));
   const specialistSet = new Set(rp.SpecialistRoles);
@@ -574,13 +827,19 @@ export function gradeImportedTactic(
     const inSlots = currentTactic.slots.map((s) => s.inPossession.positionId);
     const outSlots = currentTactic.slots.map((s) => s.outOfPossession.positionId);
 
+    const highPress = (currentTactic.teamInstructions.LineOfEngagement ?? 62) === 61;
+
     for (let sIdx = 0; sIdx < 11; sIdx++) {
       const slot = currentTactic.slots[sIdx]!;
-      const ipAlts = getCandidateRolesForSlot(
+      const ipAlts = getSolverCandidateRolesForSlot(
         slot.inPossession.positionId,
         0,
         inSlots,
-        patchVersion,
+        {
+          styleId: currentTactic.styleId,
+          highPress,
+          patchVersion,
+        },
       );
       for (const altRole of ipAlts) {
         if (altRole.Id === slot.inPossession.roleId) continue;
@@ -605,11 +864,15 @@ export function gradeImportedTactic(
         }
       }
 
-      const oopAlts = getCandidateRolesForSlot(
+      const oopAlts = getSolverCandidateRolesForSlot(
         slot.outOfPossession.positionId,
         1,
         outSlots,
-        patchVersion,
+        {
+          styleId: currentTactic.styleId,
+          highPress,
+          patchVersion,
+        },
       );
       for (const altRole of oopAlts) {
         if (altRole.Id === slot.outOfPossession.roleId) continue;

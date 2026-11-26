@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { exportFmf, parseFmf } from "@fm27/fm-codec";
+import { exportFmf, parseFmSave, parseFmf } from "@fm27/fm-codec";
 import { getPatchData } from "@fm27/fm-data";
-import { analyzeUnified, parseSquadCsv } from "@fm27/fm-engine";
+import { analyzeUnified, isOopOutletRole, parseSquadCsv } from "@fm27/fm-engine";
 import type { Player } from "@fm27/shared-types";
 
 function buildDeterministicTestSquad(): Player[] {
@@ -136,5 +136,46 @@ describe("Unified 5-Tab Deterministic Pipeline — analyzeUnified (0% AI)", () =
     );
 
     assertCatalogProvenance(run1);
+  });
+
+  it("Real .fm save (Manchester United): isolates First Team, avoids underdog/outlet gimmicks, and places stars on natural foot sides", () => {
+    const rawSave = fs.readFileSync(
+      path.resolve(process.cwd(), "tests/fixtures/sample-real.fm"),
+    );
+    const save = parseFmSave(
+      new Uint8Array(rawSave.buffer, rawSave.byteOffset, rawSave.byteLength),
+    );
+    const clubUid = save.humanClubUid;
+    expect(clubUid).not.toBeNull();
+    const manUtdAll = save.playersByClub[clubUid!] ?? [];
+    expect(manUtdAll.length).toBeGreaterThan(50);
+
+    const report = analyzeUnified({
+      squad: manUtdAll,
+      clubStaff: save.staffByClub[clubUid!],
+      worldStaffPool: save.worldStaffPool,
+      worldWonderkids: save.worldWonderkids,
+      dataset,
+    });
+
+    const rec = report.tacticAdvice.recommendedTactic;
+    expect(["Gegenpress", "ControlPossession", "VerticalTikiTaka"]).toContain(rec.styleId);
+    expect(["4-2-3-1", "4-3-3 DM"]).toContain(rec.inFormation);
+
+    const starterNames = rec.slots.map((s) => s.playerName);
+    expect(starterNames).toContain("Bruno Fernandes");
+    expect(starterNames).toContain("Bryan Mbeumo");
+    expect(starterNames).toContain("Benjamin Šeško");
+    expect(starterNames).toContain("Senne Lammens");
+
+    const dcl = rec.slots.find((s) => s.inPossession.positionId === "DCL");
+    const dcr = rec.slots.find((s) => s.inPossession.positionId === "DCR");
+    expect(dcl?.playerName).toBe("Lisandro Martínez");
+    expect(dcr?.playerName).toBe("Matthijs de Ligt");
+
+    for (const slot of rec.slots) {
+      expect(isOopOutletRole(slot.outOfPossession.roleId)).toBe(false);
+      expect(slot.inPossession.roleId).not.toBe("NoNonsenseCentreBack");
+    }
   });
 });

@@ -1,11 +1,16 @@
 import { getRoleProfiles } from "@fm27/fm-data";
 import type { LineupPreference, RoleProfileEntry } from "@fm27/shared-types";
-import { reviewCoachingKnowledge, type CoachingUnitStarter } from "./coaching-review.js";
+import {
+  reviewCoachingKnowledge,
+  scoreInstructionDemands,
+  type CoachingUnitStarter,
+} from "./coaching-review.js";
 import { computeSlotFit, satisfiesLineupLock } from "./fit-calculator.js";
-import { computePlayerStyleRating } from "./hungarian.js";
+import { computeCentralPairFootBias, computePlayerStyleRating } from "./hungarian.js";
 import type { NormalizedPlayerProfile } from "./normalizer.js";
 import {
-  getCandidateRolesForSlot,
+  getSolverCandidateRolesForSlot,
+  isOopOutletRole,
   scoreSingleRoleQuality,
   selectBestRole,
 } from "./role-evaluator.js";
@@ -71,7 +76,37 @@ export function evaluateRefinementObjective(params: {
     patchVersion: params.patchVersion,
   });
 
-  return 0.846 * meanFit + 0.1 * meanStyleRating + review.coachingAdjustment;
+  const { instructionPenalty, pressCost } = scoreInstructionDemands(
+    params.teamInstructions,
+    starters,
+    params.highPress,
+  );
+
+  const meanStarterAbility =
+    outfieldStates.length > 0
+      ? outfieldStates.reduce(
+          (acc, s) => acc + params.players[s.playerIndex]!.ability,
+          0,
+        ) / outfieldStates.length
+      : 0;
+
+  const meanFootSideBias =
+    outfieldStates.length > 0
+      ? outfieldStates.reduce(
+          (acc, s) =>
+            acc + computeCentralPairFootBias(s.inSlot, params.players[s.playerIndex]!),
+          0,
+        ) / outfieldStates.length
+      : 0;
+
+  return (
+    0.846 * (meanFit - pressCost) +
+    0.1 * meanStyleRating +
+    0.25 * meanStarterAbility +
+    meanFootSideBias +
+    review.coachingAdjustment -
+    instructionPenalty
+  );
 }
 
 /**
@@ -86,6 +121,8 @@ export function refineAssignment(params: {
   outSlots: readonly string[];
   teamInstructions: Readonly<Record<string, number>>;
   highPress: boolean;
+  styleId?: string;
+  preferredRoles?: readonly string[];
   styleAttributes?: readonly string[];
   preferencesByUid?: ReadonlyMap<number, LineupPreference>;
   patchVersion?: string;
@@ -94,6 +131,7 @@ export function refineAssignment(params: {
   const rp = getRoleProfiles(patchVersion);
   const specialistSet = new Set(rp.SpecialistRoles);
   const styleAttrSet = new Set(params.styleAttributes ?? []);
+  const preferredRoleSet = new Set(params.preferredRoles ?? []);
 
   const states = params.initialStates.map((s) => ({ ...s }));
   const starterIndices = new Set(states.map((s) => s.playerIndex));
@@ -108,12 +146,38 @@ export function refineAssignment(params: {
     const pref = params.preferencesByUid?.get(player.uid);
     if (!satisfiesLineupLock(pref, inSlot, outSlot)) return null;
 
-    const inCandidates = getCandidateRolesForSlot(inSlot, 0, params.inSlots, patchVersion);
-    const outCandidates = getCandidateRolesForSlot(outSlot, 1, params.outSlots, patchVersion);
+    const inCandidates = getSolverCandidateRolesForSlot(inSlot, 0, params.inSlots, {
+      styleId: params.styleId,
+      preferredRoles: params.preferredRoles,
+      highPress: params.highPress,
+      player,
+      patchVersion,
+    });
+    const outCandidates = getSolverCandidateRolesForSlot(outSlot, 1, params.outSlots, {
+      styleId: params.styleId,
+      preferredRoles: params.preferredRoles,
+      highPress: params.highPress,
+      player,
+      patchVersion,
+    });
     if (inCandidates.length === 0 || outCandidates.length === 0) return null;
 
-    const bestIn = selectBestRole(player, inSlot, inCandidates, styleAttrSet, patchVersion);
-    const bestOut = selectBestRole(player, outSlot, outCandidates, styleAttrSet, patchVersion);
+    const bestIn = selectBestRole(
+      player,
+      inSlot,
+      inCandidates,
+      styleAttrSet,
+      patchVersion,
+      preferredRoleSet,
+    );
+    const bestOut = selectBestRole(
+      player,
+      outSlot,
+      outCandidates,
+      styleAttrSet,
+      patchVersion,
+      preferredRoleSet,
+    );
     const fit = computeSlotFit(
       player,
       inSlot,
@@ -233,11 +297,23 @@ export function refineAssignment(params: {
 
       const posId = phase === 0 ? slot.inSlot : slot.outSlot;
       const shapeArr = phase === 0 ? params.inSlots : params.outSlots;
-      const candidates = getCandidateRolesForSlot(posId, phase, shapeArr, patchVersion);
+      const candidates = getSolverCandidateRolesForSlot(posId, phase, shapeArr, {
+        styleId: params.styleId,
+        preferredRoles: params.preferredRoles,
+        highPress: params.highPress,
+        player,
+        patchVersion,
+      });
 
       for (const candidateRole of candidates) {
         if (phase === 0 && candidateRole.Id === slot.inRole.Id) continue;
         if (phase === 1 && candidateRole.Id === slot.outRole.Id) continue;
+        if (phase === 1 && isOopOutletRole(candidateRole.Id)) {
+          const otherOutlets = states.filter(
+            (st, idx) => idx !== sIdx && isOopOutletRole(st.outRole.Id),
+          ).length;
+          if (otherOutlets >= 1) continue;
+        }
 
         const newQ = scoreSingleRoleQuality(player, posId, candidateRole, specialistSet);
         const nextInQ = phase === 0 ? newQ : slot.inRoleQuality;
