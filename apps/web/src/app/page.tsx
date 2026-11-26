@@ -13,6 +13,7 @@ import { BalanceRadar } from "@/components/analytics/BalanceRadar";
 import { CoachingFindingsList } from "@/components/analytics/CoachingFindingsList";
 import {
   Heatmap18Zone,
+  PitchColorLegend,
   type HeatmapOverlayMode,
 } from "@/components/analytics/Heatmap18Zone";
 import { UnifiedReportDashboard } from "@/components/analytics/UnifiedReportDashboard";
@@ -686,7 +687,7 @@ export default function TacticalBoardWorkspacePage() {
 
       {/* Main Tactical Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        <div className="lg:col-span-8 flex flex-col gap-3">
+        <div className="lg:col-span-8 flex flex-col gap-2.5">
           {viewMode === "split" ? (
             <SplitViewPitch
               ipOverlayNode={buildOverlayForBoard("ip")}
@@ -700,6 +701,7 @@ export default function TacticalBoardWorkspacePage() {
               />
             </div>
           )}
+          <PitchColorLegend heatmapMode={heatmapMode} viewMode={viewMode} />
         </div>
 
         {/* Right Inspector */}
