@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -21,7 +20,7 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 const VERSIONS_DIR = path.join(REPO_ROOT, "packages/fm-data/versions");
 
 function sha256File(filePath) {
-  const content = fs.readFileSync(filePath, "utf8");
+  const content = fs.readFileSync(filePath, "utf8").replace(/\r\n/g, "\n");
   return crypto.createHash("sha256").update(content, "utf8").digest("hex");
 }
 

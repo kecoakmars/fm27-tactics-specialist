@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   exportScheduleFmf,
@@ -67,22 +69,26 @@ describe("Phase 4 — F9 Parsers, Squad Store, Staff Optimizer & Training Store"
     expect(htmlStaff[0]!.attributes.tactical).toBe(18);
   });
 
-  it("wires useSquadStore demo squad -> Squad Audit -> useTrainingStore schedule & shortlist .fmf round-trip", async () => {
-    useSquadStore.getState().loadDemoSquad("27.0");
-    const demoPlayers = useSquadStore.getState().players;
-    expect(demoPlayers.length).toBeGreaterThanOrEqual(20);
+  it("wires useSquadStore CSV import -> Squad Audit -> useTrainingStore schedule & shortlist .fmf round-trip", async () => {
+    const csvPath = path.resolve(process.cwd(), "tests/fixtures/sample-squad.csv");
+    const count = useSquadStore
+      .getState()
+      .importFromText(fs.readFileSync(csvPath, "utf8"), "sample-squad.csv");
+    expect(count).toBe(18);
+    const squadPlayers = useSquadStore.getState().players;
+    expect(squadPlayers).toHaveLength(18);
 
     // Enforce <= 11 starter locks
     for (let i = 0; i < 12; i++) {
-      useSquadStore.getState().toggleMustStart(demoPlayers[i]!.uid);
+      useSquadStore.getState().toggleMustStart(squadPlayers[i]!.uid);
     }
     expect(
       useSquadStore.getState().lineupPreferences.filter((l) => l.mustStart),
     ).toHaveLength(11);
-    expect(useSquadStore.getState().errorMessage).toContain("Maximum 11");
+    expect(useSquadStore.getState().errorMessage).toMatch(/Maksimal 11|Maximum 11/i);
 
     const activeTactic = useTacticStore.getState().tactic;
-    const audit = auditSquadAgainstTactic(activeTactic, demoPlayers);
+    const audit = auditSquadAgainstTactic(activeTactic, squadPlayers);
     expect(audit.starterAudits).toHaveLength(11);
     expect(audit.weakestThreeSlotIndices).toHaveLength(3);
 
@@ -106,13 +112,13 @@ describe("Phase 4 — F9 Parsers, Squad Store, Staff Optimizer & Training Store"
     const decodedSched = await parseScheduleFmf(schedBytes);
     expect(decodedSched.days[0]!.s1).toBe("QUICKNESS");
 
-    useTrainingStore.getState().setShortlist("Phase4 Targets", [demoPlayers[0]!.uid, demoPlayers[2]!.uid]);
+    useTrainingStore.getState().setShortlist("Phase4 Targets", [squadPlayers[0]!.uid, squadPlayers[2]!.uid]);
     const slfBytes = exportShortlistFmf(
       useTrainingStore.getState().shortlistTitle,
       useTrainingStore.getState().shortlistUids,
     );
     const decodedSlf = await parseShortlistFmf(slfBytes);
     expect(decodedSlf.title).toBe("Phase4 Targets");
-    expect(decodedSlf.playerUids).toEqual([demoPlayers[0]!.uid, demoPlayers[2]!.uid]);
+    expect(decodedSlf.playerUids).toEqual([squadPlayers[0]!.uid, squadPlayers[2]!.uid]);
   });
 });

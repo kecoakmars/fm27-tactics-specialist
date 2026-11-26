@@ -1,8 +1,10 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseFmSave } from "../packages/fm-codec/src/fm-save-parser.js";
 import {
+  PatchManifestSchema,
   StaffSeedCatalogSchema,
   WonderkidsSeedCatalogSchema,
 } from "../packages/shared-types/src/index.js";
@@ -57,16 +59,32 @@ function main(): void {
     "packages/fm-data/versions/v27.0/staff-seed.json",
   );
 
-  fs.writeFileSync(
-    wonderkidsOutPath,
-    `${JSON.stringify(validatedWonderkids, null, 2)}\n`,
-    "utf8",
+  const wonderkidsJson = `${JSON.stringify(validatedWonderkids, null, 2)}\n`;
+  const staffJson = `${JSON.stringify(validatedStaff, null, 2)}\n`;
+
+  fs.writeFileSync(wonderkidsOutPath, wonderkidsJson, "utf8");
+  fs.writeFileSync(staffOutPath, staffJson, "utf8");
+
+  const manifestPath = path.resolve(
+    repoRoot,
+    "packages/fm-data/versions/v27.0/manifest.json",
   );
-  fs.writeFileSync(
-    staffOutPath,
-    `${JSON.stringify(validatedStaff, null, 2)}\n`,
-    "utf8",
-  );
+  if (fs.existsSync(manifestPath)) {
+    const manifest = PatchManifestSchema.parse(
+      JSON.parse(fs.readFileSync(manifestPath, "utf8")),
+    );
+    manifest.counts.wonderkidsSeed = validatedWonderkids.Wonderkids.length;
+    manifest.counts.staffSeed = validatedStaff.Staff.length;
+    manifest.checksums["wonderkids-seed.json"] = crypto
+      .createHash("sha256")
+      .update(wonderkidsJson, "utf8")
+      .digest("hex");
+    manifest.checksums["staff-seed.json"] = crypto
+      .createHash("sha256")
+      .update(staffJson, "utf8")
+      .digest("hex");
+    fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  }
 
   console.log(
     `[generate:seed] Sukses! Save="${parsed.saveName}" (${parsed.gameVersion}, ${parsed.gameDate})`,
