@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { temporal } from "zundo";
+import type { FmSaveClubEntry, ParsedFmSave } from "@fm27/fm-codec";
 import {
   DEFAULT_PATCH_VERSION,
   getPatchData,
@@ -25,10 +26,19 @@ import type {
   Player,
   SlotAssignment,
   StaffMember,
+  Wonderkid,
 } from "@fm27/shared-types";
+import { analyzeUnifiedInWorker } from "../lib/worker-client";
+import { useSquadStore } from "./useSquadStore";
 import { useTrainingStore } from "./useTrainingStore";
 
 export type PitchViewMode = "ip" | "oop" | "split";
+
+export interface FmImportProgressState {
+  stage: string;
+  pct: number;
+  fileName: string;
+}
 
 export function buildPresetTactic(
   styleId = "Gegenpress",
@@ -108,10 +118,43 @@ export function buildPresetTactic(
   };
 }
 
+function normalizeLoadedTactic(tactic: DualPhaseTactic): DualPhaseTactic {
+  const catalog = getPitchCatalog(tactic.patchVersion);
+  const clonedSlots: SlotAssignment[] = tactic.slots.map((s, idx) => ({
+    ...s,
+    slotIndex: idx,
+    inPossession: {
+      ...s.inPossession,
+      playerInstructionBits: [...s.inPossession.playerInstructionBits],
+    },
+    outOfPossession: {
+      ...s.outOfPossession,
+      playerInstructionBits: [...s.outOfPossession.playerInstructionBits],
+    },
+  }));
+  return {
+    ...tactic,
+    inFormation:
+      detectFormation(
+        clonedSlots.map((s) => s.inPossession.positionId),
+        { catalog },
+      ) || tactic.inFormation,
+    outFormation:
+      detectFormation(
+        clonedSlots.map((s) => s.outOfPossession.positionId),
+        { catalog },
+      ) || tactic.outFormation,
+    teamInstructions: { ...tactic.teamInstructions },
+    slots: clonedSlots,
+  };
+}
+
 function computeUnifiedSafe(params: {
   tactic: DualPhaseTactic | null;
   clubPlayers: readonly Player[];
   clubStaff: readonly StaffMember[];
+  worldWonderkids: readonly Wonderkid[];
+  worldStaffPool: readonly StaffMember[];
   patchVersion: string;
 }): UnifiedReport {
   const dataset = getPatchData(params.patchVersion);
@@ -119,6 +162,8 @@ function computeUnifiedSafe(params: {
     tactic: params.tactic,
     squad: params.clubPlayers.length >= 11 ? params.clubPlayers : null,
     clubStaff: params.clubStaff.length > 0 ? params.clubStaff : null,
+    worldWonderkids: params.worldWonderkids.length > 0 ? params.worldWonderkids : null,
+    worldStaffPool: params.worldStaffPool.length > 0 ? params.worldStaffPool : null,
     dataset,
   });
 }
@@ -128,6 +173,12 @@ export interface TacticStoreState {
   hasExplicitTactic: boolean;
   clubPlayers: Player[];
   clubStaff: StaffMember[];
+  worldWonderkids: Wonderkid[];
+  worldStaffPool: StaffMember[];
+  liveFmSave: ParsedFmSave | null;
+  selectedClubUid: number | null;
+  clubPickerOpen: boolean;
+  fmImportProgress: FmImportProgressState | null;
   unifiedReport: UnifiedReport | null;
 
   viewMode: PitchViewMode;
@@ -141,6 +192,8 @@ export interface TacticStoreState {
   selectSlot: (slotIndex: number | null, openModal?: boolean) => void;
   hoverSlot: (slotIndex: number | null) => void;
   setPlayerModalOpen: (open: boolean) => void;
+  setClubPickerOpen: (open: boolean) => void;
+  setFmImportProgress: (progress: FmImportProgressState | null) => void;
 
   setTitle: (title: string) => void;
   setMetadata: (meta: { description?: string; author?: string }) => void;
@@ -177,6 +230,18 @@ export interface TacticStoreState {
     staff?: StaffMember[];
     preferModeB?: boolean;
   }) => void;
+  ingestParsedFmSave: (
+    parsed: ParsedFmSave,
+    fileName: string,
+  ) => Promise<{
+    selectedClub: FmSaveClubEntry | null;
+    report: UnifiedReport | null;
+  }>;
+  selectClubFromFmSave: (clubUid: number) => Promise<{
+    selectedClub: FmSaveClubEntry;
+    report: UnifiedReport;
+  }>;
+  clearFmSaveSession: () => void;
   refreshUnifiedReport: () => void;
   dismissUnifiedReport: () => void;
   pushTrainingPlanToStore: () => boolean;
@@ -189,6 +254,12 @@ export const useTacticStore = create<TacticStoreState>()(
       hasExplicitTactic: false,
       clubPlayers: [],
       clubStaff: [],
+      worldWonderkids: [],
+      worldStaffPool: [],
+      liveFmSave: null,
+      selectedClubUid: null,
+      clubPickerOpen: false,
+      fmImportProgress: null,
       unifiedReport: null,
 
       viewMode: "split",
@@ -206,6 +277,8 @@ export const useTacticStore = create<TacticStoreState>()(
         })),
       hoverSlot: (hoveredSlotIndex) => set({ hoveredSlotIndex }),
       setPlayerModalOpen: (playerModalOpen) => set({ playerModalOpen }),
+      setClubPickerOpen: (clubPickerOpen) => set({ clubPickerOpen }),
+      setFmImportProgress: (fmImportProgress) => set({ fmImportProgress }),
 
       setTitle: (title) =>
         set((state) => ({
@@ -231,6 +304,8 @@ export const useTacticStore = create<TacticStoreState>()(
                   tactic: nextTactic,
                   clubPlayers: state.clubPlayers,
                   clubStaff: state.clubStaff,
+                  worldWonderkids: state.worldWonderkids,
+                  worldStaffPool: state.worldStaffPool,
                   patchVersion: nextTactic.patchVersion,
                 })
               : null,
@@ -250,6 +325,8 @@ export const useTacticStore = create<TacticStoreState>()(
                   tactic: nextTactic,
                   clubPlayers: state.clubPlayers,
                   clubStaff: state.clubStaff,
+                  worldWonderkids: state.worldWonderkids,
+                  worldStaffPool: state.worldStaffPool,
                   patchVersion: nextTactic.patchVersion,
                 })
               : null,
@@ -273,6 +350,8 @@ export const useTacticStore = create<TacticStoreState>()(
                   tactic: nextTactic,
                   clubPlayers: state.clubPlayers,
                   clubStaff: state.clubStaff,
+                  worldWonderkids: state.worldWonderkids,
+                  worldStaffPool: state.worldStaffPool,
                   patchVersion: nextTactic.patchVersion,
                 })
               : null,
@@ -296,6 +375,8 @@ export const useTacticStore = create<TacticStoreState>()(
                   tactic: nextTactic,
                   clubPlayers: state.clubPlayers,
                   clubStaff: state.clubStaff,
+                  worldWonderkids: state.worldWonderkids,
+                  worldStaffPool: state.worldStaffPool,
                   patchVersion: nextTactic.patchVersion,
                 })
               : null,
@@ -398,6 +479,8 @@ export const useTacticStore = create<TacticStoreState>()(
                   tactic: nextTactic,
                   clubPlayers: state.clubPlayers,
                   clubStaff: state.clubStaff,
+                  worldWonderkids: state.worldWonderkids,
+                  worldStaffPool: state.worldStaffPool,
                   patchVersion: nextTactic.patchVersion,
                 })
               : null,
@@ -438,6 +521,8 @@ export const useTacticStore = create<TacticStoreState>()(
                   tactic: nextTactic,
                   clubPlayers: state.clubPlayers,
                   clubStaff: state.clubStaff,
+                  worldWonderkids: state.worldWonderkids,
+                  worldStaffPool: state.worldStaffPool,
                   patchVersion: nextTactic.patchVersion,
                 })
               : null,
@@ -461,6 +546,8 @@ export const useTacticStore = create<TacticStoreState>()(
                   tactic: nextTactic,
                   clubPlayers: state.clubPlayers,
                   clubStaff: state.clubStaff,
+                  worldWonderkids: state.worldWonderkids,
+                  worldStaffPool: state.worldStaffPool,
                   patchVersion: nextTactic.patchVersion,
                 })
               : null,
@@ -507,6 +594,8 @@ export const useTacticStore = create<TacticStoreState>()(
                   tactic: nextTactic,
                   clubPlayers: state.clubPlayers,
                   clubStaff: state.clubStaff,
+                  worldWonderkids: state.worldWonderkids,
+                  worldStaffPool: state.worldStaffPool,
                   patchVersion: nextTactic.patchVersion,
                 })
               : null,
@@ -529,6 +618,8 @@ export const useTacticStore = create<TacticStoreState>()(
                   tactic: nextTactic,
                   clubPlayers: state.clubPlayers,
                   clubStaff: state.clubStaff,
+                  worldWonderkids: state.worldWonderkids,
+                  worldStaffPool: state.worldStaffPool,
                   patchVersion: nextTactic.patchVersion,
                 })
               : null,
@@ -557,6 +648,8 @@ export const useTacticStore = create<TacticStoreState>()(
                   tactic: nextTactic,
                   clubPlayers: state.clubPlayers,
                   clubStaff: state.clubStaff,
+                  worldWonderkids: state.worldWonderkids,
+                  worldStaffPool: state.worldStaffPool,
                   patchVersion: nextTactic.patchVersion,
                 })
               : null,
@@ -565,39 +658,13 @@ export const useTacticStore = create<TacticStoreState>()(
 
       loadTactic: (tactic) =>
         set((state) => {
-          const catalog = getPitchCatalog(tactic.patchVersion);
-          const clonedSlots: SlotAssignment[] = tactic.slots.map((s, idx) => ({
-            ...s,
-            slotIndex: idx,
-            inPossession: {
-              ...s.inPossession,
-              playerInstructionBits: [...s.inPossession.playerInstructionBits],
-            },
-            outOfPossession: {
-              ...s.outOfPossession,
-              playerInstructionBits: [...s.outOfPossession.playerInstructionBits],
-            },
-          }));
-          const normalizedTactic: DualPhaseTactic = {
-            ...tactic,
-            inFormation:
-              detectFormation(
-                clonedSlots.map((s) => s.inPossession.positionId),
-                { catalog },
-              ) || tactic.inFormation,
-            outFormation:
-              detectFormation(
-                clonedSlots.map((s) => s.outOfPossession.positionId),
-                { catalog },
-              ) || tactic.outFormation,
-            teamInstructions: { ...tactic.teamInstructions },
-            slots: clonedSlots,
-          };
-
+          const normalizedTactic = normalizeLoadedTactic(tactic);
           const unifiedReport = computeUnifiedSafe({
             tactic: normalizedTactic,
             clubPlayers: state.clubPlayers,
             clubStaff: state.clubStaff,
+            worldWonderkids: state.worldWonderkids,
+            worldStaffPool: state.worldStaffPool,
             patchVersion: normalizedTactic.patchVersion,
           });
 
@@ -633,15 +700,128 @@ export const useTacticStore = create<TacticStoreState>()(
             tactic: useTactic,
             clubPlayers: nextPlayers,
             clubStaff: nextStaff,
+            worldWonderkids: state.worldWonderkids,
+            worldStaffPool: state.worldStaffPool,
             patchVersion: state.tactic.patchVersion,
           });
 
+          const nextBoardTactic =
+            useTactic === null
+              ? normalizeLoadedTactic(unifiedReport.tacticAdvice.recommendedTactic)
+              : state.tactic;
+
           return {
+            tactic: nextBoardTactic,
             clubPlayers: nextPlayers,
             clubStaff: nextStaff,
             unifiedReport,
           };
         }),
+
+      ingestParsedFmSave: async (parsed, fileName) => {
+        set({
+          liveFmSave: parsed,
+          worldWonderkids: parsed.worldWonderkids,
+          worldStaffPool: parsed.worldStaffPool,
+          selectedClubUid: null,
+        });
+
+        const humanClub =
+          parsed.humanClubUid !== null
+            ? parsed.clubs.find(
+                (c) => c.uid === parsed.humanClubUid && c.playerCount >= 11,
+              ) ?? null
+            : null;
+
+        if (humanClub) {
+          const res = await get().selectClubFromFmSave(humanClub.uid);
+          return { selectedClub: res.selectedClub, report: res.report };
+        }
+
+        set({
+          clubPickerOpen: true,
+          fmImportProgress: null,
+        });
+        void fileName;
+        return { selectedClub: null, report: null };
+      },
+
+      selectClubFromFmSave: async (clubUid) => {
+        const state = get();
+        const save = state.liveFmSave;
+        if (!save) {
+          throw new Error("Belum ada sesi file save .fm yang dimuat.");
+        }
+        const selectedClub = save.clubs.find((c) => c.uid === clubUid);
+        if (!selectedClub) {
+          throw new Error(`Klub dengan UID ${clubUid} tidak ditemukan di file save .fm.`);
+        }
+
+        const clubPlayers = (save.playersByClub[clubUid] ?? []).map((p) => ({ ...p }));
+        const clubStaff = (save.staffByClub[clubUid] ?? []).map((s) => ({ ...s }));
+
+        set({
+          clubPickerOpen: false,
+          fmImportProgress: {
+            stage: "Menjalankan Hungarian Solver...",
+            pct: 92,
+            fileName: save.saveName,
+          },
+        });
+
+        useSquadStore
+          .getState()
+          .setSquadFromSave(
+            clubPlayers,
+            `${selectedClub.name} · ${save.saveName} (${clubPlayers.length} pemain)`,
+          );
+
+        try {
+          const report = await analyzeUnifiedInWorker({
+            tactic: clubPlayers.length >= 11 ? null : state.tactic,
+            squad: clubPlayers.length >= 11 ? clubPlayers : null,
+            clubStaff: clubStaff.length > 0 ? clubStaff : null,
+            worldWonderkids: save.worldWonderkids,
+            worldStaffPool: save.worldStaffPool,
+          });
+
+          const recommendedBoardTactic = normalizeLoadedTactic({
+            ...report.tacticAdvice.recommendedTactic,
+            patchVersion: state.tactic.patchVersion,
+          });
+
+          set({
+            tactic: recommendedBoardTactic,
+            hasExplicitTactic: true,
+            selectedClubUid: clubUid,
+            clubPlayers,
+            clubStaff,
+            unifiedReport: report,
+            selectedSlotIndex: 0,
+            fmImportProgress: null,
+          });
+
+          return { selectedClub, report };
+        } catch (err) {
+          set({ fmImportProgress: null });
+          throw err;
+        }
+      },
+
+      clearFmSaveSession: () => {
+        useSquadStore.getState().setSquadFromSave([], "");
+        set({
+          liveFmSave: null,
+          selectedClubUid: null,
+          clubPlayers: [],
+          clubStaff: [],
+          worldWonderkids: [],
+          worldStaffPool: [],
+          clubPickerOpen: false,
+          fmImportProgress: null,
+          unifiedReport: null,
+        });
+      },
 
       refreshUnifiedReport: () =>
         set((state) => ({
@@ -649,6 +829,8 @@ export const useTacticStore = create<TacticStoreState>()(
             tactic: state.tactic,
             clubPlayers: state.clubPlayers,
             clubStaff: state.clubStaff,
+            worldWonderkids: state.worldWonderkids,
+            worldStaffPool: state.worldStaffPool,
             patchVersion: state.tactic.patchVersion,
           }),
         })),

@@ -1,0 +1,6 @@
+# Never bundle FM binary save files or ephemeral references to Vercel
+*.fm
+tests/
+.tmp-fmsave-ref/
+_reference/
+tmp/

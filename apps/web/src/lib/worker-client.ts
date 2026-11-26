@@ -1,6 +1,11 @@
 "use client";
 
-import { exportFmf, parseFmf } from "@fm27/fm-codec";
+import {
+  exportFmf,
+  parseFmf,
+  type FmSaveProgressCallback,
+  type ParsedFmSave,
+} from "@fm27/fm-codec";
 import type {
   DualPhaseTactic,
   Player,
@@ -9,9 +14,11 @@ import type {
   WeeklySchedule,
 } from "@fm27/shared-types";
 import type {
+  AnalyzeUnifiedParams,
   Heatmap18ZoneResult,
   SquadAnalysisOptions,
   TacticalBalanceReport,
+  UnifiedReport,
 } from "@fm27/fm-engine";
 import {
   dispatchWorkerTask,
@@ -23,6 +30,8 @@ type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : n
 type EngineWorkerPayload = DistributiveOmit<EngineWorkerRequest, "id">;
 
 const WORKER_TIMEOUT_MS = 2000;
+const SAVE_WORKER_TIMEOUT_MS = 180_000;
+const UNIFIED_WORKER_TIMEOUT_MS = 45_000;
 
 let sharedWorker: Worker | null = null;
 let workerDisabled = false;
@@ -32,6 +41,7 @@ const pending = new Map<
   {
     resolve: (val: unknown) => void;
     reject: (err: Error) => void;
+    onProgress?: FmSaveProgressCallback;
     timer: ReturnType<typeof setTimeout>;
   }
 >();
@@ -63,6 +73,10 @@ function getOrCreateWorker(): Worker | null {
         const msg = event.data;
         const entry = pending.get(msg.id);
         if (!entry) return;
+        if (msg.kind === "progress") {
+          entry.onProgress?.(msg.stage, msg.pct);
+          return;
+        }
         clearTimeout(entry.timer);
         pending.delete(msg.id);
         if (msg.ok) {
@@ -86,13 +100,23 @@ function getOrCreateWorker(): Worker | null {
   return sharedWorker;
 }
 
-async function callEngineWorker<T>(payload: EngineWorkerPayload): Promise<T> {
+async function callEngineWorker<T>(
+  payload: EngineWorkerPayload,
+  opts?: {
+    timeoutMs?: number;
+    transfer?: Transferable[];
+    onProgress?: FmSaveProgressCallback;
+    allowMainThreadFallback?: boolean;
+  },
+): Promise<T> {
   const id = `w-${++seq}-${Date.now()}`;
   const fullReq = { ...payload, id } as EngineWorkerRequest;
+  const timeoutMs = opts?.timeoutMs ?? WORKER_TIMEOUT_MS;
+  const allowFallback = opts?.allowMainThreadFallback ?? true;
   const worker = getOrCreateWorker();
 
   if (!worker) {
-    return (await dispatchWorkerTask(fullReq)) as T;
+    return (await dispatchWorkerTask(fullReq, opts?.onProgress)) as T;
   }
 
   try {
@@ -100,17 +124,22 @@ async function callEngineWorker<T>(payload: EngineWorkerPayload): Promise<T> {
       const timer = setTimeout(() => {
         pending.delete(id);
         teardownWorker("Worker timed out");
-        reject(new Error("Worker timed out"));
-      }, WORKER_TIMEOUT_MS);
+        reject(new Error("Pemrosesan di Web Worker melebihi batas waktu (timeout)."));
+      }, timeoutMs);
 
       pending.set(id, {
         resolve: (val) => resolve(val as T),
         reject,
+        onProgress: opts?.onProgress,
         timer,
       });
 
       try {
-        worker.postMessage(fullReq);
+        if (opts?.transfer && opts.transfer.length > 0) {
+          worker.postMessage(fullReq, opts.transfer);
+        } else {
+          worker.postMessage(fullReq);
+        }
       } catch (err) {
         clearTimeout(timer);
         pending.delete(id);
@@ -120,20 +149,60 @@ async function callEngineWorker<T>(payload: EngineWorkerPayload): Promise<T> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const shouldFallback =
-      workerDisabled ||
-      err instanceof DOMException ||
-      msg.includes("Worker") ||
-      msg.includes("DataCloneError") ||
-      msg.includes("BigInt");
+      allowFallback &&
+      (workerDisabled ||
+        err instanceof DOMException ||
+        msg.includes("Worker") ||
+        msg.includes("DataCloneError") ||
+        msg.includes("BigInt"));
     if (shouldFallback) {
-      return (await dispatchWorkerTask(fullReq)) as T;
+      return (await dispatchWorkerTask(fullReq, opts?.onProgress)) as T;
     }
     throw err;
   }
 }
 
+/**
+ * Parses a 50-400 MB `.fm` career save 100% client-side inside the Web Worker
+ * using a zero-copy Transferable ArrayBuffer (never uploaded to any server).
+ */
+export async function parseFmSaveInWorker(
+  arrayBuffer: ArrayBuffer,
+  onProgress?: FmSaveProgressCallback,
+): Promise<ParsedFmSave> {
+  const worker = getOrCreateWorker();
+  if (!worker) {
+    return (await dispatchWorkerTask(
+      { id: "main-fm-save", type: "PARSE_FM_SAVE", buffer: arrayBuffer },
+      onProgress,
+    )) as ParsedFmSave;
+  }
+  // Note: once transferred, `arrayBuffer` is neutered on main thread (zero-copy!)
+  return callEngineWorker<ParsedFmSave>(
+    { type: "PARSE_FM_SAVE", buffer: arrayBuffer },
+    {
+      timeoutMs: SAVE_WORKER_TIMEOUT_MS,
+      transfer: [arrayBuffer],
+      onProgress,
+      allowMainThreadFallback: false,
+    },
+  );
+}
+
+export function analyzeUnifiedInWorker(
+  params: AnalyzeUnifiedParams,
+  onProgress?: FmSaveProgressCallback,
+): Promise<UnifiedReport> {
+  return callEngineWorker<UnifiedReport>(
+    { type: "ANALYZE_UNIFIED", params },
+    {
+      timeoutMs: UNIFIED_WORKER_TIMEOUT_MS,
+      onProgress,
+    },
+  );
+}
+
 export async function exportFmfInWorker(tactic: DualPhaseTactic): Promise<Uint8Array> {
-  // Direct main-thread execution avoids Web Worker hang or BigInt DataCloneError
   return exportFmf(tactic);
 }
 
@@ -141,7 +210,6 @@ export async function parseFmfInWorker(
   bytes: Uint8Array,
   patchVersion?: string,
 ): Promise<DualPhaseTactic> {
-  // Direct main-thread execution avoids Web Worker hang or BigInt DataCloneError
   return parseFmf(bytes, { patchVersion });
 }
 
@@ -166,11 +234,14 @@ export function analyzeSquadInWorker(
   players: Player[],
   options?: SquadAnalysisOptions,
 ): Promise<TacticPlanResult[]> {
-  return callEngineWorker<TacticPlanResult[]>({
-    type: "ANALYZE_SQUAD",
-    players,
-    options,
-  });
+  return callEngineWorker<TacticPlanResult[]>(
+    {
+      type: "ANALYZE_SQUAD",
+      players,
+      options,
+    },
+    { timeoutMs: UNIFIED_WORKER_TIMEOUT_MS },
+  );
 }
 
 export function auditSquadInWorker(

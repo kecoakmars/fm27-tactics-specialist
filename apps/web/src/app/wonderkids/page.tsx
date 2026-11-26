@@ -14,6 +14,8 @@ import { useTacticStore } from "../../stores/useTacticStore";
 function WonderkidsExplorerInner() {
   const searchParams = useSearchParams();
   const tactic = useTacticStore((s) => s.tactic);
+  const worldWonderkids = useTacticStore((s) => s.worldWonderkids);
+  const clubPlayers = useTacticStore((s) => s.clubPlayers);
   const weakestIndices = useSquadStore(
     (s) => s.auditResult?.weakestThreeSlotIndices,
   );
@@ -42,13 +44,22 @@ function WonderkidsExplorerInner() {
   const targetSlot = tactic.slots[slotIndex] ?? tactic.slots[0]!;
 
   const ranked = useMemo(() => {
-    const list = rankWonderkidsForSlot(targetSlot, {
-      position: (posFilter as PositionKey14) || undefined,
-      maxAge,
-      maxBudgetEurM: maxBudget,
-      styleId: styleId || undefined,
-      patchVersion: tactic.patchVersion,
-    });
+    const squadUidSet = new Set(clubPlayers.map((p) => p.uid));
+    const customPool =
+      worldWonderkids.length > 0
+        ? worldWonderkids.filter((wk) => !squadUidSet.has(wk.uid))
+        : undefined;
+    const list = rankWonderkidsForSlot(
+      targetSlot,
+      {
+        position: (posFilter as PositionKey14) || undefined,
+        maxAge,
+        maxBudgetEurM: maxBudget,
+        styleId: styleId || undefined,
+        patchVersion: tactic.patchVersion,
+      },
+      customPool,
+    );
     if (!searchText.trim()) return list.slice(0, 36);
     const q = searchText.trim().toLowerCase();
     return list
@@ -60,6 +71,8 @@ function WonderkidsExplorerInner() {
       )
       .slice(0, 36);
   }, [
+    clubPlayers,
+    worldWonderkids,
     targetSlot,
     posFilter,
     maxAge,
@@ -73,9 +86,23 @@ function WonderkidsExplorerInner() {
     <main className="mx-auto max-w-[1600px] space-y-5 px-4 py-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-100">
-            U-21 Wonderkids Scout &amp; Tactical Fit Ranker
-          </h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl font-bold text-slate-100">
+              U-21 Wonderkids Scout &amp; Tactical Fit Ranker
+            </h1>
+            <span
+              className={`rounded px-2 py-0.5 text-[10px] font-bold ${
+                worldWonderkids.length > 0
+                  ? "border border-emerald-500/40 bg-emerald-500/20 text-emerald-300"
+                  : "border border-cyan-500/30 bg-slate-800 text-cyan-300"
+              }`}
+            >
+              Sumber:{" "}
+              {worldWonderkids.length > 0
+                ? `Live dari File Save .fm (${worldWonderkids.length} U-21)`
+                : "Dataset Seed Statis FM27"}
+            </span>
+          </div>
           <p className="text-xs text-slate-400">
             Formula:{" "}
             <code className="font-mono text-emerald-300">

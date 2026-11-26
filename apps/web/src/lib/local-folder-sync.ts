@@ -15,7 +15,7 @@ export interface ExtendedDirectoryHandle extends FileSystemDirectoryHandle {
   values?: () => AsyncIterableIterator<FileSystemDirectoryHandle | FileSystemFileHandle>;
 }
 
-export type LocalFolderSubdir = "tactics" | "schedules" | "shortlists";
+export type LocalFolderSubdir = "tactics" | "schedules" | "shortlists" | "games";
 
 export interface LocalFolderFileEntry {
   name: string;

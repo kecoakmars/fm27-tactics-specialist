@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getStaffFormulas, getStaffSeed } from "@fm27/fm-data";
 import {
   calculateAllStaffStars,
@@ -9,6 +9,8 @@ import {
   parseStaffHtml,
 } from "@fm27/fm-engine";
 import type { StaffCategoryId, StaffMember } from "@fm27/shared-types";
+import { parseFmSaveInWorker } from "../../lib/worker-client";
+import { useTacticStore } from "../../stores/useTacticStore";
 
 interface StaffOptimizerTableProps {
   patchVersion: string;
@@ -23,16 +25,53 @@ export function StaffOptimizerTable({
   const formulas = getStaffFormulas(patchVersion);
   const seedStaff = getStaffSeed(patchVersion).Staff;
 
+  const {
+    clubStaff,
+    worldStaffPool,
+    liveFmSave,
+    selectedClubUid,
+    ingestParsedFmSave,
+    setFmImportProgress,
+    setClubPickerOpen,
+  } = useTacticStore();
+
   const [customStaff, setCustomStaff] = useState<StaffMember[] | null>(null);
   const [freeAgentsOnly, setFreeAgentsOnly] = useState(false);
   const [focusCategory, setFocusCategory] =
     useState<StaffCategoryId>("attacking_tactical");
-  const [selectedPoolUids, setSelectedPoolUids] = useState<number[]>(() =>
-    seedStaff.slice(0, 10).map((s) => s.uid),
-  );
+  const [selectedPoolUids, setSelectedPoolUids] = useState<number[]>([]);
   const [importError, setImportError] = useState<string | null>(null);
 
-  const activeDirectory = customStaff ?? seedStaff;
+  // Sync Club Coaching Pool strictly from real uploaded club staff (.fm or CSV/HTML), NEVER from static seed
+  useEffect(() => {
+    if (customStaff && customStaff.length > 0) {
+      setSelectedPoolUids(customStaff.slice(0, 12).map((s) => s.uid));
+    } else if (clubStaff.length > 0) {
+      setSelectedPoolUids(clubStaff.slice(0, 12).map((s) => s.uid));
+    } else {
+      setSelectedPoolUids([]);
+    }
+  }, [clubStaff, customStaff]);
+
+  const dataSourceLabel = customStaff
+    ? "Impor CSV / HTML Kustom"
+    : worldStaffPool.length > 0
+      ? "Live dari File Save .fm"
+      : "Dataset Seed Statis FM27";
+
+  const activeDirectory = useMemo(() => {
+    if (customStaff) return customStaff;
+    if (worldStaffPool.length > 0 || clubStaff.length > 0) {
+      const merged = new Map<number, StaffMember>();
+      for (const s of clubStaff) merged.set(s.uid, s);
+      for (const s of worldStaffPool) {
+        if (!merged.has(s.uid)) merged.set(s.uid, s);
+      }
+      return Array.from(merged.values());
+    }
+    return seedStaff;
+  }, [clubStaff, customStaff, seedStaff, worldStaffPool]);
+
   const staffByUid = useMemo(
     () => new Map(activeDirectory.map((s) => [s.uid, s])),
     [activeDirectory],
@@ -69,6 +108,29 @@ export function StaffOptimizerTable({
   );
 
   async function handleImportStaffFile(file: File) {
+    if (file.name.toLowerCase().endsWith(".fm")) {
+      setImportError(null);
+      setFmImportProgress({
+        stage: "Membaca file...",
+        pct: 3,
+        fileName: file.name,
+      });
+      try {
+        const ab = await file.arrayBuffer();
+        const parsed = await parseFmSaveInWorker(ab, (stage, pct) => {
+          setFmImportProgress({ stage, pct, fileName: file.name });
+        });
+        setCustomStaff(null);
+        await ingestParsedFmSave(parsed, file.name);
+      } catch (err) {
+        setFmImportProgress(null);
+        setImportError(
+          err instanceof Error ? err.message : "Gagal memproses file save .fm",
+        );
+      }
+      return;
+    }
+
     try {
       const text = await file.text();
       const isHtml =
@@ -77,11 +139,11 @@ export function StaffOptimizerTable({
         /<table\b/i.test(text);
       const parsed = isHtml ? parseStaffHtml(text) : parseStaffCsv(text);
       setCustomStaff(parsed);
-      setSelectedPoolUids(parsed.slice(0, 10).map((s) => s.uid));
+      setSelectedPoolUids(parsed.slice(0, 12).map((s) => s.uid));
       setImportError(null);
     } catch (err) {
       setImportError(
-        err instanceof Error ? err.message : "Failed to parse staff export",
+        err instanceof Error ? err.message : "Gagal memproses file ekspor staf",
       );
     }
   }
@@ -96,15 +158,15 @@ export function StaffOptimizerTable({
 
   return (
     <div className="space-y-5">
-      {assignmentPlan && (
+      {assignmentPlan ? (
         <section className="rounded-xl border border-emerald-500/30 bg-[#111827] p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="text-sm font-semibold text-emerald-300">
-                Auto-Assign Coaching Workload Optimizer ({poolMembers.length} Coaches in Pool)
+                Auto-Assign Coaching Workload Optimizer ({poolMembers.length} Pelatih di Pool Klub)
               </h3>
               <p className="text-xs text-slate-400">
-                Maximizes category stars while keeping coaching workload Light / Average.
+                Memaksimalkan bintang tiap kategori latihan sekaligus menjaga beban kerja Light / Average.
               </p>
             </div>
             <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-3 py-1 font-mono text-xs font-bold text-emerald-300">
@@ -158,16 +220,42 @@ export function StaffOptimizerTable({
             })}
           </div>
         </section>
+      ) : (
+        <section
+          id="staff-club-empty-state"
+          className="rounded-xl border border-dashed border-slate-700 bg-[#111827]/70 p-6 text-center"
+        >
+          <h3 className="text-sm font-bold text-slate-200">
+            Belum Ada Staf Klub yang Dimuat ke Workload Optimizer
+          </h3>
+          <p className="mx-auto mt-1 max-w-xl text-xs text-slate-400 leading-relaxed">
+            Unggah file save karier <code className="text-emerald-300">.fm</code> (diproses 100%
+            lokal di browser) atau ekspor <code className="text-cyan-300">Staff CSV / HTML</code>{" "}
+            untuk memuat jajaran pelatih asli klub Anda tanpa data sampel buatan, atau centang
+            pelatih dari direktori di bawah untuk simulasi manual.
+          </p>
+        </section>
       )}
 
       <section className="rounded-xl border border-slate-800 bg-[#111827] p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold text-slate-100">
-              Curated Best Staff, Free Agents &amp; F9 Importer ({filteredDirectory.length})
-            </h3>
-            <p className="text-xs text-slate-400">
-              Check coaches to include them in the Auto-Assign Optimizer pool, or click a row to load into sliders.
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-semibold text-slate-100">
+                Direktori Pelatih, Free Agents &amp; Importer ({filteredDirectory.length})
+              </h3>
+              <span
+                className={`rounded px-2 py-0.5 text-[10px] font-bold ${
+                  dataSourceLabel === "Live dari File Save .fm"
+                    ? "border border-emerald-500/40 bg-emerald-500/20 text-emerald-300"
+                    : "border border-cyan-500/30 bg-slate-800 text-cyan-300"
+                }`}
+              >
+                Sumber: {dataSourceLabel}
+              </span>
+            </div>
+            <p className="mt-0.5 text-xs text-slate-400">
+              Centang pelatih untuk dimasukkan ke Pool Optimizer klub, atau klik Load Sliders untuk kalkulasi detail.
             </p>
           </div>
 
@@ -197,7 +285,7 @@ export function StaffOptimizerTable({
             <input
               ref={fileRef}
               type="file"
-              accept=".csv,.html,.htm"
+              accept=".fm,.csv,.html,.htm"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
@@ -208,20 +296,30 @@ export function StaffOptimizerTable({
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/25"
+              className="rounded-lg border border-emerald-500/40 bg-emerald-500/20 px-3 py-1.5 text-xs font-bold text-emerald-300 hover:bg-emerald-500/30 cursor-pointer"
             >
-              Import Staff CSV/HTML
+              Unggah Save .fm / Staff CSV
             </button>
+            {liveFmSave && (
+              <button
+                type="button"
+                onClick={() => setClubPickerOpen(true)}
+                className="rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-2.5 py-1.5 text-xs font-bold text-cyan-300 hover:bg-cyan-500/25 cursor-pointer"
+              >
+                Ganti Klub (
+                {liveFmSave.clubs.find((c) => c.uid === selectedClubUid)?.shortName ?? "Pilih"})
+              </button>
+            )}
             {customStaff && (
               <button
                 type="button"
                 onClick={() => {
                   setCustomStaff(null);
-                  setSelectedPoolUids(seedStaff.slice(0, 10).map((s) => s.uid));
+                  setSelectedPoolUids(clubStaff.slice(0, 12).map((s) => s.uid));
                 }}
-                className="rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs text-slate-300"
+                className="rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs text-slate-300 cursor-pointer"
               >
-                Reset to Seed
+                Reset Kustom
               </button>
             )}
           </div>
@@ -293,7 +391,7 @@ export function StaffOptimizerTable({
                       <button
                         type="button"
                         onClick={() => onInspectCoach(member)}
-                        className="rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-[11px] text-slate-200 hover:border-cyan-500/40 hover:text-cyan-300"
+                        className="rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-[11px] text-slate-200 hover:border-cyan-500/40 hover:text-cyan-300 cursor-pointer"
                       >
                         Load Sliders
                       </button>

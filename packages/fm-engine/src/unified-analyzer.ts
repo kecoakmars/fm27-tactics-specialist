@@ -11,10 +11,11 @@ import type {
   StaffAssignmentPlan,
   StaffCategoryId,
   StaffMember,
-   StaffRole,
+  StaffRole,
   TacticPlanResult,
   TrainingCategory,
   WeeklySchedule,
+  Wonderkid,
 } from "@fm27/shared-types";
 import {
   computeTacticalBalance,
@@ -36,6 +37,7 @@ import { rankWonderkidsForSlot } from "./wonderkid-ranker.js";
 
 export type UnifiedAnalysisMode = "fmf-only" | "squad-only" | "combined";
 export type TrainingUnitKey = "attacking" | "midfield" | "defending" | "goalkeeping";
+export type LiveOrSeedDataSource = "Live dari File Save .fm" | "Dataset Seed Statis FM27";
 
 export interface AlternativeShapeRecommendation {
   shapeId: string;
@@ -134,6 +136,7 @@ export interface StaffCategoryRecommendation {
 }
 
 export interface UnifiedStaffPlan {
+  dataSource: LiveOrSeedDataSource;
   hasClubStaff: boolean;
   clubAssignment: StaffAssignmentPlan | null;
   weakestClubCategories: StaffCategoryId[];
@@ -176,6 +179,7 @@ export interface WonderkidSlotPlan {
 }
 
 export interface UnifiedWonderkidPlan {
+  dataSource: LiveOrSeedDataSource;
   prioritySlotIndices: number[];
   slots: WonderkidSlotPlan[];
 }
@@ -195,6 +199,8 @@ export interface AnalyzeUnifiedParams {
   tactic?: DualPhaseTactic | null;
   squad?: readonly Player[] | null;
   clubStaff?: readonly StaffMember[] | null;
+  worldWonderkids?: readonly Wonderkid[] | null;
+  worldStaffPool?: readonly StaffMember[] | null;
   dataset?: PatchBundle;
 }
 
@@ -642,10 +648,11 @@ function buildUnifiedStaffPlan(params: {
   tactic: DualPhaseTactic;
   audit: SquadAuditResult | null;
   clubStaff: readonly StaffMember[] | null | undefined;
+  worldStaffPool: readonly StaffMember[] | null | undefined;
   dataset: PatchBundle;
   patchVersion: string;
 }): UnifiedStaffPlan {
-  const { tactic, audit, clubStaff, dataset, patchVersion } = params;
+  const { tactic, audit, clubStaff, worldStaffPool, dataset, patchVersion } = params;
   const ti = tactic.teamInstructions;
   const loe = ti.LineOfEngagement ?? 62;
   const pd = ti.PassingDirectness ?? 0;
@@ -794,7 +801,15 @@ function buildUnifiedStaffPlan(params: {
     : [];
   const weakCatSet = new Set(weakestClubCategories);
 
-  const seedPool = dataset.staffSeed.Staff;
+  const hasLiveStaffPool = Boolean(worldStaffPool && worldStaffPool.length > 0);
+  const dataSource: LiveOrSeedDataSource = hasLiveStaffPool
+    ? "Live dari File Save .fm"
+    : "Dataset Seed Statis FM27";
+  const rawPool = hasLiveStaffPool ? worldStaffPool! : dataset.staffSeed.Staff;
+  const candidatePool =
+    clubStaffByUid.size > 0
+      ? rawPool.filter((m) => !clubStaffByUid.has(m.uid))
+      : rawPool;
 
   const categories: StaffCategoryRecommendation[] = dataset.staffFormulas.categories.map(
     (formula) => {
@@ -809,7 +824,7 @@ function buildUnifiedStaffPlan(params: {
         meta.weight + (isWeak ? 15 : 0),
       );
 
-      const evaluated = seedPool
+      const evaluated = candidatePool
         .map((member) => {
           const rating = calculateCategoryStarRating(member.attributes, formula);
           return {
@@ -859,6 +874,7 @@ function buildUnifiedStaffPlan(params: {
   );
 
   return {
+    dataSource,
     hasClubStaff,
     clubAssignment,
     weakestClubCategories,
@@ -869,10 +885,33 @@ function buildUnifiedStaffPlan(params: {
 function buildUnifiedWonderkidPlan(params: {
   tactic: DualPhaseTactic;
   audit: SquadAuditResult | null;
+  squad: readonly Player[] | null | undefined;
+  worldWonderkids: readonly Wonderkid[] | null | undefined;
   dataset: PatchBundle;
   patchVersion: string;
 }): UnifiedWonderkidPlan {
-  const { tactic, audit, dataset, patchVersion } = params;
+  const { tactic, audit, squad, worldWonderkids, dataset, patchVersion } = params;
+  const hasLiveWonderkids = Boolean(worldWonderkids && worldWonderkids.length > 0);
+  const dataSource: LiveOrSeedDataSource = hasLiveWonderkids
+    ? "Live dari File Save .fm"
+    : "Dataset Seed Statis FM27";
+  const clubPlayerUids = new Set((squad ?? []).map((p) => p.uid));
+  const clubNamesLower = new Set(
+    (squad ?? [])
+      .map((p) => p.clubName?.trim().toLowerCase())
+      .filter((x): x is string => Boolean(x)),
+  );
+  const baseWonderkids = hasLiveWonderkids
+    ? worldWonderkids!
+    : dataset.wonderkidsSeed.Wonderkids;
+  const eligibleWonderkids =
+    clubPlayerUids.size > 0
+      ? baseWonderkids.filter(
+          (wk) =>
+            !clubPlayerUids.has(wk.uid) &&
+            !clubNamesLower.has(wk.club.trim().toLowerCase()),
+        )
+      : baseWonderkids;
   const roleById = new Map(dataset.roleProfiles.Roles.map((r) => [r.Id, r]));
   const pitchRoleNameById = new Map(dataset.pitchCatalog.Roles.map((r) => [r.Id, r.Name]));
   const specialistSet = new Set(dataset.roleProfiles.SpecialistRoles);
@@ -899,7 +938,7 @@ function buildUnifiedWonderkidPlan(params: {
         limit: 3,
         patchVersion,
       },
-      dataset.wonderkidsSeed.Wonderkids,
+      eligibleWonderkids,
     );
 
     const candidates: WonderkidSlotCandidate[] = ranked.map((r) => {
@@ -1003,6 +1042,7 @@ function buildUnifiedWonderkidPlan(params: {
   }
 
   return {
+    dataSource,
     prioritySlotIndices,
     slots,
   };
@@ -1208,6 +1248,7 @@ export function analyzeUnified(params: AnalyzeUnifiedParams): UnifiedReport {
     tactic: activeTactic,
     audit,
     clubStaff: params.clubStaff,
+    worldStaffPool: params.worldStaffPool,
     dataset,
     patchVersion,
   });
@@ -1215,6 +1256,8 @@ export function analyzeUnified(params: AnalyzeUnifiedParams): UnifiedReport {
   const wonderkidPlan = buildUnifiedWonderkidPlan({
     tactic: activeTactic,
     audit,
+    squad: params.squad,
+    worldWonderkids: params.worldWonderkids,
     dataset,
     patchVersion,
   });

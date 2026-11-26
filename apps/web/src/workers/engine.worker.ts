@@ -3,15 +3,19 @@ import {
   exportScheduleFmf,
   exportShortlistFmf,
   parseFmf,
+  parseFmSave,
   parseScheduleFmf,
   parseShortlistFmf,
+  type FmSaveProgressCallback,
 } from "@fm27/fm-codec";
 import {
   analyzeSquadAndGenerateTactics,
+  analyzeUnified,
   auditSquadAgainstTactic,
   computeHeatmap18Zones,
   computeTacticalBalance,
   gradeImportedTactic,
+  type AnalyzeUnifiedParams,
   type SquadAnalysisOptions,
 } from "@fm27/fm-engine";
 import type {
@@ -23,6 +27,8 @@ import type {
 export type EngineWorkerRequest =
   | { id: string; type: "EXPORT_FMF"; tactic: DualPhaseTactic }
   | { id: string; type: "PARSE_FMF"; bytes: Uint8Array; patchVersion?: string }
+  | { id: string; type: "PARSE_FM_SAVE"; buffer: ArrayBuffer }
+  | { id: string; type: "ANALYZE_UNIFIED"; params: AnalyzeUnifiedParams }
   | { id: string; type: "COMPUTE_HEATMAP"; tactic: DualPhaseTactic }
   | { id: string; type: "COMPUTE_BALANCE"; tactic: DualPhaseTactic; squad?: Player[] }
   | {
@@ -45,15 +51,25 @@ export type EngineWorkerRequest =
   | { id: string; type: "PARSE_SHORTLIST_FMF"; bytes: Uint8Array };
 
 export type EngineWorkerResponse =
-  | { id: string; ok: true; result: unknown }
-  | { id: string; ok: false; error: string };
+  | { id: string; kind?: "done"; ok: true; result: unknown }
+  | { id: string; kind?: "done"; ok: false; error: string }
+  | { id: string; kind: "progress"; stage: string; pct: number };
 
-export async function dispatchWorkerTask(req: EngineWorkerRequest): Promise<unknown> {
+export async function dispatchWorkerTask(
+  req: EngineWorkerRequest,
+  onProgress?: FmSaveProgressCallback,
+): Promise<unknown> {
   switch (req.type) {
     case "EXPORT_FMF":
       return exportFmf(req.tactic);
     case "PARSE_FMF":
       return parseFmf(req.bytes, { patchVersion: req.patchVersion });
+    case "PARSE_FM_SAVE":
+      return parseFmSave(new Uint8Array(req.buffer), onProgress);
+    case "ANALYZE_UNIFIED": {
+      onProgress?.("Menjalankan Hungarian Solver...", 92);
+      return analyzeUnified(req.params);
+    }
     case "COMPUTE_HEATMAP":
       return computeHeatmap18Zones(req.tactic);
     case "COMPUTE_BALANCE":
@@ -84,16 +100,27 @@ if (typeof window === "undefined" && typeof self !== "undefined") {
   workerScope.onmessage = async (event: MessageEvent<EngineWorkerRequest>) => {
     const req = event.data;
     try {
-      const result = await dispatchWorkerTask(req);
+      const result = await dispatchWorkerTask(req, (stage, pct) => {
+        workerScope.postMessage({
+          id: req.id,
+          kind: "progress",
+          stage,
+          pct,
+        });
+      });
       if (result instanceof Uint8Array) {
         const copy = result.slice();
-        workerScope.postMessage({ id: req.id, ok: true, result: copy }, [copy.buffer]);
+        workerScope.postMessage(
+          { id: req.id, kind: "done", ok: true, result: copy },
+          [copy.buffer],
+        );
       } else {
-        workerScope.postMessage({ id: req.id, ok: true, result });
+        workerScope.postMessage({ id: req.id, kind: "done", ok: true, result });
       }
     } catch (err) {
       workerScope.postMessage({
         id: req.id,
+        kind: "done",
         ok: false,
         error: err instanceof Error ? err.message : String(err),
       });

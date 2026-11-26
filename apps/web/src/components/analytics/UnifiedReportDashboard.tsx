@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import type { UnifiedReport } from "@fm27/fm-engine";
-import { useSquadStore } from "@/stores/useSquadStore";
 import { useTacticStore } from "@/stores/useTacticStore";
 import { useTrainingStore } from "@/stores/useTrainingStore";
 
@@ -34,8 +33,9 @@ export function UnifiedReportDashboard({
     assignPlayerToSlot,
     pushTrainingPlanToStore,
     dismissUnifiedReport,
+    liveFmSave,
+    setClubPickerOpen,
   } = useTacticStore();
-  const loadDemoSquad = useSquadStore((s) => s.loadDemoSquad);
   const shortlistUids = useTrainingStore((s) => s.shortlistUids);
   const toggleShortlistUid = useTrainingStore((s) => s.toggleShortlistUid);
 
@@ -74,6 +74,15 @@ export function UnifiedReportDashboard({
         </div>
 
         <div className="flex items-center gap-2">
+          {liveFmSave && (
+            <button
+              type="button"
+              onClick={() => setClubPickerOpen(true)}
+              className="px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-500/18 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/28 cursor-pointer"
+            >
+              Ganti Klub (.fm)
+            </button>
+          )}
           {(report.mode === "squad-only" ||
             (tacticAdvice.gradedPlan &&
               tacticAdvice.baselineRankingFit !== null &&
@@ -277,21 +286,11 @@ export function UnifiedReportDashboard({
             >
               <span>{squadBlueprintOrAudit.honestNote}</span>
               <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    loadDemoSquad(report.patchVersion);
-                    onNotify?.("ok", "Demo Squad (22 pemain) dimuat untuk simulasi Mode C");
-                  }}
-                  className="px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 font-bold text-[11px] hover:bg-amber-300 cursor-pointer"
-                >
-                  Coba Demo Squad
-                </button>
                 <Link
                   href="/squad"
                   className="px-2.5 py-1 rounded-lg bg-[#0B0F19] text-amber-200 border border-amber-400/40 font-bold text-[11px]"
                 >
-                  Unggah CSV / HTML →
+                  Unggah Save .fm / CSV →
                 </Link>
               </div>
             </div>
@@ -520,7 +519,22 @@ export function UnifiedReportDashboard({
 
       {/* TAB 4: STAFF STAR */}
       {activeTab === "staff" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs">
+        <div className="flex flex-col gap-2.5 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-[11px] text-slate-400">
+              Rekomendasi pelatih &amp; free agent berdasarkan bobot DDM + kategori latihan taktik aktif:
+            </span>
+            <span
+              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                staffPlan.dataSource === "Live dari File Save .fm"
+                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                  : "bg-slate-800 text-cyan-300 border border-cyan-500/30"
+              }`}
+            >
+              Sumber: {staffPlan.dataSource}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
           {staffPlan.categories.slice(0, 6).map((cat) => (
             <div
               key={cat.categoryId}
@@ -569,12 +583,28 @@ export function UnifiedReportDashboard({
               </div>
             </div>
           ))}
+          </div>
         </div>
       )}
 
       {/* TAB 5: WONDERKIDS */}
       {activeTab === "wonderkids" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs max-h-[420px] overflow-y-auto pr-1">
+        <div className="flex flex-col gap-2.5 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-[11px] text-slate-400">
+              Kandidat U-21 eksternal terbaik per slot IP/OOP (pemain milik klub sendiri dikecualikan otomatis):
+            </span>
+            <span
+              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                wonderkidPlan.dataSource === "Live dari File Save .fm"
+                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                  : "bg-slate-800 text-cyan-300 border border-cyan-500/30"
+              }`}
+            >
+              Sumber: {wonderkidPlan.dataSource}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[420px] overflow-y-auto pr-1">
           {wonderkidPlan.slots.map((slotPlan) => (
             <div
               key={slotPlan.slotIndex}
@@ -633,6 +663,7 @@ export function UnifiedReportDashboard({
               </div>
             </div>
           ))}
+          </div>
         </div>
       )}
     </section>

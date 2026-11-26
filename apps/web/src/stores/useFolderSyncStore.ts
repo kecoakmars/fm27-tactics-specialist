@@ -28,6 +28,7 @@ export interface FolderSyncState {
   folderName: string | null;
   handle: ExtendedDirectoryHandle | null;
   tacticFiles: LocalFolderFileEntry[];
+  saveGameFiles: LocalFolderFileEntry[];
   exportFiles: LocalFolderFileEntry[];
   lastMessage: string | null;
 
@@ -40,6 +41,7 @@ export interface FolderSyncState {
   saveScheduleFmfDirect: (title: string, fmfBytes: Uint8Array) => Promise<string>;
   saveShortlistFmfDirect: (title: string, fmfBytes: Uint8Array) => Promise<string>;
   readTacticFileBytes: (fileName: string) => Promise<Uint8Array>;
+  readSaveGameArrayBuffer: (fileName: string) => Promise<ArrayBuffer>;
   readExportFileText: (fileName: string) => Promise<string>;
 }
 
@@ -48,6 +50,7 @@ export const useFolderSyncStore = create<FolderSyncState>((set, get) => ({
   folderName: null,
   handle: null,
   tacticFiles: [],
+  saveGameFiles: [],
   exportFiles: [],
   lastMessage: null,
 
@@ -62,8 +65,9 @@ export const useFolderSyncStore = create<FolderSyncState>((set, get) => ({
       return;
     }
     if (permission === "granted") {
-      const [tacticFiles, exportFiles] = await Promise.all([
+      const [tacticFiles, saveGameFiles, exportFiles] = await Promise.all([
         listFilesInLocalSubdir(handle, "tactics"),
+        listFilesInLocalSubdir(handle, "games", [".fm"]),
         listExportFilesInRoot(handle),
       ]);
       set({
@@ -71,6 +75,7 @@ export const useFolderSyncStore = create<FolderSyncState>((set, get) => ({
         handle,
         folderName: handle.name,
         tacticFiles,
+        saveGameFiles,
         exportFiles,
       });
     } else {
@@ -85,8 +90,9 @@ export const useFolderSyncStore = create<FolderSyncState>((set, get) => ({
   connectNewFolder: async () => {
     try {
       const handle = await pickFm27Directory();
-      const [tacticFiles, exportFiles] = await Promise.all([
+      const [tacticFiles, saveGameFiles, exportFiles] = await Promise.all([
         listFilesInLocalSubdir(handle, "tactics"),
+        listFilesInLocalSubdir(handle, "games", [".fm"]),
         listExportFilesInRoot(handle),
       ]);
       set({
@@ -94,6 +100,7 @@ export const useFolderSyncStore = create<FolderSyncState>((set, get) => ({
         handle,
         folderName: handle.name,
         tacticFiles,
+        saveGameFiles,
         exportFiles,
         lastMessage: `Connected to "${handle.name}"`,
       });
@@ -109,13 +116,15 @@ export const useFolderSyncStore = create<FolderSyncState>((set, get) => ({
     try {
       const granted = await requestFolderReadWritePermission(handle);
       if (!granted) return false;
-      const [tacticFiles, exportFiles] = await Promise.all([
+      const [tacticFiles, saveGameFiles, exportFiles] = await Promise.all([
         listFilesInLocalSubdir(handle, "tactics"),
+        listFilesInLocalSubdir(handle, "games", [".fm"]),
         listExportFilesInRoot(handle),
       ]);
       set({
         status: "connected",
         tacticFiles,
+        saveGameFiles,
         exportFiles,
         lastMessage: `Reconnected "${handle.name}"`,
       });
@@ -132,6 +141,7 @@ export const useFolderSyncStore = create<FolderSyncState>((set, get) => ({
       handle: null,
       folderName: null,
       tacticFiles: [],
+      saveGameFiles: [],
       exportFiles: [],
       lastMessage: "Disconnected local FM27 folder",
     });
@@ -140,11 +150,12 @@ export const useFolderSyncStore = create<FolderSyncState>((set, get) => ({
   refreshTacticFiles: async () => {
     const { handle, status } = get();
     if (!handle || status !== "connected") return;
-    const [tacticFiles, exportFiles] = await Promise.all([
+    const [tacticFiles, saveGameFiles, exportFiles] = await Promise.all([
       listFilesInLocalSubdir(handle, "tactics"),
+      listFilesInLocalSubdir(handle, "games", [".fm"]),
       listExportFilesInRoot(handle),
     ]);
-    set({ tacticFiles, exportFiles });
+    set({ tacticFiles, saveGameFiles, exportFiles });
   },
 
   saveTacticFmfDirect: async (title, fmfBytes) => {
@@ -190,6 +201,18 @@ export const useFolderSyncStore = create<FolderSyncState>((set, get) => ({
       throw new Error("FM27 folder is not connected");
     }
     return readFileBytesFromLocalSubdir(handle, "tactics", fileName);
+  },
+
+  readSaveGameArrayBuffer: async (fileName) => {
+    const { handle, status } = get();
+    if (!handle || status !== "connected") {
+      throw new Error("Folder FM27 belum ditautkan");
+    }
+    const bytes = await readFileBytesFromLocalSubdir(handle, "games", fileName);
+    return bytes.buffer.slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength,
+    ) as ArrayBuffer;
   },
 
   readExportFileText: async (fileName) => {

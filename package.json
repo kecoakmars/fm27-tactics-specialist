@@ -21,7 +21,8 @@
     "data:validate": "tsx scripts/validate-data.mjs",
     "data:new-patch": "node scripts/new-patch-version.mjs",
     "data:fixtures": "tsx scripts/generate-golden-fixtures.mjs",
-    "db:seed": "node scripts/seed-db.mjs"
+    "db:seed": "node scripts/seed-db.mjs",
+    "generate:seed": "tsx scripts/generate-seed-from-save.ts"
   },
   "devDependencies": {
     "@types/node": "^22.13.0",

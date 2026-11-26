@@ -1,0 +1,118 @@
+import fs from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+import { parseFmSave, scaleFmRawAttribute } from "@fm27/fm-codec";
+import { analyzeUnified } from "@fm27/fm-engine";
+import { ALL_49_ATTRIBUTES } from "@fm27/shared-types";
+
+const SAMPLE_SAVE_PATH = path.resolve(__dirname, "fixtures/sample-real.fm");
+
+describe("FM26/FM27 Client-Side .fm Save Parser & Live World Pool", () => {
+  it("normalizes raw 0-125 internal FM attributes deterministically to 1-20 scale", () => {
+    expect(scaleFmRawAttribute(0)).toBe(1);
+    expect(scaleFmRawAttribute(1)).toBe(1);
+    expect(scaleFmRawAttribute(5)).toBe(1);
+    expect(scaleFmRawAttribute(8)).toBe(2);
+    expect(scaleFmRawAttribute(10)).toBe(2);
+    expect(scaleFmRawAttribute(50)).toBe(10);
+    expect(scaleFmRawAttribute(75)).toBe(15);
+    expect(scaleFmRawAttribute(98)).toBe(20);
+    expect(scaleFmRawAttribute(100)).toBe(20);
+    expect(scaleFmRawAttribute(125)).toBe(20);
+  });
+
+  it("throws clear Indonesian error messages on empty, non-FM, encrypted tactic, or truncated buffers", () => {
+    expect(() => parseFmSave(new Uint8Array(0))).toThrow(/tidak valid atau kosong/i);
+
+    const nonFm = new TextEncoder().encode("NOT_AN_FM_SAVE_FILE_0123456789ABCDEF");
+    expect(() => parseFmSave(nonFm)).toThrow(/header biner Football Manager/i);
+
+    const encryptedAfe = new Uint8Array(32);
+    encryptedAfe.set([0x02, 0x01, 0x61, 0x66, 0x65, 0x2e], 0);
+    expect(() => parseFmSave(encryptedAfe)).toThrow(/afe\./i);
+
+    const truncatedFmf = new Uint8Array(40);
+    truncatedFmf.set([0x02, 0x01, 0x66, 0x6d, 0x66, 0x2e], 0);
+    new DataView(truncatedFmf.buffer).setUint32(9, 999_999, true);
+    expect(() => parseFmSave(truncatedFmf)).toThrow(/rusak atau terpotong/i);
+  });
+
+  it.skipIf(!fs.existsSync(SAMPLE_SAVE_PATH))(
+    "parses sample-real.fm, extracts clubs/players/staff/wonderkids, and runs deterministic 5-tab analyzeUnified",
+    () => {
+      const rawBuf = fs.readFileSync(SAMPLE_SAVE_PATH);
+      const stages: string[] = [];
+      const parsed = parseFmSave(
+        new Uint8Array(rawBuf.buffer, rawBuf.byteOffset, rawBuf.byteLength),
+        (stage) => stages.push(stage),
+      );
+
+      expect(stages.length).toBeGreaterThanOrEqual(4);
+      expect(parsed.clubs.length).toBeGreaterThan(0);
+      expect(parsed.humanClubUid).not.toBeNull();
+      expect(parsed.worldWonderkids.length).toBeGreaterThan(0);
+      expect(parsed.worldWonderkids.length).toBeLessThanOrEqual(500);
+      expect(parsed.worldStaffPool.length).toBeGreaterThan(0);
+      expect(parsed.worldStaffPool.length).toBeLessThanOrEqual(200);
+      expect(parsed.worldStaffPool.some((s) => s.isFreeAgent)).toBe(true);
+
+      const targetClub =
+        parsed.clubs.find(
+          (c) => c.uid === parsed.humanClubUid && c.playerCount >= 11,
+        ) ?? parsed.clubs.find((c) => c.playerCount >= 11)!;
+      expect(targetClub).toBeDefined();
+
+      const roster = parsed.playersByClub[targetClub.uid] ?? [];
+      expect(roster.length).toBeGreaterThanOrEqual(11);
+
+      for (const player of roster) {
+        for (const attr of ALL_49_ATTRIBUTES) {
+          const val = player.attributes[attr];
+          expect(val).toBeGreaterThanOrEqual(1);
+          expect(val).toBeLessThanOrEqual(20);
+        }
+      }
+
+      for (const wk of parsed.worldWonderkids.slice(0, 25)) {
+        expect(wk.age).toBeLessThanOrEqual(21);
+        expect(wk.attributes.passing).toBeGreaterThanOrEqual(1);
+        expect(wk.attributes.passing).toBeLessThanOrEqual(20);
+      }
+
+      const clubStaff = parsed.staffByClub[targetClub.uid] ?? [];
+      expect(clubStaff.length).toBeGreaterThan(0);
+
+      const reportA = analyzeUnified({
+        squad: roster,
+        clubStaff,
+        worldWonderkids: parsed.worldWonderkids,
+        worldStaffPool: parsed.worldStaffPool,
+      });
+      const reportB = analyzeUnified({
+        squad: roster,
+        clubStaff,
+        worldWonderkids: parsed.worldWonderkids,
+        worldStaffPool: parsed.worldStaffPool,
+      });
+
+      expect(reportA).toEqual(reportB);
+      expect(reportA.mode).toBe("squad-only");
+      expect(reportA.deterministicBadge).toBe("100% Data Deterministik (Non-AI)");
+      expect(reportA.tacticAdvice.recommendedTactic.slots).toHaveLength(11);
+      expect(reportA.squadBlueprintOrAudit.kind).toBe("audit");
+      expect(reportA.squadBlueprintOrAudit.audit?.starterAudits).toHaveLength(11);
+      expect(reportA.trainingPlan.schedule.days).toHaveLength(7);
+      expect(reportA.staffPlan.dataSource).toBe("Live dari File Save .fm");
+      expect(reportA.staffPlan.hasClubStaff).toBe(true);
+      expect(reportA.wonderkidPlan.dataSource).toBe("Live dari File Save .fm");
+
+      const rosterUids = new Set(roster.map((p) => p.uid));
+      for (const slot of reportA.wonderkidPlan.slots) {
+        for (const cand of slot.candidates) {
+          expect(rosterUids.has(cand.uid)).toBe(false);
+        }
+      }
+    },
+    60_000,
+  );
+});

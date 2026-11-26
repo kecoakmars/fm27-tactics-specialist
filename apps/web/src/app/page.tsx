@@ -27,6 +27,7 @@ import { DualPhasePitch } from "@/components/pitch/DualPhasePitch";
 import { SplitViewPitch } from "@/components/pitch/SplitViewPitch";
 import { sanitizeFileName, triggerBrowserDownload } from "@/lib/local-folder-sync";
 import { exportDualPhasePngCard } from "@/lib/svg-card-exporter";
+import { parseFmSaveInWorker } from "@/lib/worker-client";
 import { useFolderSyncStore } from "@/stores/useFolderSyncStore";
 import { useTacticStore } from "@/stores/useTacticStore";
 
@@ -46,6 +47,11 @@ export default function TacticalBoardWorkspacePage() {
     applyPresetStyle,
     applyDualShape,
     loadTactic,
+    ingestParsedFmSave,
+    setFmImportProgress,
+    setClubPickerOpen,
+    liveFmSave,
+    selectedClubUid,
     refreshUnifiedReport,
   } = useTacticStore();
 
@@ -57,8 +63,10 @@ export default function TacticalBoardWorkspacePage() {
   const {
     status: folderStatus,
     tacticFiles,
+    saveGameFiles,
     saveTacticFmfDirect,
     readTacticFileBytes,
+    readSaveGameArrayBuffer,
     refreshTacticFiles,
   } = useFolderSyncStore();
 
@@ -157,6 +165,44 @@ export default function TacticalBoardWorkspacePage() {
     Array.from(bytes.subarray(0, maxBytes))
       .map((b) => b.toString(16).padStart(2, "0").toUpperCase())
       .join(" ");
+
+  const handleImportFmSaveArrayBuffer = useCallback(
+    async (fileName: string, arrayBuffer: ArrayBuffer) => {
+      setBusyAction("import-fm-save");
+      setFmImportProgress({
+        stage: "Membaca file...",
+        pct: 3,
+        fileName,
+      });
+      try {
+        if (arrayBuffer.byteLength === 0) {
+          throw new Error("File save .fm kosong (0 bytes).");
+        }
+        const parsed = await parseFmSaveInWorker(arrayBuffer, (stage, pct) => {
+          setFmImportProgress({ stage, pct, fileName });
+        });
+        const { selectedClub, report } = await ingestParsedFmSave(parsed, fileName);
+        if (selectedClub && report) {
+          notify(
+            "ok",
+            `Save "${parsed.saveName}" dimuat 100% lokal! Klub: ${selectedClub.name} (${selectedClub.playerCount} pemain, ${selectedClub.staffCount} pelatih) · Rekomendasi #1: ${report.tacticAdvice.recommendedTactic.title} (IP ${report.tacticAdvice.recommendedTactic.inFormation} → OOP ${report.tacticAdvice.recommendedTactic.outFormation})`,
+          );
+        } else {
+          notify(
+            "ok",
+            `Save "${parsed.saveName}" berhasil diekstrak (${parsed.stats.totalClubs.toLocaleString()} klub, ${parsed.worldWonderkids.length} U-21 wonderkids). Silakan pilih klub Anda.`,
+          );
+        }
+      } catch (err) {
+        setFmImportProgress(null);
+        const message = err instanceof Error ? err.message : String(err);
+        notify("error", `Gagal impor save ${fileName}: ${message}`);
+      } finally {
+        setBusyAction(null);
+      }
+    },
+    [ingestParsedFmSave, notify, setFmImportProgress],
+  );
 
   const handleImportBytes = useCallback(
     async (fileName: string, bytes: Uint8Array) => {
@@ -317,9 +363,14 @@ export default function TacticalBoardWorkspacePage() {
         setIsDraggingFile(false);
         const file = e.dataTransfer.files?.[0];
         if (!file) return;
+        const isFmSave = file.name.toLowerCase().endsWith(".fm");
         void file
           .arrayBuffer()
-          .then((ab) => handleImportBytes(file.name, new Uint8Array(ab)))
+          .then((ab) =>
+            isFmSave
+              ? handleImportFmSaveArrayBuffer(file.name, ab)
+              : handleImportBytes(file.name, new Uint8Array(ab)),
+          )
           .catch((err) =>
             notify(
               "error",
@@ -355,10 +406,10 @@ export default function TacticalBoardWorkspacePage() {
         <div className="fixed inset-4 z-50 rounded-2xl bg-emerald-950/80 border-2 border-dashed border-emerald-400 flex items-center justify-center pointer-events-none">
           <div className="text-center">
             <p className="text-lg font-extrabold text-emerald-200">
-              Drop .fmf or .fm27.json to Load onto Tactical Board
+              Drop .fmf Tactic, .fm Career Save, or .fm27.json
             </p>
             <p className="text-xs text-emerald-300/80 mt-1">
-              Supports plain fmf., encrypted afe. (AES-128-CTR), raw .tac, and .fm27.json
+              Diproses 100% lokal di browser (tidak diunggah ke server) · Mendukung .fm Zstd, fmf., afe., &amp; .fm27.json
             </p>
           </div>
         </div>
@@ -419,15 +470,20 @@ export default function TacticalBoardWorkspacePage() {
               ref={fileInputRef}
               id="import-tactic-file-input"
               type="file"
-              accept=".fmf,.tac,.json"
+              accept=".fmf,.fm,.tac,.json,.fm27.json"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 e.target.value = "";
                 if (!f) return;
+                const isFmSave = f.name.toLowerCase().endsWith(".fm");
                 void f
                   .arrayBuffer()
-                  .then((ab) => handleImportBytes(f.name, new Uint8Array(ab)))
+                  .then((ab) =>
+                    isFmSave
+                      ? handleImportFmSaveArrayBuffer(f.name, ab)
+                      : handleImportBytes(f.name, new Uint8Array(ab)),
+                  )
                   .catch((err) =>
                     notify(
                       "error",
@@ -440,11 +496,24 @@ export default function TacticalBoardWorkspacePage() {
             <button
               id="import-fmf-btn"
               type="button"
+              disabled={busyAction !== null}
               onClick={() => fileInputRef.current?.click()}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#0B0F19] hover:bg-slate-800 text-slate-200 border border-white/12 cursor-pointer"
+              title="Impor taktik .fmf atau file save karier .fm (100% diproses lokal di browser)"
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#0B0F19] hover:bg-slate-800 text-slate-200 border border-white/12 cursor-pointer disabled:opacity-50"
             >
-              Import .fmf
+              Import .fmf / .fm Save
             </button>
+
+            {liveFmSave && (
+              <button
+                id="board-switch-club-btn"
+                type="button"
+                onClick={() => setClubPickerOpen(true)}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-500/18 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/28 transition cursor-pointer"
+              >
+                Ganti Klub ({liveFmSave.clubs.find((c) => c.uid === selectedClubUid)?.shortName ?? "Pilih"})
+              </button>
+            )}
 
             {folderStatus === "connected" && (
               <button
@@ -758,7 +827,7 @@ export default function TacticalBoardWorkspacePage() {
             <section className="tactical-surface rounded-xl p-3.5 flex flex-col gap-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                  Local /tactics Folder ({tacticFiles.length})
+                  Local /tactics ({tacticFiles.length}) &amp; /games ({saveGameFiles.length})
                 </span>
                 <button
                   id="refresh-local-tactics-btn"
@@ -769,6 +838,44 @@ export default function TacticalBoardWorkspacePage() {
                   Refresh
                 </button>
               </div>
+
+              {saveGameFiles.length > 0 && (
+                <div className="flex flex-col gap-1.5 pb-2 border-b border-white/8">
+                  <span className="text-[11px] font-semibold text-cyan-300">
+                    Career Saves di /games (100% Lokal di Browser):
+                  </span>
+                  <div className="flex flex-col gap-1.5 max-h-32 overflow-y-auto">
+                    {saveGameFiles.map((sf) => (
+                      <button
+                        key={sf.name}
+                        type="button"
+                        disabled={busyAction !== null}
+                        onClick={async () => {
+                          try {
+                            const ab = await readSaveGameArrayBuffer(sf.name);
+                            await handleImportFmSaveArrayBuffer(sf.name, ab);
+                          } catch (err) {
+                            notify(
+                              "error",
+                              err instanceof Error
+                                ? err.message
+                                : "Gagal membaca file save dari folder /games",
+                            );
+                          }
+                        }}
+                        className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-cyan-950/30 hover:bg-cyan-950/50 border border-cyan-500/25 text-left transition cursor-pointer disabled:opacity-50"
+                      >
+                        <span className="text-xs font-semibold text-cyan-200 truncate">
+                          {sf.name}
+                        </span>
+                        <span className="text-[11px] font-mono-metric text-cyan-400 ml-2 shrink-0">
+                          {(sf.size / (1024 * 1024)).toFixed(1)} MB
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {tacticFiles.length === 0 ? (
                 <p className="text-xs text-slate-400">

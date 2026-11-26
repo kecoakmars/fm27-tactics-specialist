@@ -154,6 +154,23 @@ export default function SquadAuditPage() {
         </div>
       )}
 
+      {players.length === 0 && (
+        <section
+          id="squad-empty-state"
+          className="rounded-xl border border-dashed border-slate-700 bg-[#111827]/70 p-8 text-center"
+        >
+          <h2 className="text-sm font-bold text-slate-200">
+            Belum Ada Data Skuad Klub yang Dimuat
+          </h2>
+          <p className="mx-auto mt-1.5 max-w-xl text-xs text-slate-400 leading-relaxed">
+            Unggah file save karier <code className="text-emerald-300">.fm</code> (diproses 100%
+            lokal di Web Worker browser tanpa unggah server) atau file ekspor{" "}
+            <code className="text-cyan-300">CSV / HTML</code> di atas untuk membuka Audit Starter
+            XI, 3 Posisi Terlemah, dan Hungarian 13×16 Tactic Generator tanpa data sampel buatan.
+          </p>
+        </section>
+      )}
+
       {players.length >= 11 && (
         <section className="rounded-xl border border-slate-800 bg-[#111827] p-4">
           <div className="flex flex-wrap items-end justify-between gap-3">

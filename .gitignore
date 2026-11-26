@@ -19,9 +19,13 @@ coverage/
 _reference/
 /tmp/
 tmp/
+.tmp-fmsave-ref/
 fm-refs/
 extracted-runtime/
 07-rea-evidence/
+
+# Large FM Save Files (NEVER commit to GitHub)
+*.fm
 
 # OS & Logs
 .DS_Store
