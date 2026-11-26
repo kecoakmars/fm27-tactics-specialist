@@ -1,19 +1,17 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { exportScheduleJson, parseScheduleJson } from "@fm27/fm-codec";
+import { exportScheduleJson } from "@fm27/fm-codec";
 import { getTrainingPresets } from "@fm27/fm-data";
 import { LoadMeterBar } from "../../components/training/LoadMeterBar";
 import { SessionPalette } from "../../components/training/SessionPalette";
 import { WeeklyScheduleGrid } from "../../components/training/WeeklyScheduleGrid";
+import { importAnySupportedFile } from "../../lib/file-importer";
 import {
   sanitizeFileName,
   triggerBrowserDownload,
 } from "../../lib/local-folder-sync";
-import {
-  exportScheduleFmfInWorker,
-  parseScheduleFmfInWorker,
-} from "../../lib/worker-client";
+import { exportScheduleFmfInWorker } from "../../lib/worker-client";
 import { useFolderSyncStore } from "../../stores/useFolderSyncStore";
 import { useTacticStore } from "../../stores/useTacticStore";
 import { useTrainingStore } from "../../stores/useTrainingStore";
@@ -23,13 +21,18 @@ export default function TrainingPage() {
   const [activeBrushCode, setActiveBrushCode] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
-  const patchVersion = useTacticStore((s) => s.tactic.patchVersion);
+  const tactic = useTacticStore((s) => s.tactic);
+  const refreshUnifiedReport = useTacticStore((s) => s.refreshUnifiedReport);
+  const pushTrainingPlanToStore = useTacticStore((s) => s.pushTrainingPlanToStore);
+  const patchVersion = tactic.patchVersion;
+
   const schedule = useTrainingStore((s) => s.schedule);
   const loadMetrics = useTrainingStore((s) => s.loadMetrics);
+  const syncedTacticTitle = useTrainingStore((s) => s.syncedTacticTitle);
+  const isManuallyEdited = useTrainingStore((s) => s.isManuallyEdited);
   const setSlotSession = useTrainingStore((s) => s.setSlotSession);
   const swapSlots = useTrainingStore((s) => s.swapSlots);
   const applyPreset = useTrainingStore((s) => s.applyPreset);
-  const loadSchedule = useTrainingStore((s) => s.loadSchedule);
   const setScheduleMeta = useTrainingStore((s) => s.setScheduleMeta);
 
   const folderStatus = useFolderSyncStore((s) => s.status);
@@ -61,20 +64,8 @@ export default function TrainingPage() {
 
   async function handleImportFile(file: File) {
     try {
-      if (file.name.toLowerCase().endsWith(".fmf")) {
-        const ab = await file.arrayBuffer();
-        const parsed = await parseScheduleFmfInWorker(
-          new Uint8Array(ab),
-          patchVersion,
-        );
-        loadSchedule(parsed);
-        setStatusMsg(`Imported .fmf schedule "${parsed.name}"`);
-      } else {
-        const text = await file.text();
-        const parsed = parseScheduleJson(text);
-        loadSchedule(parsed);
-        setStatusMsg(`Imported JSON schedule "${parsed.name}"`);
-      }
+      const res = await importAnySupportedFile(file);
+      setStatusMsg(res.message);
     } catch (err) {
       setStatusMsg(
         err instanceof Error ? err.message : "Failed to import schedule",
@@ -82,13 +73,34 @@ export default function TrainingPage() {
     }
   }
 
+  function handleResyncFromActiveTactic() {
+    refreshUnifiedReport();
+    const ok = pushTrainingPlanToStore();
+    if (ok) {
+      setStatusMsg(`Jadwal latihan disinkronkan ke taktik aktif "${tactic.title}"`);
+    }
+  }
+
   return (
     <main className="mx-auto max-w-[1600px] space-y-5 px-4 py-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-100">
-            Adaptive Training Recommender &amp; 7x3 Weekly Schedule Builder
-          </h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl font-bold text-slate-100">
+              Adaptive Training Recommender &amp; 7x3 Weekly Schedule Builder
+            </h1>
+            <span
+              className={`rounded px-2 py-0.5 text-[10px] font-bold ${
+                syncedTacticTitle && !isManuallyEdited
+                  ? "border border-emerald-500/40 bg-emerald-500/20 text-emerald-300"
+                  : "border border-cyan-500/40 bg-cyan-500/15 text-cyan-300"
+              }`}
+            >
+              {syncedTacticTitle && !isManuallyEdited
+                ? `Tersinkron: ${syncedTacticTitle}`
+                : `Taktik Aktif: ${tactic.title}`}
+            </span>
+          </div>
           <p className="text-xs text-slate-400">
             Presets calibrated to <code className="text-cyan-300">fm-scoring</code>{" "}
             FM27 attribute progression &amp; binary <code className="text-emerald-300">.tsc / .fmf</code>{" "}
@@ -97,6 +109,13 @@ export default function TrainingPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleResyncFromActiveTactic}
+            className="rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-3 py-1.5 text-xs font-bold text-cyan-300 hover:bg-cyan-500/25 cursor-pointer"
+          >
+            Sinkronkan dari Taktik Aktif
+          </button>
           <input
             ref={fileRef}
             type="file"

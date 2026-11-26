@@ -76,7 +76,7 @@ export default function SquadAuditPage() {
     return ftU21.length >= 11 ? ftU21 : players;
   }, [hasTeamSlots, players, squadTierFilter]);
 
-  // Auto-run Audit Active Tactic whenever active squad slice or active tactic updates
+  // Auto-run Audit Active Tactic + initial 13x16 recommendations whenever active squad slice updates
   useEffect(() => {
     if (activePlayers.length < 11) {
       setAuditResult(null);
@@ -105,6 +105,37 @@ export default function SquadAuditPage() {
       cancelled = true;
     };
   }, [activePlayers, tactic, setAuditResult, setError]);
+
+  useEffect(() => {
+    if (activePlayers.length < 11 || generatedPlans.length > 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const plans = await analyzeSquadInWorker(activePlayers, {
+          styleId: styleFilter || undefined,
+          priorities,
+          lineupPreferences,
+          patchVersion: tactic.patchVersion,
+        });
+        if (!cancelled) {
+          setGeneratedPlans(plans);
+        }
+      } catch {
+        // Non-fatal if squad lacks a GK
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activePlayers,
+    generatedPlans.length,
+    lineupPreferences,
+    priorities,
+    setGeneratedPlans,
+    styleFilter,
+    tactic.patchVersion,
+  ]);
 
   async function handleAutoGenerateBestTactics() {
     if (activePlayers.length < 11) return;
@@ -247,6 +278,7 @@ export default function SquadAuditPage() {
                   className="mt-1 rounded-lg border border-slate-700 bg-[#0B0F19] px-2.5 py-1.5 text-xs text-slate-100"
                 >
                   <option value="">All 13 Styles x 16 Dual-Shapes</option>
+                  <option value="__auto__">Auto Murni (8 Dual-Shapes)</option>
                   {stylesCatalog.TacticalStyles.map((st) => (
                     <option key={st.Id} value={st.Id}>
                       {st.Name}

@@ -8,7 +8,7 @@ import { POSITION_14_KEYS, type PositionKey14 } from "@fm27/shared-types";
 import { ShortlistExporter } from "../../components/wonderkids/ShortlistExporter";
 import { TrendingStrip } from "../../components/wonderkids/TrendingStrip";
 import { WonderkidCard } from "../../components/wonderkids/WonderkidCard";
-import { importFmSaveFile, isFmSaveFileName } from "../../lib/file-importer";
+import { importAnySupportedFile } from "../../lib/file-importer";
 import { useSquadStore } from "../../stores/useSquadStore";
 import { useTacticStore } from "../../stores/useTacticStore";
 
@@ -17,15 +17,19 @@ function WonderkidsExplorerInner() {
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const tactic = useTacticStore((s) => s.tactic);
+  const unifiedReport = useTacticStore((s) => s.unifiedReport);
   const liveFmSave = useTacticStore((s) => s.liveFmSave);
   const worldWonderkids = useTacticStore((s) => s.worldWonderkids);
   const clubPlayers = useTacticStore((s) => s.clubPlayers);
   const setClubPickerOpen = useTacticStore((s) => s.setClubPickerOpen);
-  const weakestIndices = useSquadStore(
+  const squadAuditWeakest = useSquadStore(
     (s) => s.auditResult?.weakestThreeSlotIndices,
   );
+  const weakestIndices =
+    squadAuditWeakest ??
+    unifiedReport?.squadBlueprintOrAudit.audit?.weakestThreeSlotIndices;
 
-  const defaultSlot = weakestIndices?.[0] ?? 10;
+  const defaultSlot = weakestIndices?.[0] ?? 0;
   const [activeTab, setActiveTab] = useState<"best-fit" | "trending">("best-fit");
   const [slotIndex, setSlotIndex] = useState<number>(defaultSlot);
   const [posFilter, setPosFilter] = useState<string>("");
@@ -43,25 +47,27 @@ function WonderkidsExplorerInner() {
       if (Number.isInteger(parsed) && parsed >= 0 && parsed <= 10) {
         setSlotIndex(parsed);
         setActiveTab("best-fit");
+        return;
       }
     }
-  }, [searchParams]);
+    if (weakestIndices && weakestIndices.length > 0) {
+      setSlotIndex(weakestIndices[0]!);
+    }
+  }, [searchParams, weakestIndices]);
+
+  useEffect(() => {
+    setStyleId(tactic.styleId ?? "");
+  }, [tactic.styleId]);
 
   const stylesCatalog = getTacticalStyles(tactic.patchVersion);
   const targetSlot = tactic.slots[slotIndex] ?? tactic.slots[0]!;
   const hasLiveData = worldWonderkids.length > 0;
 
   async function handleUploadFmSave(file: File) {
-    if (!isFmSaveFileName(file.name)) {
-      setImportError(
-        "Halaman Wonderkids membutuhkan file save karier .fm (bukan .fmf) untuk mengekstrak daftar U-21 asli.",
-      );
-      return;
-    }
     setImportError(null);
     setIsImporting(true);
     try {
-      await importFmSaveFile(file);
+      await importAnySupportedFile(file);
     } catch (err) {
       setImportError(
         err instanceof Error ? err.message : "Gagal memproses file save .fm",

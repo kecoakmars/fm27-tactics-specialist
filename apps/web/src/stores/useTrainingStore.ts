@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { DEFAULT_PATCH_VERSION, getTrainingPresets } from "@fm27/fm-data";
-import { evaluateWeeklyScheduleLoad } from "@fm27/fm-engine";
+import { evaluateWeeklyScheduleLoad, type UnifiedReport } from "@fm27/fm-engine";
 import type {
   AttributeName,
   LoadMetrics,
@@ -33,6 +33,8 @@ export interface TrainingStoreState {
   unitScope: TrainingUnitScope;
   shortlistTitle: string;
   shortlistUids: number[];
+  isManuallyEdited: boolean;
+  syncedTacticTitle: string | null;
 
   setSlotSession: (dayIndex: number, slot: SlotColumnKey, sessionCode: string) => void;
   swapSlots: (
@@ -42,7 +44,8 @@ export interface TrainingStoreState {
     toSlot: SlotColumnKey,
   ) => void;
   applyPreset: (presetId: string, patchVersion?: string) => void;
-  loadSchedule: (schedule: WeeklySchedule) => void;
+  loadSchedule: (schedule: WeeklySchedule, options?: { fromAutoSync?: boolean; syncedTacticTitle?: string | null }) => void;
+  syncFromUnifiedReport: (report: UnifiedReport, force?: boolean) => boolean;
   setScheduleMeta: (meta: { name?: string; description?: string }) => void;
 
   setTargetAttributes: (attrs: AttributeName[]) => void;
@@ -71,6 +74,8 @@ export const useTrainingStore = create<TrainingStoreState>((set) => ({
   unitScope: "all",
   shortlistTitle: "FM27 Tactical Targets",
   shortlistUids: [],
+  isManuallyEdited: false,
+  syncedTacticTitle: null,
 
   setSlotSession: (dayIndex, slot, sessionCode) =>
     set((state) => {
@@ -81,6 +86,7 @@ export const useTrainingStore = create<TrainingStoreState>((set) => ({
       return {
         schedule: nextSchedule,
         loadMetrics: evaluateWeeklyScheduleLoad(nextSchedule),
+        isManuallyEdited: true,
       };
     }),
 
@@ -100,6 +106,7 @@ export const useTrainingStore = create<TrainingStoreState>((set) => ({
       return {
         schedule: nextSchedule,
         loadMetrics: evaluateWeeklyScheduleLoad(nextSchedule),
+        isManuallyEdited: true,
       };
     }),
 
@@ -114,14 +121,47 @@ export const useTrainingStore = create<TrainingStoreState>((set) => ({
       return {
         schedule: cloned,
         loadMetrics: evaluateWeeklyScheduleLoad(cloned),
+        isManuallyEdited: true,
+        syncedTacticTitle: null,
       };
     }),
 
-  loadSchedule: (schedule) =>
+  loadSchedule: (schedule, options) =>
     set(() => ({
       schedule,
       loadMetrics: evaluateWeeklyScheduleLoad(schedule),
+      isManuallyEdited: !options?.fromAutoSync,
+      syncedTacticTitle: options?.syncedTacticTitle ?? null,
     })),
+
+  syncFromUnifiedReport: (report, force = false) => {
+    let applied = false;
+    set((state) => {
+      if (state.isManuallyEdited && !force) {
+        return state;
+      }
+      applied = true;
+      const nextSchedule: WeeklySchedule = {
+        ...report.trainingPlan.schedule,
+        days: report.trainingPlan.schedule.days.map((d) => ({ ...d })),
+      };
+      const topAttrs = new Set<AttributeName>();
+      for (const unit of ["attacking", "midfield", "defending", "goalkeeping"] as const) {
+        for (const item of report.trainingPlan.unitAttributeFrequencies[unit].slice(0, 2)) {
+          topAttrs.add(item.attribute);
+        }
+      }
+      return {
+        schedule: nextSchedule,
+        loadMetrics: evaluateWeeklyScheduleLoad(nextSchedule),
+        targetAttributes:
+          topAttrs.size > 0 ? Array.from(topAttrs).slice(0, 8) : state.targetAttributes,
+        isManuallyEdited: false,
+        syncedTacticTitle: report.tacticAdvice.activeTactic.title,
+      };
+    });
+    return applied;
+  },
 
   setScheduleMeta: (meta) =>
     set((state) => ({

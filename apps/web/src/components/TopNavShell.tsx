@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { listPatchVersions } from "@fm27/fm-data";
 import { ClubPickerModal } from "@/components/ClubPickerModal";
+import { importAnySupportedFile } from "@/lib/file-importer";
 import { useFolderSyncStore } from "@/stores/useFolderSyncStore";
 import { useTacticStore } from "@/stores/useTacticStore";
 
@@ -20,12 +21,18 @@ const NAV_ITEMS = [
 export function TopNavShell() {
   const pathname = usePathname();
   const patchVersions = listPatchVersions();
+  const globalFileRef = useRef<HTMLInputElement | null>(null);
+  const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [importingGlobal, setImportingGlobal] = useState(false);
+
   const {
     tactic,
     liveFmSave,
     selectedClubUid,
+    globalNotice,
     setPatchVersion,
     setClubPickerOpen,
+    setGlobalNotice,
   } = useTacticStore();
   const {
     status,
@@ -41,6 +48,36 @@ export function TopNavShell() {
   useEffect(() => {
     void hydrateFromIndexedDb();
   }, [hydrateFromIndexedDb]);
+
+  useEffect(() => {
+    return () => {
+      if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    };
+  }, []);
+
+  const showGlobalToast = (tone: "ok" | "error", text: string) => {
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    setGlobalNotice({ tone, text });
+    noticeTimerRef.current = setTimeout(
+      () => setGlobalNotice(null),
+      tone === "error" ? 9000 : 5500,
+    );
+  };
+
+  async function handleGlobalImport(file: File) {
+    setImportingGlobal(true);
+    try {
+      const res = await importAnySupportedFile(file);
+      showGlobalToast("ok", res.message);
+    } catch (err) {
+      showGlobalToast(
+        "error",
+        err instanceof Error ? err.message : `Gagal memproses ${file.name}`,
+      );
+    } finally {
+      setImportingGlobal(false);
+    }
+  }
 
   const activeClub =
     liveFmSave && selectedClubUid !== null
@@ -95,8 +132,32 @@ export function TopNavShell() {
             </nav>
           </div>
 
-          {/* Right Controls: Live .fm Club Switcher + Patch Selector + Local FM27 Folder Sync */}
+          {/* Right Controls: Global File Import + Live .fm Club Switcher + Patch Selector + Local FM27 Folder Sync */}
           <div className="flex items-center gap-2.5 shrink-0">
+            <input
+              ref={globalFileRef}
+              id="global-any-file-input"
+              type="file"
+              accept=".fm,.fmf,.tac,.json,.fm27.json,.csv,.html,.htm"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (f) void handleGlobalImport(f);
+              }}
+            />
+
+            <button
+              id="header-global-import-btn"
+              type="button"
+              disabled={importingGlobal}
+              onClick={() => globalFileRef.current?.click()}
+              title="Unggah Save Karier (.fm), Taktik/Jadwal (.fmf), atau Ekspor CSV/HTML dari halaman mana saja"
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition cursor-pointer disabled:opacity-50"
+            >
+              {importingGlobal ? "Memproses..." : "Impor .fm / .fmf"}
+            </button>
+
             {liveFmSave && (
               <button
                 id="header-switch-club-btn"
@@ -184,6 +245,28 @@ export function TopNavShell() {
           </div>
         </div>
       </header>
+
+      {globalNotice && (
+        <div className="max-w-[1640px] mx-auto px-4 sm:px-6 pt-3">
+          <div
+            role="status"
+            className={`rounded-xl px-3.5 py-2 text-xs font-medium flex items-center justify-between ${
+              globalNotice.tone === "ok"
+                ? "bg-emerald-500/12 border border-emerald-500/35 text-emerald-200"
+                : "bg-rose-500/15 border border-rose-500/40 text-rose-200"
+            }`}
+          >
+            <span>{globalNotice.text}</span>
+            <button
+              type="button"
+              onClick={() => setGlobalNotice(null)}
+              className="ml-3 text-slate-400 hover:text-slate-100 cursor-pointer"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
 
       <ClubPickerModal />
     </>

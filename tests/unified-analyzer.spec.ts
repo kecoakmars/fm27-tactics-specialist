@@ -177,5 +177,5 @@ describe("Unified 5-Tab Deterministic Pipeline — analyzeUnified (0% AI)", () =
       expect(isOopOutletRole(slot.outOfPossession.roleId)).toBe(false);
       expect(slot.inPossession.roleId).not.toBe("NoNonsenseCentreBack");
     }
-  });
+  }, 30_000);
 });

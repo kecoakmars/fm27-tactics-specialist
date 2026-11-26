@@ -24,11 +24,9 @@ import { TeamInstructionPanel } from "@/components/instructions/TeamInstructionP
 import { DualPhasePitch } from "@/components/pitch/DualPhasePitch";
 import { SplitViewPitch } from "@/components/pitch/SplitViewPitch";
 import {
+  importAnySupportedFile,
   importFmSaveArrayBuffer,
-  importFmSaveFile,
   importTacticBytes,
-  importTacticFile,
-  isFmSaveFileName,
 } from "@/lib/file-importer";
 import { sanitizeFileName, triggerBrowserDownload } from "@/lib/local-folder-sync";
 import { exportDualPhasePngCard } from "@/lib/svg-card-exporter";
@@ -52,6 +50,7 @@ export default function TacticalBoardWorkspacePage() {
     applyDualShape,
     loadTactic,
     setClubPickerOpen,
+    clubPlayers,
     liveFmSave,
     selectedClubUid,
     refreshUnifiedReport,
@@ -95,7 +94,32 @@ export default function TacticalBoardWorkspacePage() {
     [pitchCatalog.Roles],
   );
 
-  const balanceReport = useMemo(() => computeTacticalBalance(tactic), [tactic]);
+  const balanceReport = useMemo(
+    () => computeTacticalBalance(tactic, clubPlayers.length >= 11 ? clubPlayers : undefined),
+    [clubPlayers, tactic],
+  );
+
+  const activeShapeId = useMemo(() => {
+    const isHighPress = (tactic.teamInstructions.LineOfEngagement ?? 62) === 61;
+    const exactMatch = stylesCatalog.StyleShapes.find(
+      (sh) =>
+        sh.InPossessionName === tactic.inFormation &&
+        sh.OutOfPossessionName === tactic.outFormation &&
+        sh.HighPress === isHighPress,
+    );
+    if (exactMatch) return exactMatch.Id;
+    const formationMatch = stylesCatalog.StyleShapes.find(
+      (sh) =>
+        sh.InPossessionName === tactic.inFormation &&
+        sh.OutOfPossessionName === tactic.outFormation,
+    );
+    return formationMatch?.Id ?? "custom";
+  }, [
+    stylesCatalog.StyleShapes,
+    tactic.inFormation,
+    tactic.outFormation,
+    tactic.teamInstructions.LineOfEngagement,
+  ]);
 
   const notify = useCallback((tone: "ok" | "error", text: string) => {
     if (toastTimerRef.current) {
@@ -121,7 +145,7 @@ export default function TacticalBoardWorkspacePage() {
       if (!hash.includes("t=")) return;
       try {
         const decoded = decodeTacticFromUrlHash(hash);
-        loadTactic(decoded);
+        loadTactic(decoded, { fromUserTactic: true });
         notify("ok", `Loaded shared tactic "${decoded.title}" from URL`);
       } catch (err) {
         notify(
@@ -196,39 +220,6 @@ export default function TacticalBoardWorkspacePage() {
     [notify],
   );
 
-  const handleImportFmSaveFile = useCallback(
-    async (file: File) => {
-      setBusyAction("import-fm-save");
-      try {
-        const outcome = await importFmSaveFile(file);
-        if (outcome.cancelled) {
-          notify("ok", `Pembacaan file ${file.name} dibatalkan.`);
-          return;
-        }
-        const { parsed, selectedClub, report } = outcome;
-        if (selectedClub && report) {
-          notify(
-            "ok",
-            `Save "${parsed.saveName}" dimuat 100% lokal! Klub: ${selectedClub.name} (${selectedClub.playerCount} pemain, ${selectedClub.staffCount} pelatih) · Rekomendasi #1: ${report.tacticAdvice.recommendedTactic.title} (IP ${report.tacticAdvice.recommendedTactic.inFormation} → OOP ${report.tacticAdvice.recommendedTactic.outFormation})`,
-          );
-        } else {
-          notify(
-            "ok",
-            `Save "${parsed.saveName}" berhasil diekstrak (${parsed.stats.totalClubs.toLocaleString()} klub, ${parsed.worldWonderkids.length} U-21 wonderkids). Silakan pilih klub Anda.`,
-          );
-        }
-      } catch (err) {
-        notify(
-          "error",
-          `Gagal impor save ${file.name}: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      } finally {
-        setBusyAction(null);
-      }
-    },
-    [notify],
-  );
-
   const handleImportBytes = useCallback(
     async (fileName: string, bytes: Uint8Array) => {
       setBusyAction("import");
@@ -252,17 +243,10 @@ export default function TacticalBoardWorkspacePage() {
 
   const handleImportPickedFile = useCallback(
     async (file: File) => {
-      if (isFmSaveFileName(file.name)) {
-        await handleImportFmSaveFile(file);
-        return;
-      }
       setBusyAction("import");
       try {
-        const { tactic: imported, byteLength } = await importTacticFile(file);
-        notify(
-          "ok",
-          `Imported "${imported.title}" (IP ${imported.inFormation} → OOP ${imported.outFormation}) dari ${file.name} (${byteLength} B)`,
-        );
+        const summary = await importAnySupportedFile(file);
+        notify("ok", summary.message);
       } catch (err) {
         notify(
           "error",
@@ -272,7 +256,7 @@ export default function TacticalBoardWorkspacePage() {
         setBusyAction(null);
       }
     },
-    [handleImportFmSaveFile, notify],
+    [notify],
   );
 
   const handleDownloadFmf = () => {
@@ -490,7 +474,7 @@ export default function TacticalBoardWorkspacePage() {
               ref={fileInputRef}
               id="import-tactic-file-input"
               type="file"
-              accept=".fmf,.fm,.tac,.json,.fm27.json"
+              accept=".fmf,.fm,.tac,.json,.fm27.json,.csv,.html,.htm"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -621,10 +605,15 @@ export default function TacticalBoardWorkspacePage() {
               </label>
               <select
                 id="dual-shape-select"
-                defaultValue="shape-03-433-4141"
+                value={activeShapeId}
                 onChange={(e) => applyDualShape(e.target.value)}
                 className="px-2.5 py-1.5 rounded-lg bg-[#0B0F19] border border-white/12 text-xs font-semibold text-slate-100 cursor-pointer"
               >
+                {activeShapeId === "custom" && (
+                  <option value="custom">
+                    Custom IP {tactic.inFormation} → OOP {tactic.outFormation}
+                  </option>
+                )}
                 {stylesCatalog.StyleShapes.map((sh) => (
                   <option key={sh.Id} value={sh.Id}>
                     IP {sh.InPossessionName} → OOP {sh.OutOfPossessionName}

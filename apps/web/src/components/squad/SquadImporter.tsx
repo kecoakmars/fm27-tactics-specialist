@@ -2,9 +2,8 @@
 
 import { useRef, useState } from "react";
 import {
+  importAnySupportedFile,
   importFmSaveArrayBuffer,
-  importFmSaveFile,
-  isFmSaveFileName,
 } from "../../lib/file-importer";
 import { useFolderSyncStore } from "../../stores/useFolderSyncStore";
 import { useSquadStore } from "../../stores/useSquadStore";
@@ -47,29 +46,14 @@ export function SquadImporter() {
   }
 
   async function handleFile(file: File) {
-    if (isFmSaveFileName(file.name)) {
-      setBusy(true);
-      setError(null);
-      try {
-        await importFmSaveFile(file);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Gagal membaca file save .fm");
-      } finally {
-        setBusy(false);
-      }
-      return;
-    }
-    if (file.name.toLowerCase().endsWith(".fmf") || file.name.toLowerCase().endsWith(".tac")) {
-      setError(
-        "File .fmf / .tac adalah file taktik, bukan daftar skuad. Impor taktik di halaman Pitch Board, atau unggah file save karier .fm / CSV / HTML di sini.",
-      );
-      return;
-    }
+    setBusy(true);
+    setError(null);
     try {
-      const text = await file.text();
-      importFromText(text, file.name);
+      await importAnySupportedFile(file);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal memproses file CSV/HTML skuad");
+      setError(err instanceof Error ? err.message : "Gagal memproses file yang diunggah");
+    } finally {
+      setBusy(false);
     }
   }
 

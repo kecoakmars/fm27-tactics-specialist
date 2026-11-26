@@ -26,7 +26,12 @@ import { computeSlotFit } from "./fit-calculator.js";
 import { computeHeatmap18Zones, type Heatmap18ZoneResult } from "./heatmap-18zone.js";
 import { normalizePlayer } from "./normalizer.js";
 import { scoreSingleRoleQuality } from "./role-evaluator.js";
-import { analyzeSquadAndGenerateTactics, gradeImportedTactic } from "./squad-analyzer.js";
+import {
+  analyzeSquadAndGenerateTactics,
+  gradeImportedTactic,
+  selectPrimarySquadPlayers,
+  type SquadAnalysisOptions,
+} from "./squad-analyzer.js";
 import { auditSquadAgainstTactic } from "./squad-audit.js";
 import {
   calculateCategoryStarRating,
@@ -1079,6 +1084,7 @@ function solveAll13StylesBy16Shapes(
   squad: readonly Player[],
   dataset: PatchBundle,
   patchVersion: string,
+  options?: Pick<SquadAnalysisOptions, "lineupPreferences" | "priorities">,
 ): Array<{
   styleId: string;
   styleName: string;
@@ -1119,6 +1125,8 @@ function solveAll13StylesBy16Shapes(
   for (const style of dataset.tacticalStyles.TacticalStyles) {
     const plans = analyzeSquadAndGenerateTactics(squad, {
       styleId: style.Id,
+      priorities: options?.priorities,
+      lineupPreferences: options?.lineupPreferences,
       patchVersion,
     });
     for (const plan of plans) {
@@ -1204,6 +1212,29 @@ function solveAll13StylesBy16Shapes(
       a.plan.tactic.title.localeCompare(b.plan.tactic.title),
   );
   return allCandidates;
+}
+
+export function solveBestTacticsAcrossAllStyles(
+  squadPlayers: readonly Player[],
+  options: Pick<SquadAnalysisOptions, "lineupPreferences" | "priorities" | "patchVersion"> = {},
+): TacticPlanResult[] {
+  const patchVersion = options.patchVersion ?? "27.0";
+  const dataset = getPatchData(patchVersion);
+  const primary = selectPrimarySquadPlayers(squadPlayers, options.lineupPreferences);
+  const evaluated = solveAll13StylesBy16Shapes(primary, dataset, patchVersion, options);
+  const seen = new Set<string>();
+  const topPlans: TacticPlanResult[] = [];
+  for (const item of evaluated) {
+    const key = `${item.styleId}:${item.plan.tactic.inFormation}->${item.plan.tactic.outFormation}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    topPlans.push(item.plan);
+    if (topPlans.length >= 16) break;
+  }
+  if (topPlans.length >= 2 && topPlans[0]!.rankingFit - topPlans[1]!.rankingFit < 0.1) {
+    topPlans[0] = { ...topPlans[0]!, nearTieWithNext: true };
+  }
+  return topPlans;
 }
 
 /**

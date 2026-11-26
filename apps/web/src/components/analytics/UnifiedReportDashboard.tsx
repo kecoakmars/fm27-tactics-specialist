@@ -32,6 +32,7 @@ export function UnifiedReportDashboard({
     setTeamInstruction,
     assignPlayerToSlot,
     pushTrainingPlanToStore,
+    solveBestTacticForCurrentClub,
     dismissUnifiedReport,
     liveFmSave,
     setClubPickerOpen,
@@ -81,6 +82,23 @@ export function UnifiedReportDashboard({
               className="px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-500/18 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/28 cursor-pointer"
             >
               Ganti Klub (.fm)
+            </button>
+          )}
+          {report.mode === "combined" && (
+            <button
+              type="button"
+              onClick={async () => {
+                const best = await solveBestTacticForCurrentClub();
+                if (best) {
+                  onNotify?.(
+                    "ok",
+                    `Diselesaikan ulang 13×16 untuk klub: "${best.tacticAdvice.recommendedTactic.title}"`,
+                  );
+                }
+              }}
+              className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/18 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/28 cursor-pointer"
+            >
+              Cari Taktik Terbaik Klub (13×16)
             </button>
           )}
           {(report.mode === "squad-only" ||

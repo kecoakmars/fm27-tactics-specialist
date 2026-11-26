@@ -15,6 +15,7 @@ import {
   computeHeatmap18Zones,
   computeTacticalBalance,
   gradeImportedTactic,
+  solveBestTacticsAcrossAllStyles,
   type AnalyzeUnifiedParams,
   type SquadAnalysisOptions,
 } from "@fm27/fm-engine";
@@ -75,6 +76,19 @@ export async function dispatchWorkerTask(
     case "COMPUTE_BALANCE":
       return computeTacticalBalance(req.tactic, req.squad);
     case "ANALYZE_SQUAD":
+      if (!req.options?.styleId) {
+        return solveBestTacticsAcrossAllStyles(req.players, {
+          lineupPreferences: req.options?.lineupPreferences,
+          priorities: req.options?.priorities,
+          patchVersion: req.options?.patchVersion,
+        });
+      }
+      if (req.options.styleId === "__auto__") {
+        return analyzeSquadAndGenerateTactics(req.players, {
+          ...req.options,
+          styleId: undefined,
+        });
+      }
       return analyzeSquadAndGenerateTactics(req.players, req.options);
     case "AUDIT_SQUAD":
       return auditSquadAgainstTactic(req.tactic, req.players);

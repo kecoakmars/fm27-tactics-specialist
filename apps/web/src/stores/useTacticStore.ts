@@ -11,10 +11,12 @@ import {
   migrateTacticToPatch,
 } from "@fm27/fm-data";
 import {
+  analyzeSquadAndGenerateTactics,
   analyzeUnified,
   computeEffectivePlayerInstructionBits,
   detectFormation,
   getCandidateRolesForSlot,
+  gradeImportedTactic,
   inferDutyForRole,
   resolveTeamInstructionConflicts,
   type UnifiedReport,
@@ -168,9 +170,70 @@ function computeUnifiedSafe(params: {
   });
 }
 
+export interface GlobalToastNotice {
+  tone: "ok" | "error";
+  text: string;
+}
+
+function syncDependentStoresFromReport(report: UnifiedReport): void {
+  useTrainingStore.getState().syncFromUnifiedReport(report, false);
+  if (report.squadBlueprintOrAudit.audit) {
+    useSquadStore.getState().setAuditResult(report.squadBlueprintOrAudit.audit);
+  }
+}
+
+function buildSquadAwarePresetTactic(
+  styleId: string,
+  shapeId: string | undefined,
+  patchVersion: string,
+  clubPlayers: readonly Player[],
+): DualPhaseTactic {
+  const basePreset = buildPresetTactic(styleId, shapeId, patchVersion);
+  if (clubPlayers.length < 11) {
+    return basePreset;
+  }
+
+  try {
+    const stylesCatalog = getTacticalStyles(patchVersion);
+    const targetShape = shapeId
+      ? stylesCatalog.StyleShapes.find((sh) => sh.Id === shapeId)
+      : undefined;
+
+    const plans = analyzeSquadAndGenerateTactics(clubPlayers, {
+      styleId,
+      patchVersion,
+    });
+
+    if (!targetShape && plans.length > 0) {
+      return normalizeLoadedTactic(plans[0]!.tactic);
+    }
+
+    if (targetShape) {
+      const matched = plans.find(
+        (p) =>
+          p.tactic.inFormation === targetShape.InPossessionName &&
+          p.tactic.outFormation === targetShape.OutOfPossessionName,
+      );
+      if (matched) {
+        return normalizeLoadedTactic(matched.tactic);
+      }
+      const graded = gradeImportedTactic(basePreset, clubPlayers, {
+        improve: true,
+        patchVersion,
+      });
+      return normalizeLoadedTactic(graded.tactic);
+    }
+  } catch {
+    // Fallback to clean preset if squad lacks GK/outfielders
+  }
+
+  return basePreset;
+}
+
 export interface TacticStoreState {
   tactic: DualPhaseTactic;
   hasExplicitTactic: boolean;
+  hasUserImportedTactic: boolean;
   clubPlayers: Player[];
   clubStaff: StaffMember[];
   worldWonderkids: Wonderkid[];
@@ -180,6 +243,7 @@ export interface TacticStoreState {
   clubPickerOpen: boolean;
   fmImportProgress: FmImportProgressState | null;
   unifiedReport: UnifiedReport | null;
+  globalNotice: GlobalToastNotice | null;
 
   viewMode: PitchViewMode;
   showTransitionVectors: boolean;
@@ -194,6 +258,7 @@ export interface TacticStoreState {
   setPlayerModalOpen: (open: boolean) => void;
   setClubPickerOpen: (open: boolean) => void;
   setFmImportProgress: (progress: FmImportProgressState | null) => void;
+  setGlobalNotice: (notice: GlobalToastNotice | null) => void;
 
   setTitle: (title: string) => void;
   setMetadata: (meta: { description?: string; author?: string }) => void;
@@ -223,7 +288,7 @@ export interface TacticStoreState {
     playerUid: number | undefined,
     playerName?: string,
   ) => void;
-  loadTactic: (tactic: DualPhaseTactic) => void;
+  loadTactic: (tactic: DualPhaseTactic, options?: { fromUserTactic?: boolean }) => void;
 
   syncClubData: (data: {
     players?: Player[];
@@ -241,6 +306,7 @@ export interface TacticStoreState {
     selectedClub: FmSaveClubEntry;
     report: UnifiedReport;
   }>;
+  solveBestTacticForCurrentClub: () => Promise<UnifiedReport | null>;
   clearFmSaveSession: () => void;
   refreshUnifiedReport: () => void;
   dismissUnifiedReport: () => void;
@@ -252,6 +318,7 @@ export const useTacticStore = create<TacticStoreState>()(
     (set, get) => ({
       tactic: buildPresetTactic("Gegenpress", "shape-03-433-4141"),
       hasExplicitTactic: false,
+      hasUserImportedTactic: false,
       clubPlayers: [],
       clubStaff: [],
       worldWonderkids: [],
@@ -261,6 +328,7 @@ export const useTacticStore = create<TacticStoreState>()(
       clubPickerOpen: false,
       fmImportProgress: null,
       unifiedReport: null,
+      globalNotice: null,
 
       viewMode: "split",
       showTransitionVectors: true,
@@ -279,6 +347,7 @@ export const useTacticStore = create<TacticStoreState>()(
       setPlayerModalOpen: (playerModalOpen) => set({ playerModalOpen }),
       setClubPickerOpen: (clubPickerOpen) => set({ clubPickerOpen }),
       setFmImportProgress: (fmImportProgress) => set({ fmImportProgress }),
+      setGlobalNotice: (globalNotice) => set({ globalNotice }),
 
       setTitle: (title) =>
         set((state) => ({
@@ -583,13 +652,17 @@ export const useTacticStore = create<TacticStoreState>()(
           return { tactic: { ...tactic, slots: updatedSlots } };
         }),
 
-      applyPresetStyle: (styleId, shapeId) =>
+      applyPresetStyle: (styleId, shapeId) => {
+        let computedReport: UnifiedReport | null = null;
         set((state) => {
-          const nextTactic = buildPresetTactic(styleId, shapeId, state.tactic.patchVersion);
-          return {
-            tactic: nextTactic,
-            selectedSlotIndex: 0,
-            unifiedReport: state.unifiedReport
+          const nextTactic = buildSquadAwarePresetTactic(
+            styleId,
+            shapeId,
+            state.tactic.patchVersion,
+            state.clubPlayers,
+          );
+          computedReport =
+            state.unifiedReport || state.clubPlayers.length >= 11
               ? computeUnifiedSafe({
                   tactic: nextTactic,
                   clubPlayers: state.clubPlayers,
@@ -598,22 +671,31 @@ export const useTacticStore = create<TacticStoreState>()(
                   worldStaffPool: state.worldStaffPool,
                   patchVersion: nextTactic.patchVersion,
                 })
-              : null,
+              : null;
+          return {
+            tactic: nextTactic,
+            selectedSlotIndex: 0,
+            unifiedReport: computedReport,
           };
-        }),
+        });
+        if (computedReport) {
+          syncDependentStoresFromReport(computedReport);
+        }
+      },
 
       applyDualShape: (shapeId) => {
+        if (shapeId === "custom") return;
         const currentStyle = get().tactic.styleId ?? "Balanced";
+        let computedReport: UnifiedReport | null = null;
         set((state) => {
-          const nextTactic = buildPresetTactic(
+          const nextTactic = buildSquadAwarePresetTactic(
             currentStyle,
             shapeId,
             state.tactic.patchVersion,
+            state.clubPlayers,
           );
-          return {
-            tactic: nextTactic,
-            selectedSlotIndex: 0,
-            unifiedReport: state.unifiedReport
+          computedReport =
+            state.unifiedReport || state.clubPlayers.length >= 11
               ? computeUnifiedSafe({
                   tactic: nextTactic,
                   clubPlayers: state.clubPlayers,
@@ -622,9 +704,16 @@ export const useTacticStore = create<TacticStoreState>()(
                   worldStaffPool: state.worldStaffPool,
                   patchVersion: nextTactic.patchVersion,
                 })
-              : null,
+              : null;
+          return {
+            tactic: nextTactic,
+            selectedSlotIndex: 0,
+            unifiedReport: computedReport,
           };
         });
+        if (computedReport) {
+          syncDependentStoresFromReport(computedReport);
+        }
       },
 
       assignPlayerToSlot: (slotIndex, playerUid, playerName) =>
@@ -656,7 +745,8 @@ export const useTacticStore = create<TacticStoreState>()(
           };
         }),
 
-      loadTactic: (tactic) =>
+      loadTactic: (tactic, options) => {
+        let computedReport: UnifiedReport | null = null;
         set((state) => {
           const normalizedTactic = normalizeLoadedTactic(tactic);
           const unifiedReport = computeUnifiedSafe({
@@ -667,17 +757,33 @@ export const useTacticStore = create<TacticStoreState>()(
             worldStaffPool: state.worldStaffPool,
             patchVersion: normalizedTactic.patchVersion,
           });
+          computedReport = unifiedReport;
+
+          const hasNoAssignedPlayers = normalizedTactic.slots.every((s) => !s.playerUid);
+          const boardTactic =
+            hasNoAssignedPlayers && state.clubPlayers.length >= 11
+              ? normalizeLoadedTactic(unifiedReport.tacticAdvice.activeTactic)
+              : normalizedTactic;
 
           return {
-            tactic: normalizedTactic,
+            tactic: boardTactic,
             hasExplicitTactic: true,
+            hasUserImportedTactic:
+              options?.fromUserTactic !== undefined
+                ? options.fromUserTactic
+                : state.hasUserImportedTactic,
             unifiedReport,
             selectedSlotIndex: 0,
             playerModalOpen: false,
           };
-        }),
+        });
+        if (computedReport) {
+          syncDependentStoresFromReport(computedReport);
+        }
+      },
 
-      syncClubData: ({ players, staff, preferModeB }) =>
+      syncClubData: ({ players, staff, preferModeB }) => {
+        let computedReport: UnifiedReport | null = null;
         set((state) => {
           const nextPlayers =
             players !== undefined ? players.map((p) => ({ ...p })) : state.clubPlayers;
@@ -692,7 +798,7 @@ export const useTacticStore = create<TacticStoreState>()(
           }
 
           const useTactic =
-            preferModeB || (!state.hasExplicitTactic && nextPlayers.length >= 11)
+            preferModeB || (!state.hasUserImportedTactic && nextPlayers.length >= 11)
               ? null
               : state.tactic;
 
@@ -704,19 +810,26 @@ export const useTacticStore = create<TacticStoreState>()(
             worldStaffPool: state.worldStaffPool,
             patchVersion: state.tactic.patchVersion,
           });
+          computedReport = unifiedReport;
 
           const nextBoardTactic =
             useTactic === null
               ? normalizeLoadedTactic(unifiedReport.tacticAdvice.recommendedTactic)
-              : state.tactic;
+              : normalizeLoadedTactic(unifiedReport.tacticAdvice.activeTactic);
 
           return {
             tactic: nextBoardTactic,
+            hasExplicitTactic: true,
+            hasUserImportedTactic: preferModeB ? false : state.hasUserImportedTactic,
             clubPlayers: nextPlayers,
             clubStaff: nextStaff,
             unifiedReport,
           };
-        }),
+        });
+        if (computedReport) {
+          syncDependentStoresFromReport(computedReport);
+        }
+      },
 
       ingestParsedFmSave: async (parsed, fileName) => {
         set({
@@ -759,6 +872,8 @@ export const useTacticStore = create<TacticStoreState>()(
 
         const clubPlayers = (save.playersByClub[clubUid] ?? []).map((p) => ({ ...p }));
         const clubStaff = (save.staffByClub[clubUid] ?? []).map((s) => ({ ...s }));
+        const keepImportedTactic =
+          state.hasUserImportedTactic && clubPlayers.length >= 11 && state.selectedClubUid === null;
 
         set({
           clubPickerOpen: false,
@@ -778,21 +893,30 @@ export const useTacticStore = create<TacticStoreState>()(
 
         try {
           const report = await analyzeUnifiedInWorker({
-            tactic: clubPlayers.length >= 11 ? null : state.tactic,
+            tactic: keepImportedTactic
+              ? state.tactic
+              : clubPlayers.length >= 11
+                ? null
+                : state.tactic,
             squad: clubPlayers.length >= 11 ? clubPlayers : null,
             clubStaff: clubStaff.length > 0 ? clubStaff : null,
             worldWonderkids: save.worldWonderkids,
             worldStaffPool: save.worldStaffPool,
           });
 
-          const recommendedBoardTactic = normalizeLoadedTactic({
-            ...report.tacticAdvice.recommendedTactic,
+          const targetTactic = keepImportedTactic
+            ? report.tacticAdvice.activeTactic
+            : report.tacticAdvice.recommendedTactic;
+
+          const nextBoardTactic = normalizeLoadedTactic({
+            ...targetTactic,
             patchVersion: state.tactic.patchVersion,
           });
 
           set({
-            tactic: recommendedBoardTactic,
+            tactic: nextBoardTactic,
             hasExplicitTactic: true,
+            hasUserImportedTactic: keepImportedTactic,
             selectedClubUid: clubUid,
             clubPlayers,
             clubStaff,
@@ -801,6 +925,7 @@ export const useTacticStore = create<TacticStoreState>()(
             fmImportProgress: null,
           });
 
+          syncDependentStoresFromReport(report);
           return { selectedClub, report };
         } catch (err) {
           set({ fmImportProgress: null });
@@ -808,11 +933,39 @@ export const useTacticStore = create<TacticStoreState>()(
         }
       },
 
+      solveBestTacticForCurrentClub: async () => {
+        const state = get();
+        if (state.clubPlayers.length < 11) return null;
+        const report = await analyzeUnifiedInWorker({
+          tactic: null,
+          squad: state.clubPlayers,
+          clubStaff: state.clubStaff.length > 0 ? state.clubStaff : null,
+          worldWonderkids:
+            state.worldWonderkids.length > 0 ? state.worldWonderkids : null,
+          worldStaffPool:
+            state.worldStaffPool.length > 0 ? state.worldStaffPool : null,
+        });
+        const recommendedBoardTactic = normalizeLoadedTactic({
+          ...report.tacticAdvice.recommendedTactic,
+          patchVersion: state.tactic.patchVersion,
+        });
+        set({
+          tactic: recommendedBoardTactic,
+          hasExplicitTactic: true,
+          hasUserImportedTactic: false,
+          unifiedReport: report,
+          selectedSlotIndex: 0,
+        });
+        syncDependentStoresFromReport(report);
+        return report;
+      },
+
       clearFmSaveSession: () => {
         useSquadStore.getState().setSquadFromSave([], "");
         set({
           liveFmSave: null,
           selectedClubUid: null,
+          hasUserImportedTactic: false,
           clubPlayers: [],
           clubStaff: [],
           worldWonderkids: [],
@@ -823,39 +976,30 @@ export const useTacticStore = create<TacticStoreState>()(
         });
       },
 
-      refreshUnifiedReport: () =>
-        set((state) => ({
-          unifiedReport: computeUnifiedSafe({
+      refreshUnifiedReport: () => {
+        let computedReport: UnifiedReport | null = null;
+        set((state) => {
+          computedReport = computeUnifiedSafe({
             tactic: state.tactic,
             clubPlayers: state.clubPlayers,
             clubStaff: state.clubStaff,
             worldWonderkids: state.worldWonderkids,
             worldStaffPool: state.worldStaffPool,
             patchVersion: state.tactic.patchVersion,
-          }),
-        })),
+          });
+          return { unifiedReport: computedReport };
+        });
+        if (computedReport) {
+          syncDependentStoresFromReport(computedReport);
+        }
+      },
 
       dismissUnifiedReport: () => set({ unifiedReport: null }),
 
       pushTrainingPlanToStore: () => {
         const report = get().unifiedReport;
         if (!report) return false;
-        const trainingStore = useTrainingStore.getState();
-        trainingStore.loadSchedule({
-          ...report.trainingPlan.schedule,
-          days: report.trainingPlan.schedule.days.map((d) => ({ ...d })),
-        });
-
-        const topAttrs = new Set<AttributeName>();
-        for (const unit of ["attacking", "midfield", "defending", "goalkeeping"] as const) {
-          for (const item of report.trainingPlan.unitAttributeFrequencies[unit].slice(0, 2)) {
-            topAttrs.add(item.attribute);
-          }
-        }
-        if (topAttrs.size > 0) {
-          trainingStore.setTargetAttributes(Array.from(topAttrs).slice(0, 8));
-        }
-        return true;
+        return useTrainingStore.getState().syncFromUnifiedReport(report, true);
       },
     }),
     {

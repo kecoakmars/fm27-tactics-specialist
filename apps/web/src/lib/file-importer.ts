@@ -3,12 +3,18 @@
 import {
   parseFm27Json,
   parseFmf,
+  parseScheduleFmf,
+  parseScheduleJson,
+  parseShortlistFmf,
+  unpackFmfArchive,
   type FmSaveClubEntry,
   type ParsedFmSave,
 } from "@fm27/fm-codec";
-import type { UnifiedReport } from "@fm27/fm-engine";
-import type { DualPhaseTactic } from "@fm27/shared-types";
+import { parseStaffCsv, parseStaffHtml, type UnifiedReport } from "@fm27/fm-engine";
+import type { DualPhaseTactic, WeeklySchedule } from "@fm27/shared-types";
+import { useSquadStore } from "../stores/useSquadStore";
 import { useTacticStore } from "../stores/useTacticStore";
+import { useTrainingStore } from "../stores/useTrainingStore";
 import { FM_SAVE_CANCELLED_ERROR, parseFmSaveInWorker } from "./worker-client";
 
 export type FmSaveImportOutcome =
@@ -114,7 +120,7 @@ export async function importTacticBytes(
     const imported = lower.endsWith(".json")
       ? parseFm27Json(new TextDecoder().decode(bytes))
       : await parseFmf(bytes, { patchVersion });
-    useTacticStore.getState().loadTactic(imported);
+    useTacticStore.getState().loadTactic(imported, { fromUserTactic: true });
     return { tactic: imported, byteLength: bytes.byteLength };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -128,4 +134,148 @@ export async function importTacticFile(
 ): Promise<{ tactic: DualPhaseTactic; byteLength: number }> {
   const ab = await file.arrayBuffer();
   return importTacticBytes(file.name, new Uint8Array(ab));
+}
+
+export type AnyFileImportSummary =
+  | { kind: "cancelled"; message: string }
+  | { kind: "fm-save"; message: string; parsed: ParsedFmSave }
+  | { kind: "tactic"; message: string; tactic: DualPhaseTactic }
+  | { kind: "schedule"; message: string; schedule: WeeklySchedule }
+  | { kind: "shortlist"; message: string; title: string; count: number }
+  | { kind: "squad"; message: string; count: number }
+  | { kind: "staff"; message: string; count: number };
+
+function looksLikeStaffTableText(rawText: string): boolean {
+  const lower = rawText.slice(0, 4000).toLowerCase();
+  const hasStaffKeys =
+    lower.includes("working with youngsters") ||
+    lower.includes("working_with_youngsters") ||
+    lower.includes("gk shot stopping") ||
+    lower.includes("gk_shot_stopping") ||
+    lower.includes("level of discipline") ||
+    lower.includes("level_of_discipline");
+  const hasSquadPosKeys =
+    lower.includes("pos_gk") ||
+    lower.includes("finishing") ||
+    lower.includes("dribbling");
+  return hasStaffKeys && !hasSquadPosKeys;
+}
+
+/**
+ * Universal smart client-side file router that accepts `.fm`, `.fmf`, `.tac`, `.json`, `.csv`, `.html`
+ * from ANY page in the app and syncs the appropriate stores automatically without dead-end errors.
+ */
+export async function importAnySupportedFile(file: File): Promise<AnyFileImportSummary> {
+  const lower = file.name.toLowerCase();
+
+  if (isFmSaveFileName(lower)) {
+    const outcome = await importFmSaveFile(file);
+    if (outcome.cancelled) {
+      return { kind: "cancelled", message: `Pembacaan file ${file.name} dibatalkan.` };
+    }
+    const { parsed, selectedClub, report } = outcome;
+    if (selectedClub && report) {
+      return {
+        kind: "fm-save",
+        parsed,
+        message: `Save "${parsed.saveName}" dimuat! Klub: ${selectedClub.name} (${selectedClub.playerCount} pemain, ${selectedClub.staffCount} staf) · Taktik: ${report.tacticAdvice.activeTactic.title}`,
+      };
+    }
+    return {
+      kind: "fm-save",
+      parsed,
+      message: `Save "${parsed.saveName}" diekstrak (${parsed.stats.totalClubs.toLocaleString()} klub). Silakan pilih klub Anda.`,
+    };
+  }
+
+  if (lower.endsWith(".fmf") || lower.endsWith(".tac")) {
+    const ab = await file.arrayBuffer();
+    const bytes = new Uint8Array(ab);
+    if (bytes.byteLength === 0) {
+      throw new Error("File kosong (0 bytes).");
+    }
+    const patchVersion = useTacticStore.getState().tactic.patchVersion;
+
+    // Peek inside `.fmf` archive to route `.tsc` schedule and `.slf` shortlist cleanly
+    if (lower.endsWith(".fmf")) {
+      try {
+        const unpacked = await unpackFmfArchive(bytes);
+        const fileNames = Array.from(unpacked.files.keys()).map((k) => k.toLowerCase());
+        if (fileNames.some((n) => n.endsWith(".tsc"))) {
+          const schedule = await parseScheduleFmf(bytes, patchVersion);
+          useTrainingStore.getState().loadSchedule(schedule);
+          return {
+            kind: "schedule",
+            schedule,
+            message: `Jadwal Latihan "${schedule.name}" dimuat ke tab Training dari ${file.name}`,
+          };
+        }
+        if (fileNames.some((n) => n.endsWith(".slf"))) {
+          const sl = await parseShortlistFmf(bytes);
+          useTrainingStore.getState().setShortlist(sl.title, sl.playerUids);
+          return {
+            kind: "shortlist",
+            title: sl.title,
+            count: sl.playerUids.length,
+            message: `Shortlist "${sl.title}" (${sl.playerUids.length} pemain) dimuat dari ${file.name}`,
+          };
+        }
+      } catch {
+        // Fall through to parseFmf for detailed error diagnostics (e.g. raw .tac or save header)
+      }
+    }
+
+    const { tactic, byteLength } = await importTacticBytes(file.name, bytes);
+    return {
+      kind: "tactic",
+      tactic,
+      message: `Taktik "${tactic.title}" (IP ${tactic.inFormation} → OOP ${tactic.outFormation}) dimuat dari ${file.name} (${byteLength} B)`,
+    };
+  }
+
+  if (lower.endsWith(".json")) {
+    const text = await file.text();
+    const raw = JSON.parse(text) as Record<string, unknown>;
+    if (raw && typeof raw === "object" && "schedule" in raw) {
+      const schedule = parseScheduleJson(raw);
+      useTrainingStore.getState().loadSchedule(schedule);
+      return {
+        kind: "schedule",
+        schedule,
+        message: `Jadwal Latihan "${schedule.name}" dimuat ke tab Training dari ${file.name}`,
+      };
+    }
+    const tactic = parseFm27Json(raw);
+    useTacticStore.getState().loadTactic(tactic, { fromUserTactic: true });
+    return {
+      kind: "tactic",
+      tactic,
+      message: `Taktik "${tactic.title}" (IP ${tactic.inFormation} → OOP ${tactic.outFormation}) dimuat dari ${file.name}`,
+    };
+  }
+
+  if (lower.endsWith(".csv") || lower.endsWith(".html") || lower.endsWith(".htm")) {
+    const text = await file.text();
+    const isHtml =
+      lower.endsWith(".html") || lower.endsWith(".htm") || /<table\b/i.test(text);
+    if (looksLikeStaffTableText(text)) {
+      const staff = isHtml ? parseStaffHtml(text) : parseStaffCsv(text);
+      useTacticStore.getState().syncClubData({ staff });
+      return {
+        kind: "staff",
+        count: staff.length,
+        message: `${staff.length} staf pelatih dimuat ke klub aktif dari ${file.name}`,
+      };
+    }
+    const count = useSquadStore.getState().importFromText(text, file.name);
+    return {
+      kind: "squad",
+      count,
+      message: `${count} pemain skuad dimuat & disinkronkan ke Papan Taktik dari ${file.name}`,
+    };
+  }
+
+  throw new Error(
+    `Format file "${file.name}" tidak didukung. Gunakan file .fm (Save Karier), .fmf (Taktik/Jadwal/Shortlist), .json, .csv, atau .html.`,
+  );
 }

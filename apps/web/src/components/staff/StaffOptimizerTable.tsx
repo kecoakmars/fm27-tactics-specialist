@@ -5,11 +5,9 @@ import { getStaffFormulas } from "@fm27/fm-data";
 import {
   calculateAllStaffStars,
   optimizeStaffAssignments,
-  parseStaffCsv,
-  parseStaffHtml,
 } from "@fm27/fm-engine";
 import type { StaffCategoryId, StaffMember } from "@fm27/shared-types";
-import { importFmSaveFile, isFmSaveFileName } from "../../lib/file-importer";
+import { importAnySupportedFile } from "../../lib/file-importer";
 import { useTacticStore } from "../../stores/useTacticStore";
 
 interface StaffOptimizerTableProps {
@@ -127,38 +125,12 @@ export function StaffOptimizerTable({
   );
 
   async function handleImportStaffFile(file: File) {
-    if (isFmSaveFileName(file.name)) {
-      setImportError(null);
-      try {
-        const outcome = await importFmSaveFile(file);
-        if (!outcome.cancelled) {
-          setCustomStaff(null);
-        }
-      } catch (err) {
-        setImportError(
-          err instanceof Error ? err.message : "Gagal memproses file save .fm",
-        );
-      }
-      return;
-    }
-
-    if (file.name.toLowerCase().endsWith(".fmf") || file.name.toLowerCase().endsWith(".tac")) {
-      setImportError(
-        "File .fmf / .tac adalah file taktik, bukan daftar staf. Impor taktik di halaman Pitch Board, atau unggah file save karier .fm / CSV / HTML di sini.",
-      );
-      return;
-    }
-
+    setImportError(null);
     try {
-      const text = await file.text();
-      const isHtml =
-        file.name.toLowerCase().endsWith(".html") ||
-        file.name.toLowerCase().endsWith(".htm") ||
-        /<table\b/i.test(text);
-      const parsed = isHtml ? parseStaffHtml(text) : parseStaffCsv(text);
-      setCustomStaff(parsed);
-      setSelectedPoolUids(parsed.slice(0, 12).map((s) => s.uid));
-      setImportError(null);
+      const res = await importAnySupportedFile(file);
+      if (res.kind === "fm-save" || res.kind === "staff") {
+        setCustomStaff(null);
+      }
     } catch (err) {
       setImportError(
         err instanceof Error ? err.message : "Gagal memproses file ekspor staf",
