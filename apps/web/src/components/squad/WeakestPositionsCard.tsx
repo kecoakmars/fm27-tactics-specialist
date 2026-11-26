@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { SquadAuditResult } from "@fm27/shared-types";
+import { useLocale } from "../../stores/useLocaleStore";
 import { useTrainingStore } from "../../stores/useTrainingStore";
 
 interface WeakestPositionsCardProps {
@@ -15,6 +16,7 @@ export function WeakestPositionsCard({
   onInspectSlot,
 }: WeakestPositionsCardProps) {
   const router = useRouter();
+  const { t } = useLocale();
   const setTargetAttributes = useTrainingStore((s) => s.setTargetAttributes);
 
   const weakestItems = audit.weakestThreeSlotIndices
@@ -31,26 +33,30 @@ export function WeakestPositionsCard({
   return (
     <section className="rounded-xl border border-rose-500/30 bg-[#111827] p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
+        <div className="flex items-center gap-3">
           <h3 className="text-sm font-semibold text-rose-300">
-            3 Weakest Starter Positions
+            {t("3 Posisi Paling Rawan", "3 Weakest Positions")}
           </h3>
-          <p className="text-xs text-slate-400">
-            Overall Squad Fit:{" "}
-            <span className="font-mono font-semibold text-emerald-300">
-              {audit.overallSquadFit.toFixed(1)}
-            </span>{" "}
-            / 100
-          </p>
+          <span className="text-xs text-slate-400">
+            {t("Kecocokan Tim:", "Squad Fit:")}{" "}
+            <strong className="font-mono text-emerald-300">
+              {audit.overallSquadFit.toFixed(0)}/100
+            </strong>
+          </span>
         </div>
 
         {audit.weakestTeamAttributes.length > 0 && (
           <button
             type="button"
             onClick={handleSyncToTraining}
-            className="rounded-lg border border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/25"
+            className="rounded-lg border border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/25 cursor-pointer"
           >
-            Train Weakest Attributes ({audit.weakestTeamAttributes.slice(0, 3).join(", ")})
+            {t("Latih Atribut Ini", "Train Weak Attributes")} (
+            {audit.weakestTeamAttributes
+              .slice(0, 3)
+              .map((a) => a.replace(/_/g, " "))
+              .join(", ")}
+            )
           </button>
         )}
       </div>
@@ -64,10 +70,10 @@ export function WeakestPositionsCard({
             <div>
               <div className="flex items-center justify-between gap-2">
                 <span className="rounded bg-rose-500/20 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-rose-300">
-                  #{rank + 1} Weakest · {item.inSlot}/{item.outSlot}
+                  #{rank + 1} · {item.inSlot}/{item.outSlot}
                 </span>
                 <span className="font-mono text-sm font-bold text-rose-300">
-                  {item.fitScore.toFixed(1)}
+                  {item.fitScore.toFixed(0)}
                 </span>
               </div>
 
@@ -86,7 +92,7 @@ export function WeakestPositionsCard({
                       key={g.attribute}
                       className="rounded border border-slate-700/80 bg-slate-900 px-1.5 py-0.5 font-mono text-[10px] text-slate-300"
                     >
-                      {g.attribute.replace(/_/g, " ")}: {g.value}/{g.target}
+                      {g.attribute.replace(/_/g, " ")}: {g.value}
                     </span>
                   ))}
                 </div>
@@ -97,9 +103,9 @@ export function WeakestPositionsCard({
               <button
                 type="button"
                 onClick={() => onInspectSlot(item.slotIndex)}
-                className="flex-1 rounded-md bg-emerald-500/20 px-2.5 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/30"
+                className="flex-1 rounded-md bg-emerald-500/20 px-2.5 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/30 cursor-pointer"
               >
-                Instant Replacement
+                {t("Cari Pengganti", "Find Replacement")}
               </button>
               <Link
                 href={`/wonderkids?slot=${item.slotIndex}`}

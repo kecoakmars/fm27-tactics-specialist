@@ -2,10 +2,12 @@
 
 import React, { useMemo, useState } from "react";
 import { getPitchCatalog } from "@fm27/fm-data";
+import { useLocale } from "@/stores/useLocaleStore";
 import { useTacticStore } from "@/stores/useTacticStore";
 
 export function TeamInstructionPanel() {
   const { tactic, setTeamInstruction, resolveAllConflicts } = useTacticStore();
+  const { t } = useLocale();
   const [phaseTab, setPhaseTab] = useState<"ip" | "oop">("ip");
 
   const catalog = useMemo(() => getPitchCatalog(tactic.patchVersion), [tactic.patchVersion]);
@@ -21,7 +23,6 @@ export function TeamInstructionPanel() {
     [tactic.teamInstructions],
   );
 
-  // Detect any active conflicts or candidate bit conflicts from PitchCatalog.Conflicts
   const conflictingActiveBits = useMemo(() => {
     const bad = new Set<number>();
     for (const [a, b] of catalog.Conflicts) {
@@ -56,7 +57,7 @@ export function TeamInstructionPanel() {
     >
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
-          Team Instructions (29)
+          {t("Instruksi Tim", "Team Instructions")}
         </span>
 
         {conflictingActiveBits.size > 0 && (
@@ -66,7 +67,7 @@ export function TeamInstructionPanel() {
             onClick={resolveAllConflicts}
             className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30 transition cursor-pointer"
           >
-            Resolve Conflict
+            {t("Rapikan Bentrok", "Resolve Conflict")}
           </button>
         )}
       </div>
@@ -83,7 +84,7 @@ export function TeamInstructionPanel() {
               : "text-slate-400 hover:text-slate-200 border border-transparent"
           }`}
         >
-          <span>In Possession</span>
+          <span>{t("Menyerang (IP)", "In Possession")}</span>
           <span className="font-mono-metric text-[11px] opacity-80">{activeCountIp}</span>
         </button>
         <button
@@ -96,12 +97,12 @@ export function TeamInstructionPanel() {
               : "text-slate-400 hover:text-slate-200 border border-transparent"
           }`}
         >
-          <span>Out of Possession</span>
+          <span>{t("Bertahan (OOP)", "Out of Possession")}</span>
           <span className="font-mono-metric text-[11px] opacity-80">{activeCountOop}</span>
         </button>
       </div>
 
-      {/* Scrollable 29 Instruction Groups */}
+      {/* Instruction Groups */}
       <div className="flex flex-col gap-2.5 max-h-[430px] overflow-y-auto pr-1">
         {groupsForTab.map((group) => {
           const currentBit = tactic.teamInstructions[group.Group] ?? group.Current;
@@ -120,7 +121,7 @@ export function TeamInstructionPanel() {
                 <span className="text-xs font-semibold text-slate-200">{group.Label}</span>
                 {hasGroupConflict && (
                   <span className="text-[10px] font-bold uppercase text-rose-400">
-                    Overlap/Underlap Conflict
+                    {t("Bentrok", "Conflict")}
                   </span>
                 )}
               </div>
@@ -141,11 +142,6 @@ export function TeamInstructionPanel() {
                       id={`ti-opt-${group.Group}-${opt.Bit}`}
                       type="button"
                       onClick={() => setTeamInstruction(group.Group, opt.Bit, false)}
-                      title={
-                        causesConflict
-                          ? "Conflicts with an active Overlap/Underlap instruction"
-                          : opt.Label
-                      }
                       className={`px-2 py-1 rounded text-[11px] font-medium border transition cursor-pointer ${
                         isSelected
                           ? hasGroupConflict

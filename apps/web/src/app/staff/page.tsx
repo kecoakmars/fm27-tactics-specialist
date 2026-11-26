@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { StaffAttributes, StaffMember } from "@fm27/shared-types";
 import { StaffOptimizerTable } from "../../components/staff/StaffOptimizerTable";
 import { StaffStarCalculator } from "../../components/staff/StaffStarCalculator";
+import { useLocale } from "../../stores/useLocaleStore";
 import { useTacticStore } from "../../stores/useTacticStore";
 
 const NEUTRAL_CALCULATOR_ATTRIBUTES: StaffAttributes = {
@@ -26,12 +27,11 @@ const NEUTRAL_CALCULATOR_ATTRIBUTES: StaffAttributes = {
 };
 
 export default function StaffPage() {
+  const { t } = useLocale();
   const patchVersion = useTacticStore((s) => s.tactic.patchVersion);
   const clubStaff = useTacticStore((s) => s.clubStaff);
 
-  const [coachLabel, setCoachLabel] = useState<string>(
-    "Kalkulator Manual (Belum Ada Pelatih Dipilih)",
-  );
+  const [coachLabel, setCoachLabel] = useState<string>("");
   const [attributes, setAttributes] = useState<StaffAttributes>({
     ...NEUTRAL_CALCULATOR_ATTRIBUTES,
   });
@@ -51,29 +51,23 @@ export default function StaffPage() {
 
   return (
     <main className="mx-auto max-w-[1600px] space-y-5 px-4 py-5">
-      <div>
-        <h1 className="text-xl font-bold text-slate-100">
-          Coaching Staff Star Calculator &amp; Workload Optimizer
-        </h1>
-        <p className="text-xs text-slate-400">
-          10-category training star engine (0.5-5.0 step 0.5) calibrated to{" "}
-          <code className="text-cyan-300">FM_Staff_Scores</code> DDM + coaching weights.
-        </p>
-      </div>
-
-      <StaffStarCalculator
-        attributes={attributes}
-        coachLabel={coachLabel}
-        patchVersion={patchVersion}
-        onChangeAttribute={(key, val) => {
-          setCoachLabel("Custom Edited Profile");
-          setAttributes((prev) => ({ ...prev, [key]: val }));
-        }}
-      />
+      <h1 className="text-xl font-bold text-slate-100">
+        {t("Staf Pelatih", "Coaching Staff")}
+      </h1>
 
       <StaffOptimizerTable
         patchVersion={patchVersion}
         onInspectCoach={handleInspectCoach}
+      />
+
+      <StaffStarCalculator
+        attributes={attributes}
+        coachLabel={coachLabel || t("Simulasi Manual", "Manual Simulator")}
+        patchVersion={patchVersion}
+        onChangeAttribute={(key, val) => {
+          setCoachLabel(t("Simulasi Manual", "Custom Coach"));
+          setAttributes((prev) => ({ ...prev, [key]: val }));
+        }}
       />
     </main>
   );

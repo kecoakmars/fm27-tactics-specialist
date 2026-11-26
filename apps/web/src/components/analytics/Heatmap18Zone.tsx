@@ -30,7 +30,7 @@ export function Heatmap18Zone({ cells, mode }: Heatmap18ZoneProps) {
   const cellH = innerH / 6;
 
   return (
-    <g className="pointer-events-none" aria-label="18-Zone Spatial Heatmap">
+    <g className="pointer-events-none" aria-label="Pitch Zone Heatmap">
       {cells.map((cell) => {
         const x = innerX + cell.col * cellW;
         const y = innerY + cell.row * cellH;
@@ -52,19 +52,6 @@ export function Heatmap18Zone({ cells, mode }: Heatmap18ZoneProps) {
               strokeWidth={cell.isZone14 ? 1.8 : 1}
               strokeDasharray={cell.isZone14 ? "4 3" : undefined}
             />
-            {cell.isZone14 && (
-              <text
-                x={x + 8}
-                y={y + 15}
-                fill="#F8FAFC"
-                fillOpacity={0.85}
-                fontSize={9}
-                fontWeight={800}
-                className="font-mono-metric"
-              >
-                ZONE 14
-              </text>
-            )}
             <text
               x={x + cellW - 8}
               y={y + cellH - 8}

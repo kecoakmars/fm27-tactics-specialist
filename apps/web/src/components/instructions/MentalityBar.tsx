@@ -2,10 +2,12 @@
 
 import React, { useMemo } from "react";
 import { getTacticalStyles } from "@fm27/fm-data";
+import { useLocale } from "@/stores/useLocaleStore";
 import { useTacticStore } from "@/stores/useTacticStore";
 
 export function MentalityBar() {
   const { tactic, setMentality } = useTacticStore();
+  const { t } = useLocale();
   const mentalities = useMemo(
     () => getTacticalStyles(tactic.patchVersion).Mentalities,
     [tactic.patchVersion],
@@ -21,10 +23,10 @@ export function MentalityBar() {
     >
       <div className="flex items-center justify-between">
         <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-          Mentality
+          {t("Mentalitas", "Mentality")}
         </span>
         <span className="text-xs font-bold text-cyan-400 font-mono-metric">
-          {tactic.mentality}/7 · {activeItem.Label}
+          {activeItem.Label}
         </span>
       </div>
 

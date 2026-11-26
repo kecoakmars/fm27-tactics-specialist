@@ -2,6 +2,7 @@
 
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { getPitchCatalog } from "@fm27/fm-data";
+import { useLocale } from "@/stores/useLocaleStore";
 import { useTacticStore } from "@/stores/useTacticStore";
 import { PlayerToken } from "./PlayerToken";
 import { TransitionVectors } from "./TransitionVectors";
@@ -30,6 +31,7 @@ export function DualPhasePitch({
   overlayNode,
 }: DualPhasePitchProps) {
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const { t } = useLocale();
   const {
     tactic,
     selectedSlotIndex,
@@ -156,7 +158,9 @@ export function DualPhasePitch({
             style={{ backgroundColor: phaseAccent }}
           />
           <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
-            {phase === "ip" ? "In Possession" : "Out of Possession"}
+            {phase === "ip"
+              ? t("Saat Menguasai Bola (IP)", "In Possession")
+              : t("Saat Bertahan (OOP)", "Out of Possession")}
           </span>
         </div>
         <span
@@ -178,7 +182,6 @@ export function DualPhasePitch({
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
         >
-          {/* Turf mowing stripes */}
           {Array.from({ length: 12 }).map((_, idx) => (
             <rect
               key={`stripe-${idx}`}
@@ -190,18 +193,14 @@ export function DualPhasePitch({
             />
           ))}
 
-          {/* Optional Analytics Overlay (18-Zone Heatmap in Phase 3) */}
           {overlayNode}
 
-          {/* Subtle Half-Space & Zone 14 tactical channel guides */}
           <g stroke="#10B981" strokeOpacity={0.09} strokeDasharray="4 6" strokeWidth={1}>
             <line x1={212} y1={28} x2={212} y2={PITCH_SVG_HEIGHT - 28} />
             <line x1={388} y1={28} x2={388} y2={PITCH_SVG_HEIGHT - 28} />
           </g>
 
-          {/* Official Pitch Markings */}
           <g stroke="#10B981" strokeOpacity={0.38} strokeWidth={1.8} fill="none">
-            {/* Outer touchline & goal lines */}
             <rect
               x={28}
               y={28}
@@ -209,23 +208,19 @@ export function DualPhasePitch({
               height={PITCH_SVG_HEIGHT - 56}
               rx={4}
             />
-            {/* Halfway line & center circle */}
             <line x1={28} y1={PITCH_SVG_HEIGHT / 2} x2={PITCH_SVG_WIDTH - 28} y2={PITCH_SVG_HEIGHT / 2} />
             <circle cx={PITCH_SVG_WIDTH / 2} cy={PITCH_SVG_HEIGHT / 2} r={62} />
             <circle cx={PITCH_SVG_WIDTH / 2} cy={PITCH_SVG_HEIGHT / 2} r={2.5} fill="#10B981" />
 
-            {/* Top (Attacking) Penalty Area & 6-Yard Box */}
             <rect x={165} y={28} width={270} height={106} />
             <rect x={232} y={28} width={136} height={40} />
             <path d="M 252 134 A 52 52 0 0 0 348 134" />
 
-            {/* Bottom (Defending) Penalty Area & 6-Yard Box */}
             <rect x={165} y={PITCH_SVG_HEIGHT - 134} width={270} height={106} />
             <rect x={232} y={PITCH_SVG_HEIGHT - 68} width={136} height={40} />
             <path d={`M 252 ${PITCH_SVG_HEIGHT - 134} A 52 52 0 0 1 348 ${PITCH_SVG_HEIGHT - 134}`} />
           </g>
 
-          {/* Attacking Direction Indicator */}
           <g transform="translate(46, 52)" opacity={0.45}>
             <path d="M0 16 L6 4 L12 16" stroke="#10B981" strokeWidth={1.8} fill="none" />
             <text x={18} y={14} fill="#10B981" fontSize={9.5} fontWeight={700} letterSpacing="0.08em">
@@ -233,7 +228,6 @@ export function DualPhasePitch({
             </text>
           </g>
 
-          {/* 24 Official Snap Targets (interactive click-to-move when an outfield slot is selected, or drag drop zone) */}
           {catalog.Positions.map((pos) => {
             if (pos.Id === "GK") return null;
             const isOccupied = occupiedPositionMap.has(pos.Id);
@@ -279,7 +273,6 @@ export function DualPhasePitch({
             );
           })}
 
-          {/* Cross-Phase Transition Vectors */}
           {showTransitionVectors && (
             <TransitionVectors
               slots={tactic.slots}
@@ -290,7 +283,6 @@ export function DualPhasePitch({
             />
           )}
 
-          {/* 11 Active Player Tokens */}
           {tactic.slots.map((slot) => {
             const cfg = phase === "ip" ? slot.inPossession : slot.outOfPossession;
             const coord = positionsById.get(cfg.positionId) ?? { X: 50, Y: 50 };

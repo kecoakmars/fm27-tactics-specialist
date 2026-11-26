@@ -5,14 +5,15 @@ import { getPitchCatalog, getRoleProfiles } from "@fm27/fm-data";
 import {
   getCandidateRolesForSlot,
   getPlayerInstructionPolicy,
-  resolveEligibilityKey,
 } from "@fm27/fm-engine";
 import type { Duty } from "@fm27/shared-types";
+import { useLocale } from "@/stores/useLocaleStore";
 import { useTacticStore } from "@/stores/useTacticStore";
 
 const DUTIES: readonly Duty[] = ["Defend", "Support", "Attack"];
 
 export function PlayerInstructionModal() {
+  const { t } = useLocale();
   const {
     tactic,
     selectedSlotIndex,
@@ -42,7 +43,6 @@ export function PlayerInstructionModal() {
     phaseTab === "ip" ? s.inPossession.positionId : s.outOfPossession.positionId,
   );
 
-  const eligKey = resolveEligibilityKey(shapeSlots, catalog);
   const candidateRoles = getCandidateRolesForSlot(
     cfg.positionId,
     phaseNum,
@@ -71,7 +71,7 @@ export function PlayerInstructionModal() {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Player Role and Instructions"
+        aria-label={t("Peran & Instruksi Pemain", "Player Role & Instructions")}
         className="tactical-surface-elevated w-full max-w-2xl max-h-[88vh] rounded-2xl flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
@@ -83,11 +83,10 @@ export function PlayerInstructionModal() {
             </span>
             <div>
               <h2 className="text-base font-bold text-slate-100">
-                Slot #{slot.slotIndex + 1} · IP {slot.inPossession.positionId} → OOP{" "}
-                {slot.outOfPossession.positionId}
+                {slot.playerName ?? `${t("Pemain", "Player")} #${slot.slotIndex + 1}`}
               </h2>
               <p className="text-xs text-slate-400 font-mono-metric">
-                Eligibility Matrix Key: {eligKey}
+                IP {slot.inPossession.positionId} → OOP {slot.outOfPossession.positionId}
               </p>
             </div>
           </div>
@@ -98,34 +97,33 @@ export function PlayerInstructionModal() {
             onClick={() => setPlayerModalOpen(false)}
             className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 cursor-pointer"
           >
-            Done
+            {t("Selesai", "Done")}
           </button>
         </div>
 
         {/* Body */}
         <div className="p-5 overflow-y-auto flex flex-col gap-4">
-          {/* Custom Player Name + Phase Switcher */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label
                 htmlFor="slot-player-name-input"
                 className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1"
               >
-                Assigned Player Label
+                {t("Nama Pemain", "Player Name")}
               </label>
               <input
                 id="slot-player-name-input"
                 type="text"
                 value={slot.playerName ?? ""}
                 onChange={(e) => updatePlayerLabel(e.target.value)}
-                placeholder={`Player #${slot.slotIndex + 1}`}
+                placeholder={`${t("Pemain", "Player")} #${slot.slotIndex + 1}`}
                 className="w-full px-3 py-2 rounded-lg bg-[#0B0F19] border border-white/12 text-sm text-slate-100 placeholder:text-slate-600"
               />
             </div>
 
             <div>
               <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                Phase Configuration
+                {t("Fase Permainan", "Phase")}
               </span>
               <div className="grid grid-cols-2 gap-1.5 p-1 rounded-lg bg-[#0B0F19] border border-white/10">
                 <button
@@ -138,7 +136,7 @@ export function PlayerInstructionModal() {
                       : "text-slate-400 hover:text-slate-200"
                   }`}
                 >
-                  In Possession ({slot.inPossession.positionId})
+                  {t("Menyerang", "In Possession")} ({slot.inPossession.positionId})
                 </button>
                 <button
                   id="pi-modal-tab-oop"
@@ -150,7 +148,7 @@ export function PlayerInstructionModal() {
                       : "text-slate-400 hover:text-slate-200"
                   }`}
                 >
-                  Out of Possession ({slot.outOfPossession.positionId})
+                  {t("Bertahan", "Out of Possession")} ({slot.outOfPossession.positionId})
                 </button>
               </div>
             </div>
@@ -164,7 +162,7 @@ export function PlayerInstructionModal() {
                   htmlFor="slot-role-select"
                   className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1"
                 >
-                  Eligible FM27 Role ({candidateRoles.length})
+                  {t("Peran Pemain", "Player Role")}
                 </label>
                 <select
                   id="slot-role-select"
@@ -208,7 +206,9 @@ export function PlayerInstructionModal() {
 
             {activeRoleProfile && (
               <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                <span className="text-[11px] text-slate-400 mr-1">5 Key Attributes:</span>
+                <span className="text-[11px] text-slate-400 mr-1">
+                  {t("Atribut Utama:", "Key Attributes:")}
+                </span>
                 {activeRoleProfile.Keys.map((attr) => (
                   <span
                     key={attr}
@@ -221,15 +221,14 @@ export function PlayerInstructionModal() {
             )}
           </div>
 
-          {/* 43-Bit Policy-Driven Player Instructions */}
+          {/* Player Instructions */}
           <div className="flex flex-col gap-2.5">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
-              Player Instructions ({phaseTab === "ip" ? "In Possession" : "Out of Possession"})
+              {t("Instruksi Individu", "Player Instructions")}
             </span>
 
             {piGroups.map((group) => {
               const nonZeroBits = group.Options.map((o) => o.Bit).filter((b) => b > 0);
-              // Hide entire group if every non-zero option is policy '1' (Hidden)
               const visibleOptions = group.Options.filter((opt) => {
                 if (opt.Bit === 0) return true;
                 return (
@@ -299,7 +298,7 @@ export function PlayerInstructionModal() {
                           }`}
                         >
                           {opt.Label}
-                          {isPreset ? " (Role Preset)" : ""}
+                          {isPreset ? ` (${t("Bawaan Peran", "Role Default")})` : ""}
                         </button>
                       );
                     })}

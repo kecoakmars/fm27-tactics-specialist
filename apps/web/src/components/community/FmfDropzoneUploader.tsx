@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import type { DualPhaseTactic } from "@fm27/shared-types";
 import { getBrowserSupabaseClient } from "../../lib/supabase-client";
 import { exportFmfInWorker, parseFmfInWorker } from "../../lib/worker-client";
+import { useLocale } from "../../stores/useLocaleStore";
 import { useTacticStore } from "../../stores/useTacticStore";
 import { AutoTacticThumbnail } from "./AutoTacticThumbnail";
 
@@ -22,6 +23,7 @@ function bytesToBase64Browser(bytes: Uint8Array): string {
 export function FmfDropzoneUploader({ onSubmitted }: FmfDropzoneUploaderProps) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const activeBoardTactic = useTacticStore((s) => s.tactic);
+  const { t } = useLocale();
 
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -46,11 +48,13 @@ export function FmfDropzoneUploader({ onSubmitted }: FmfDropzoneUploaderProps) {
         setDescription(parsed.description);
       }
       setFeedback(
-        `Parsed binary .fmf -> IP ${parsed.inFormation} / OOP ${parsed.outFormation}`,
+        `IP ${parsed.inFormation} / OOP ${parsed.outFormation}`,
       );
     } catch (err) {
       setFeedback(
-        err instanceof Error ? err.message : "Invalid .fmf tactic file",
+        err instanceof Error
+          ? err.message
+          : t("File taktik .fmf tidak valid", "Invalid .fmf tactic file"),
       );
     }
   }
@@ -64,16 +68,21 @@ export function FmfDropzoneUploader({ onSubmitted }: FmfDropzoneUploaderProps) {
       setDescription(
         activeBoardTactic.description.length >= 10
           ? activeBoardTactic.description
-          : `Dual-phase ${activeBoardTactic.inFormation} IP -> ${activeBoardTactic.outFormation} OOP tactic tuned for FM27.`,
+          : `${activeBoardTactic.inFormation} IP -> ${activeBoardTactic.outFormation} OOP (${activeBoardTactic.patchVersion}).`,
       );
     }
-    setFeedback("Loaded active Pitch Board tactic into binary .fmf uploader");
+    setFeedback(t("Taktik papan aktif dipilih", "Active board tactic selected"));
   }
 
   async function handlePublish(e: React.FormEvent) {
     e.preventDefault();
     if (!previewTactic || !fmfBase64) {
-      setFeedback("Drop a .fmf file or click Use Active Board Tactic first.");
+      setFeedback(
+        t(
+          "Pilih file .fmf atau gunakan taktik aktif lebih dulu.",
+          "Choose a .fmf file or use your active tactic first.",
+        ),
+      );
       return;
     }
     setSubmitting(true);
@@ -103,21 +112,22 @@ export function FmfDropzoneUploader({ onSubmitted }: FmfDropzoneUploaderProps) {
       const data = (await res.json()) as {
         ok?: boolean;
         error?: string;
-        moderation?: { playstyleTag: string; guideQualityScore: number };
       };
 
       if (!res.ok) {
-        setFeedback(data.error || "Submission rejected");
+        setFeedback(data.error || t("Gagal membagikan taktik", "Submission rejected"));
         return;
       }
 
-      setFeedback(
-        `Published! Auto-tagged "${data.moderation?.playstyleTag}" (Quality ${Math.round((data.moderation?.guideQualityScore ?? 0.5) * 100)}%)`,
-      );
+      setFeedback(t("Taktik berhasil dibagikan!", "Tactic published!"));
       onSubmitted();
       setTimeout(() => setOpen(false), 900);
     } catch (err) {
-      setFeedback(err instanceof Error ? err.message : "Upload failed");
+      setFeedback(
+        err instanceof Error
+          ? err.message
+          : t("Gagal mengunggah taktik", "Upload failed"),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -128,9 +138,9 @@ export function FmfDropzoneUploader({ onSubmitted }: FmfDropzoneUploaderProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400"
+        className="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 cursor-pointer"
       >
-        + Upload .fmf Tactic
+        {t("+ Bagikan Taktik (.fmf)", "+ Share Tactic (.fmf)")}
       </button>
     );
   }
@@ -138,21 +148,15 @@ export function FmfDropzoneUploader({ onSubmitted }: FmfDropzoneUploaderProps) {
   return (
     <section className="rounded-xl border border-emerald-500/40 bg-[#111827] p-4">
       <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-slate-100">
-            Publish .fmf Tactic (Auto SVG Preview + AI Moderation)
-          </h3>
-          <p className="text-xs text-slate-400">
-            Binary <code className="text-emerald-300">.fmf</code> is parsed automatically into Dual-Phase SVG preview and classified by{" "}
-            <code className="text-cyan-300">gemini-decision-1</code>.
-          </p>
-        </div>
+        <h3 className="text-sm font-semibold text-slate-100">
+          {t("Bagikan Taktik ke Komunitas", "Share Tactic to Community")}
+        </h3>
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-300"
+          className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-300 cursor-pointer"
         >
-          Cancel
+          {t("Batal", "Cancel")}
         </button>
       </div>
 
@@ -172,24 +176,21 @@ export function FmfDropzoneUploader({ onSubmitted }: FmfDropzoneUploaderProps) {
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/25"
+            className="rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/25 cursor-pointer"
           >
-            Choose .fmf File
+            {t("Pilih File .fmf", "Choose .fmf File")}
           </button>
           <button
             type="button"
             onClick={() => void handleUseActiveBoardTactic()}
-            className="rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/25"
+            className="rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/25 cursor-pointer"
           >
-            Use Active Pitch Board Tactic
+            {t("Pakai Taktik di Papan", "Use Active Board Tactic")}
           </button>
         </div>
 
         {previewTactic && (
           <div className="rounded-lg border border-slate-800 bg-[#0B0F19] p-3">
-            <div className="mb-2 text-xs font-medium text-slate-300">
-              Auto-Generated Dual-Phase Preview (No Screenshot Required):
-            </div>
             <AutoTacticThumbnail tactic={previewTactic} />
           </div>
         )}
@@ -197,7 +198,7 @@ export function FmfDropzoneUploader({ onSubmitted }: FmfDropzoneUploaderProps) {
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="block text-[11px] text-slate-400">
-              Tactic Title
+              {t("Nama Taktik", "Tactic Name")}
             </label>
             <input
               type="text"
@@ -211,12 +212,12 @@ export function FmfDropzoneUploader({ onSubmitted }: FmfDropzoneUploaderProps) {
           </div>
           <div>
             <label className="block text-[11px] text-slate-400">
-              Creator Handle
+              {t("Nama Pembuat", "Author Name")}
             </label>
             <input
               type="text"
               maxLength={60}
-              placeholder="e.g. TacticalLab"
+              placeholder="Manager"
               value={authorName}
               onChange={(e) => setAuthorName(e.target.value)}
               className="mt-1 w-full rounded-lg border border-slate-700 bg-[#0B0F19] px-3 py-1.5 text-xs text-slate-100"
@@ -226,7 +227,7 @@ export function FmfDropzoneUploader({ onSubmitted }: FmfDropzoneUploaderProps) {
 
         <div>
           <label className="block text-[11px] text-slate-400">
-            Tactical Guide &amp; Role Notes (min 10 chars)
+            {t("Catatan Taktik", "Tactic Notes")}
           </label>
           <textarea
             required
@@ -234,7 +235,10 @@ export function FmfDropzoneUploader({ onSubmitted }: FmfDropzoneUploaderProps) {
             rows={3}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Explain key IP/OOP transitions, key player roles, and opposition adjustments..."
+            placeholder={t(
+              "Ceritakan keunggulan taktik ini, tim yang cocok, atau tips peran pemain...",
+              "Describe how this tactic plays, recommended club level, or key roles...",
+            )}
             className="mt-1 w-full rounded-lg border border-slate-700 bg-[#0B0F19] p-2.5 text-xs text-slate-100"
           />
         </div>
@@ -248,9 +252,9 @@ export function FmfDropzoneUploader({ onSubmitted }: FmfDropzoneUploaderProps) {
           <button
             type="submit"
             disabled={submitting}
-            className="rounded-lg bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-50"
+            className="rounded-lg bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-50 cursor-pointer"
           >
-            {submitting ? "Moderating & Publishing..." : "Publish to Gallery"}
+            {submitting ? t("Mengirim...", "Publishing...") : t("Bagikan", "Publish")}
           </button>
         </div>
       </form>

@@ -21,11 +21,13 @@ import {
   exportScheduleFmfInWorker,
   exportShortlistFmfInWorker,
 } from "../../lib/worker-client";
+import { useLocale } from "../../stores/useLocaleStore";
 import { useTacticStore } from "../../stores/useTacticStore";
 import { useTrainingStore } from "../../stores/useTrainingStore";
 
 export default function CommunityGalleryPage() {
   const router = useRouter();
+  const { t } = useLocale();
   const loadTactic = useTacticStore((s) => s.loadTactic);
   const loadSchedule = useTrainingStore((s) => s.loadSchedule);
   const setShortlist = useTrainingStore((s) => s.setShortlist);
@@ -93,17 +95,9 @@ export default function CommunityGalleryPage() {
   return (
     <main className="mx-auto max-w-[1600px] space-y-5 px-4 py-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-slate-100">
-            FM27 Community Hub (Tactics, Schedules &amp; Shortlists)
-          </h1>
-          <p className="text-xs text-slate-400">
-            Auto-parsed Dual-Phase <code className="text-emerald-300">.fmf</code>{" "}
-            SVG previews, <code className="text-cyan-300">gemini-decision-1</code>{" "}
-            moderation, and <code className="text-cyan-300">gemini-embedding-2</code>{" "}
-            natural-language search.
-          </p>
-        </div>
+        <h1 className="text-xl font-bold text-slate-100">
+          {t("Komunitas Taktik", "Community Hub")}
+        </h1>
 
         <FmfDropzoneUploader onSubmitted={() => void fetchGallery()} />
       </div>
@@ -113,16 +107,16 @@ export default function CommunityGalleryPage() {
           <div className="flex items-center gap-1.5">
             {(
               [
-                { id: "tactics", label: `Tactics (${tactics.length})` },
-                { id: "schedules", label: `Training Schedules (${schedules.length})` },
-                { id: "shortlists", label: `Wonderkid Shortlists (${shortlists.length})` },
+                { id: "tactics", label: `${t("Taktik", "Tactics")} (${tactics.length})` },
+                { id: "schedules", label: `${t("Jadwal Latihan", "Training Schedules")} (${schedules.length})` },
+                { id: "shortlists", label: `Shortlist (${shortlists.length})` },
               ] as const
             ).map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setCategory(tab.id)}
-                className={`rounded-lg px-3.5 py-1.5 text-xs font-medium transition ${
+                className={`rounded-lg px-3.5 py-1.5 text-xs font-medium transition cursor-pointer ${
                   category === tab.id
                     ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
                     : "text-slate-400 hover:text-slate-200"
@@ -139,7 +133,7 @@ export default function CommunityGalleryPage() {
               onChange={(e) => setGameVersion(e.target.value)}
               className="rounded-lg border border-slate-700 bg-[#0B0F19] px-2.5 py-1.5 text-xs text-slate-200"
             >
-              <option value="">All Patches</option>
+              <option value="">{t("Semua Patch", "All Patches")}</option>
               {listPatchVersions().map((v) => (
                 <option key={v} value={v}>
                   v{v}
@@ -154,7 +148,7 @@ export default function CommunityGalleryPage() {
                   onChange={(e) => setPlaystyleTag(e.target.value)}
                   className="rounded-lg border border-slate-700 bg-[#0B0F19] px-2.5 py-1.5 text-xs text-slate-200"
                 >
-                  <option value="">All Playstyles</option>
+                  <option value="">{t("Semua Gaya", "All Styles")}</option>
                   <option value="gegenpress">Gegenpress</option>
                   <option value="possession">Possession</option>
                   <option value="counter">Counter-Attack</option>
@@ -164,10 +158,10 @@ export default function CommunityGalleryPage() {
 
                 <input
                   type="text"
-                  placeholder="IP Formation (e.g. 4-3-3 DM)"
+                  placeholder={t("Formasi (cth. 4-3-3 DM)", "Formation (e.g. 4-3-3 DM)")}
                   value={ipFormation}
                   onChange={(e) => setIpFormation(e.target.value)}
-                  className="w-40 rounded-lg border border-slate-700 bg-[#0B0F19] px-2.5 py-1.5 text-xs text-slate-200"
+                  className="w-44 rounded-lg border border-slate-700 bg-[#0B0F19] px-2.5 py-1.5 text-xs text-slate-200"
                 />
               </>
             )}
@@ -181,9 +175,9 @@ export default function CommunityGalleryPage() {
               }
               className="rounded-lg border border-slate-700 bg-[#0B0F19] px-2.5 py-1.5 text-xs text-slate-200"
             >
-              <option value="trending">Sort: Trending (7d)</option>
-              <option value="top_upvoted">Sort: Top Upvoted</option>
-              <option value="newest">Sort: Newest</option>
+              <option value="trending">{t("Populer Minggu Ini", "Trending")}</option>
+              <option value="top_upvoted">{t("Paling Disukai", "Top Rated")}</option>
+              <option value="newest">{t("Terbaru", "Newest")}</option>
             </select>
           </div>
         </div>
@@ -194,7 +188,10 @@ export default function CommunityGalleryPage() {
               type="search"
               value={semanticQuery}
               onChange={(e) => setSemanticQuery(e.target.value)}
-              placeholder='Semantic Search (e.g. "taktik 3 bek aman buat tim papan tengah" or "high press 4-3-3")'
+              placeholder={t(
+                'Cari taktik (contoh: "taktik 3 bek aman buat tim papan tengah" atau "4-3-3 high press")',
+                'Search tactics (e.g. "4-3-3 high press" or "solid 3-back counter")',
+              )}
               className="flex-1 rounded-lg border border-slate-700 bg-[#0B0F19] px-3 py-2 text-xs text-slate-100"
             />
           </div>
@@ -203,7 +200,7 @@ export default function CommunityGalleryPage() {
 
       {loading ? (
         <div className="py-10 text-center text-xs text-slate-400">
-          Loading community gallery...
+          {t("Memuat koleksi komunitas...", "Loading community hub...")}
         </div>
       ) : category === "tactics" ? (
         <div className="grid gap-4 md:grid-cols-2">
@@ -222,14 +219,14 @@ export default function CommunityGalleryPage() {
                       {item.title}
                     </Link>
                     <div className="mt-0.5 text-xs text-slate-400">
-                      by <strong>{item.authorName}</strong> · v{item.gameVersion} ·{" "}
+                      {t("oleh", "by")} <strong>{item.authorName}</strong> · v{item.gameVersion} ·{" "}
                       <span className="rounded bg-cyan-500/15 px-1.5 py-0.5 font-mono text-[10px] text-cyan-300">
                         {item.playstyleTag}
                       </span>
                     </div>
                   </div>
                   <span className="rounded border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 font-mono text-xs font-bold text-emerald-300">
-                    Bal {item.balanceScore}
+                    {item.balanceScore}/100
                   </span>
                 </div>
 
@@ -255,7 +252,7 @@ export default function CommunityGalleryPage() {
                     href={`/community/${item.id}`}
                     className="rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs text-slate-300 hover:border-slate-500"
                   >
-                    Inspect
+                    {t("Detail", "Details")}
                   </Link>
                   <button
                     type="button"
@@ -263,14 +260,14 @@ export default function CommunityGalleryPage() {
                       loadTactic(item.tactic);
                       router.push("/");
                     }}
-                    className="rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/25"
+                    className="rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/25 cursor-pointer"
                   >
-                    Load to Board
+                    {t("Coba di Papan", "Open on Board")}
                   </button>
                   <button
                     type="button"
                     onClick={() => void handleDownloadTacticFmf(item)}
-                    className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400"
+                    className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400 cursor-pointer"
                   >
                     .fmf
                   </button>
@@ -289,7 +286,7 @@ export default function CommunityGalleryPage() {
               <div>
                 <h3 className="text-sm font-bold text-slate-100">{sched.title}</h3>
                 <p className="mt-0.5 text-xs text-slate-400">
-                  by {sched.authorName} · v{sched.gameVersion}
+                  {t("oleh", "by")} {sched.authorName} · v{sched.gameVersion}
                 </p>
                 <p className="mt-2 text-xs text-slate-300">
                   {sched.schedule.description}
@@ -320,9 +317,9 @@ export default function CommunityGalleryPage() {
                       loadSchedule(sched.schedule);
                       router.push("/training");
                     }}
-                    className="rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-2.5 py-1 text-xs text-cyan-300"
+                    className="rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-2.5 py-1 text-xs text-cyan-300 cursor-pointer"
                   >
-                    Open in Builder
+                    {t("Buka di Latihan", "Open Schedule")}
                   </button>
                   <button
                     type="button"
@@ -333,7 +330,7 @@ export default function CommunityGalleryPage() {
                         bytes,
                       );
                     }}
-                    className="rounded-lg bg-emerald-500 px-2.5 py-1 text-xs font-semibold text-slate-950"
+                    className="rounded-lg bg-emerald-500 px-2.5 py-1 text-xs font-semibold text-slate-950 cursor-pointer"
                   >
                     .fmf
                   </button>
@@ -352,7 +349,7 @@ export default function CommunityGalleryPage() {
               <div>
                 <h3 className="text-sm font-bold text-slate-100">{sl.title}</h3>
                 <p className="mt-0.5 text-xs text-slate-400">
-                  by {sl.authorName} · {sl.wonderkidUids.length} Wonderkids · v
+                  {t("oleh", "by")} {sl.authorName} · {sl.wonderkidUids.length} Wonderkids · v
                   {sl.gameVersion}
                 </p>
                 <p className="mt-2 text-xs text-slate-300">{sl.description}</p>
@@ -372,9 +369,9 @@ export default function CommunityGalleryPage() {
                       setShortlist(sl.title, sl.wonderkidUids);
                       router.push("/wonderkids");
                     }}
-                    className="rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-2.5 py-1 text-xs text-cyan-300"
+                    className="rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-2.5 py-1 text-xs text-cyan-300 cursor-pointer"
                   >
-                    Load Shortlist
+                    {t("Muat Shortlist", "Load Shortlist")}
                   </button>
                   <button
                     type="button"
@@ -388,7 +385,7 @@ export default function CommunityGalleryPage() {
                         bytes,
                       );
                     }}
-                    className="rounded-lg bg-emerald-500 px-2.5 py-1 text-xs font-semibold text-slate-950"
+                    className="rounded-lg bg-emerald-500 px-2.5 py-1 text-xs font-semibold text-slate-950 cursor-pointer"
                   >
                     .fmf
                   </button>

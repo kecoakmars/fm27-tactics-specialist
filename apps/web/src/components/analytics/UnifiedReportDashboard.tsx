@@ -3,29 +3,25 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import type { UnifiedReport } from "@fm27/fm-engine";
+import { localizeTacticalAlert, useLocale } from "@/stores/useLocaleStore";
 import { useTacticStore } from "@/stores/useTacticStore";
 import { useTrainingStore } from "@/stores/useTrainingStore";
 
 type UnifiedTabKey = "formation" | "squad" | "training" | "staff" | "wonderkids";
 
-const TABS: ReadonlyArray<{ id: UnifiedTabKey; label: string }> = [
-  { id: "formation", label: "Formasi" },
-  { id: "squad", label: "Squad Audit/Blueprint" },
-  { id: "training", label: "Training" },
-  { id: "staff", label: "Staff Star" },
-  { id: "wonderkids", label: "Wonderkids" },
-];
-
 export interface UnifiedReportDashboardProps {
   report: UnifiedReport;
   onNotify?: (tone: "ok" | "error", text: string) => void;
+  onRequestLoadFm?: () => void;
 }
 
 export function UnifiedReportDashboard({
   report,
   onNotify,
+  onRequestLoadFm,
 }: UnifiedReportDashboardProps) {
   const [activeTab, setActiveTab] = useState<UnifiedTabKey>("formation");
+  const { locale, t } = useLocale();
   const {
     loadTactic,
     applyDualShape,
@@ -34,18 +30,17 @@ export function UnifiedReportDashboard({
     pushTrainingPlanToStore,
     solveBestTacticForCurrentClub,
     dismissUnifiedReport,
-    liveFmSave,
-    setClubPickerOpen,
   } = useTacticStore();
   const shortlistUids = useTrainingStore((s) => s.shortlistUids);
   const toggleShortlistUid = useTrainingStore((s) => s.toggleShortlistUid);
 
-  const modeLabel =
-    report.mode === "fmf-only"
-      ? "Mode A · .fmf Blueprint"
-      : report.mode === "squad-only"
-        ? "Mode B · Squad Solver (13×16)"
-        : "Mode C · .fmf + Klub Nyata";
+  const tabs: ReadonlyArray<{ id: UnifiedTabKey; label: string }> = [
+    { id: "formation", label: t("Formasi", "Formation") },
+    { id: "squad", label: t("Skuad", "Squad") },
+    { id: "training", label: t("Latihan", "Training") },
+    { id: "staff", label: t("Staf Pelatih", "Staff") },
+    { id: "wonderkids", label: "Wonderkids" },
+  ];
 
   const { tacticAdvice, squadBlueprintOrAudit, trainingPlan, staffPlan, wonderkidPlan } =
     report;
@@ -53,37 +48,22 @@ export function UnifiedReportDashboard({
   return (
     <section
       id="unified-report-dashboard"
-      aria-label="Unified 5-Tab Deterministic Tactical Report"
+      aria-label={t("Ringkasan Tim", "Team Summary")}
       className="tactical-surface rounded-2xl p-4 border border-emerald-500/30 flex flex-col gap-3.5"
     >
-      {/* Header + Non-AI Badge */}
+      {/* Clean Header */}
       <div className="flex flex-wrap items-center justify-between gap-2.5">
         <div className="flex flex-wrap items-center gap-2">
-          <span
-            id="non-ai-deterministic-badge"
-            className="px-2.5 py-1 rounded-md text-[11px] font-extrabold tracking-wide bg-emerald-500/20 text-emerald-300 border border-emerald-500/45"
-          >
-            {report.deterministicBadge}
+          <span className="text-sm font-extrabold text-slate-100">
+            {tacticAdvice.activeTactic.title}
           </span>
           <span className="px-2 py-0.5 rounded text-[11px] font-mono-metric bg-[#0B0F19] text-cyan-300 border border-cyan-500/30">
-            {modeLabel}
-          </span>
-          <span className="text-xs font-semibold text-slate-200">
-            {tacticAdvice.activeTactic.title} (IP {tacticAdvice.activeTactic.inFormation} → OOP{" "}
-            {tacticAdvice.activeTactic.outFormation})
+            IP {tacticAdvice.activeTactic.inFormation} → OOP{" "}
+            {tacticAdvice.activeTactic.outFormation}
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          {liveFmSave && (
-            <button
-              type="button"
-              onClick={() => setClubPickerOpen(true)}
-              className="px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-500/18 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/28 cursor-pointer"
-            >
-              Ganti Klub (.fm)
-            </button>
-          )}
+        <div className="flex flex-wrap items-center gap-2">
           {report.mode === "combined" && (
             <button
               type="button"
@@ -92,13 +72,16 @@ export function UnifiedReportDashboard({
                 if (best) {
                   onNotify?.(
                     "ok",
-                    `Diselesaikan ulang 13×16 untuk klub: "${best.tacticAdvice.recommendedTactic.title}"`,
+                    t(
+                      `Rekomendasi terbaik: "${best.tacticAdvice.recommendedTactic.title}"`,
+                      `Best tactic found: "${best.tacticAdvice.recommendedTactic.title}"`,
+                    ),
                   );
                 }
               }}
               className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/18 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/28 cursor-pointer"
             >
-              Cari Taktik Terbaik Klub (13×16)
+              {t("Cari Taktik Terbaik", "Find Best Tactic")}
             </button>
           )}
           {(report.mode === "squad-only" ||
@@ -111,21 +94,23 @@ export function UnifiedReportDashboard({
                 loadTactic(tacticAdvice.recommendedTactic);
                 onNotify?.(
                   "ok",
-                  `Dimuat ke Papan Taktik: "${tacticAdvice.recommendedTactic.title}"`,
+                  t(
+                    `Diterapkan: "${tacticAdvice.recommendedTactic.title}"`,
+                    `Applied: "${tacticAdvice.recommendedTactic.title}"`,
+                  ),
                 );
               }}
               className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500 text-slate-950 hover:bg-emerald-400 cursor-pointer"
             >
-              Terapkan Taktik Rekomendasi #1
+              {t("Pakai Rekomendasi", "Apply Recommended")}
             </button>
           )}
           <button
             type="button"
             onClick={dismissUnifiedReport}
-            title="Sembunyikan panel ringkasan"
             className="px-2 py-1 rounded-lg text-xs text-slate-400 hover:text-slate-100 bg-[#0B0F19] border border-white/10 cursor-pointer"
           >
-            Tutup
+            {t("Tutup", "Close")}
           </button>
         </div>
       </div>
@@ -135,7 +120,7 @@ export function UnifiedReportDashboard({
         role="tablist"
         className="flex flex-wrap gap-1.5 p-1 rounded-xl bg-[#0B0F19] border border-white/10"
       >
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
             <button
@@ -157,101 +142,113 @@ export function UnifiedReportDashboard({
         })}
       </div>
 
-      {/* TAB 1: FORMASI */}
+      {/* TAB 1: FORMATION */}
       {activeTab === "formation" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 text-xs">
           <div className="rounded-xl p-3 bg-[#0B0F19] border border-white/8 flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <span className="font-bold text-slate-200">6 Pilar &amp; 18-Zone Spatial</span>
+              <span className="font-bold text-slate-200">
+                {t("Keseimbangan Taktik", "Tactical Balance")}
+              </span>
               <span className="font-mono-metric font-bold text-emerald-400">
-                {tacticAdvice.balance.overallScore.toFixed(1)} / 100
+                {tacticAdvice.balance.overallScore.toFixed(0)} / 100
               </span>
             </div>
             <div className="grid grid-cols-2 gap-1.5 text-[11px]">
-              <div className="px-2 py-1 rounded bg-slate-900/80 flex justify-between">
-                <span className="text-slate-400">Attack</span>
+              <div className="px-2 py-1.5 rounded bg-slate-900/80 flex justify-between">
+                <span className="text-slate-400">{t("Serangan", "Attack")}</span>
                 <span className="font-mono-metric text-slate-100">
                   {tacticAdvice.balance.pillars.attackingThreat.toFixed(0)}
                 </span>
               </div>
-              <div className="px-2 py-1 rounded bg-slate-900/80 flex justify-between">
+              <div className="px-2 py-1.5 rounded bg-slate-900/80 flex justify-between">
                 <span className="text-slate-400">Build-Up</span>
                 <span className="font-mono-metric text-slate-100">
                   {tacticAdvice.balance.pillars.buildUpProgression.toFixed(0)}
                 </span>
               </div>
-              <div className="px-2 py-1 rounded bg-slate-900/80 flex justify-between">
-                <span className="text-slate-400">Rest-Def</span>
+              <div className="px-2 py-1.5 rounded bg-slate-900/80 flex justify-between">
+                <span className="text-slate-400">{t("Pertahanan", "Defense")}</span>
                 <span className="font-mono-metric text-slate-100">
                   {tacticAdvice.balance.pillars.restDefenseStability.toFixed(0)}
                 </span>
               </div>
-              <div className="px-2 py-1 rounded bg-slate-900/80 flex justify-between">
-                <span className="text-slate-400">Half-Space</span>
+              <div className="px-2 py-1.5 rounded bg-slate-900/80 flex justify-between">
+                <span className="text-slate-400">{t("Lebar Sayap", "Width")}</span>
                 <span className="font-mono-metric text-slate-100">
                   {tacticAdvice.balance.pillars.widthAndHalfSpaceCoverage.toFixed(0)}
                 </span>
               </div>
-              <div className="px-2 py-1 rounded bg-slate-900/80 flex justify-between">
+              <div className="px-2 py-1.5 rounded bg-slate-900/80 flex justify-between">
                 <span className="text-slate-400">Pressing</span>
                 <span className="font-mono-metric text-slate-100">
                   {tacticAdvice.balance.pillars.pressingCohesion.toFixed(0)}
                 </span>
               </div>
-              <div className="px-2 py-1 rounded bg-slate-900/80 flex justify-between">
-                <span className="text-slate-400">Transisi</span>
+              <div className="px-2 py-1.5 rounded bg-slate-900/80 flex justify-between">
+                <span className="text-slate-400">{t("Transisi", "Transition")}</span>
                 <span className="font-mono-metric text-slate-100">
                   {tacticAdvice.balance.pillars.transitionResilience.toFixed(0)}
                 </span>
               </div>
             </div>
-            <div className="text-[11px] text-slate-400 font-mono-metric pt-1 border-t border-white/6">
-              Zone 14 IP: {tacticAdvice.heatmap.zone14IntensityIp.toFixed(1)}% · LHS{" "}
-              {tacticAdvice.heatmap.leftHalfSpaceIntensityIp.toFixed(0)}% · RHS{" "}
-              {tacticAdvice.heatmap.rightHalfSpaceIntensityIp.toFixed(0)}% · Dist{" "}
-              {tacticAdvice.heatmap.averageTransitionDistance.toFixed(1)}
-            </div>
           </div>
 
           <div className="rounded-xl p-3 bg-[#0B0F19] border border-white/8 flex flex-col gap-2">
             <span className="font-bold text-slate-200">
-              Celah Struktural &amp; Coaching Auto-Adjustment (
+              {t("Catatan Taktis", "Tactical Notes")} (
               {tacticAdvice.structuralAdjustments.length})
             </span>
             {tacticAdvice.structuralAdjustments.length === 0 ? (
               <p className="text-emerald-300 text-[11px]">
-                Struktur 18-zona seimbang tanpa celah rest-defense kritis.
+                {t(
+                  "Struktur formasi sudah seimbang saat menyerang maupun bertahan.",
+                  "Formation is balanced across both attacking and defensive phases.",
+                )}
               </p>
             ) : (
               <div className="flex flex-col gap-1.5 max-h-44 overflow-y-auto pr-1">
-                {tacticAdvice.structuralAdjustments.map((al) => (
-                  <div
-                    key={al.id}
-                    className="p-2 rounded-lg bg-slate-900/80 border border-white/8 flex flex-col gap-1"
-                  >
-                    <div className="font-semibold text-amber-300 text-[11px]">{al.title}</div>
-                    <p className="text-[11px] text-slate-400 leading-snug">{al.detail}</p>
-                    {al.autoFix && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTeamInstruction(al.autoFix!.group, al.autoFix!.toBit, true);
-                          onNotify?.("ok", `Auto-adjustment diterapkan: ${al.autoFix!.text}`);
-                        }}
-                        className="self-start mt-0.5 px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/35 text-[10px] font-bold hover:bg-emerald-500/30 cursor-pointer"
-                      >
-                        Auto-Fix: {al.autoFix.text}
-                      </button>
-                    )}
-                  </div>
-                ))}
+                {tacticAdvice.structuralAdjustments.map((al) => {
+                  const localized = localizeTacticalAlert(al, locale);
+                  return (
+                    <div
+                      key={al.id}
+                      className="p-2 rounded-lg bg-slate-900/80 border border-white/8 flex flex-col gap-1"
+                    >
+                      <div className="font-semibold text-amber-300 text-[11px]">
+                        {localized.title}
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-snug">
+                        {localized.detail}
+                      </p>
+                      {al.autoFix && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTeamInstruction(al.autoFix!.group, al.autoFix!.toBit, true);
+                            onNotify?.(
+                              "ok",
+                              t(
+                                `Instruksi diterapkan: ${al.autoFix!.text}`,
+                                `Applied instruction: ${al.autoFix!.text}`,
+                              ),
+                            );
+                          }}
+                          className="self-start mt-0.5 px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/35 text-[10px] font-bold hover:bg-emerald-500/30 cursor-pointer"
+                        >
+                          {t("Terapkan", "Apply")}: {al.autoFix.text}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
 
           <div className="rounded-xl p-3 bg-[#0B0F19] border border-white/8 flex flex-col gap-2">
             <span className="font-bold text-slate-200">
-              Top 3 Pasangan Formasi IP/OOP Alternatif
+              {t("Formasi Alternatif", "Alternative Formations")}
             </span>
             <div className="flex flex-col gap-1.5">
               {tacticAdvice.alternativeShapes.map((alt) => (
@@ -263,11 +260,15 @@ export function UnifiedReportDashboard({
                     <div className="font-bold text-cyan-300 text-[11px]">
                       IP {alt.inPossessionName} → OOP {alt.outOfPossessionName}
                     </div>
-                    <div className="text-[10px] text-slate-400 truncate">{alt.rationale}</div>
+                    {alt.styleName && (
+                      <div className="text-[10px] text-slate-400 truncate">
+                        {alt.styleName}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span className="font-mono-metric text-[11px] font-bold text-emerald-300">
-                      {alt.compatibilityScore.toFixed(1)}
+                      {alt.compatibilityScore.toFixed(0)}
                     </span>
                     <button
                       type="button"
@@ -279,12 +280,15 @@ export function UnifiedReportDashboard({
                         }
                         onNotify?.(
                           "ok",
-                          `Formasi diubah ke IP ${alt.inPossessionName} → OOP ${alt.outOfPossessionName}`,
+                          t(
+                            `Formasi diubah ke IP ${alt.inPossessionName} → OOP ${alt.outOfPossessionName}`,
+                            `Switched to IP ${alt.inPossessionName} → OOP ${alt.outOfPossessionName}`,
+                          ),
                         );
                       }}
                       className="px-2 py-1 rounded bg-cyan-500/18 text-cyan-300 border border-cyan-500/35 text-[10px] font-bold hover:bg-cyan-500/28 cursor-pointer"
                     >
-                      Pakai
+                      {t("Pakai", "Use")}
                     </button>
                   </div>
                 </div>
@@ -294,23 +298,36 @@ export function UnifiedReportDashboard({
         </div>
       )}
 
-      {/* TAB 2: SQUAD AUDIT / BLUEPRINT */}
+      {/* TAB 2: SQUAD */}
       {activeTab === "squad" && (
         <div className="flex flex-col gap-3 text-xs">
-          {!squadBlueprintOrAudit.hasClubSquad && squadBlueprintOrAudit.honestNote && (
+          {!squadBlueprintOrAudit.hasClubSquad && (
             <div
               id="squad-honest-note"
               className="rounded-xl p-3 bg-amber-500/12 border border-amber-500/35 text-amber-200 flex flex-wrap items-center justify-between gap-2"
             >
-              <span>{squadBlueprintOrAudit.honestNote}</span>
-              <div className="flex items-center gap-2 shrink-0">
+              <span>
+                {t(
+                  "Muat file save karier (.fm) untuk melihat kecocokan pemain klub Anda.",
+                  "Load a career save (.fm) to see how your squad fits this tactic.",
+                )}
+              </span>
+              {onRequestLoadFm ? (
+                <button
+                  type="button"
+                  onClick={onRequestLoadFm}
+                  className="px-2.5 py-1 rounded-lg bg-[#0B0F19] text-amber-200 border border-amber-400/40 font-bold text-[11px] cursor-pointer"
+                >
+                  {t("Muat Save .fm", "Load .fm Save")}
+                </button>
+              ) : (
                 <Link
                   href="/squad"
                   className="px-2.5 py-1 rounded-lg bg-[#0B0F19] text-amber-200 border border-amber-400/40 font-bold text-[11px]"
                 >
-                  Unggah Save .fm / CSV →
+                  {t("Buka Skuad →", "Open Squad →")}
                 </Link>
-              </div>
+              )}
             </div>
           )}
 
@@ -318,17 +335,19 @@ export function UnifiedReportDashboard({
             <div className="flex flex-col gap-2.5">
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                 <span className="font-bold text-slate-200">
-                  Audit Skuad Nyata · Overall Fit{" "}
+                  {t("Kecocokan Skuad", "Squad Fit")}{" "}
                   <span className="font-mono-metric text-emerald-400">
-                    {squadBlueprintOrAudit.audit.overallSquadFit.toFixed(1)}
+                    {squadBlueprintOrAudit.audit.overallSquadFit.toFixed(0)}/100
                   </span>
                 </span>
                 <span className="text-[11px] text-rose-300">
-                  3 Titik Terlemah:{" "}
+                  {t("Perlu Dibenahi:", "Weakest Spots:")}{" "}
                   {squadBlueprintOrAudit.audit.weakestThreeSlotIndices
                     .map((idx) => {
                       const st = squadBlueprintOrAudit.audit!.starterAudits[idx];
-                      return st ? `${st.inSlot} (${st.playerName}, ${st.fitScore.toFixed(1)})` : `#${idx + 1}`;
+                      return st
+                        ? `${st.inSlot} (${st.playerName})`
+                        : `#${idx + 1}`;
                     })
                     .join(" · ")}
                 </span>
@@ -338,12 +357,12 @@ export function UnifiedReportDashboard({
                 <table className="w-full text-left border-collapse text-[11px]">
                   <thead>
                     <tr className="border-b border-white/10 text-slate-400">
-                      <th className="py-1.5 pr-2">Slot IP→OOP</th>
-                      <th className="py-1.5 pr-2">Starter</th>
-                      <th className="py-1.5 pr-2">Role IP / OOP</th>
-                      <th className="py-1.5 pr-2">Role Fit</th>
-                      <th className="py-1.5 pr-2">Atribut Kurang (&lt;14)</th>
-                      <th className="py-1.5">Pengganti Internal</th>
+                      <th className="py-1.5 pr-2">{t("Posisi", "Position")}</th>
+                      <th className="py-1.5 pr-2">{t("Pemain", "Starter")}</th>
+                      <th className="py-1.5 pr-2">{t("Peran (IP / OOP)", "Role (IP / OOP)")}</th>
+                      <th className="py-1.5 pr-2">{t("Skor", "Fit")}</th>
+                      <th className="py-1.5 pr-2">{t("Atribut Kurang", "Low Attributes")}</th>
+                      <th className="py-1.5">{t("Cadangan Lebih Cocok", "Better Option")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -368,13 +387,13 @@ export function UnifiedReportDashboard({
                             {item.inRoleId} / {item.outRoleId}
                           </td>
                           <td className="py-1.5 pr-2 font-mono-metric font-bold text-emerald-300">
-                            {item.fitScore.toFixed(1)}
+                            {item.fitScore.toFixed(0)}
                           </td>
                           <td className="py-1.5 pr-2 text-amber-300">
                             {item.keyAttributeGaps.length === 0
-                              ? "Optimal"
+                              ? t("Aman", "Solid")
                               : item.keyAttributeGaps
-                                  .map((g) => `${g.attribute} (${g.value})`)
+                                  .map((g) => `${g.attribute.replace(/_/g, " ")} (${g.value})`)
                                   .join(", ")}
                           </td>
                           <td className="py-1.5">
@@ -389,15 +408,20 @@ export function UnifiedReportDashboard({
                                   );
                                   onNotify?.(
                                     "ok",
-                                    `${bestSub.playerName} dipasang di ${item.inSlot} (+${bestSub.fitGain.toFixed(1)} Fit)`,
+                                    t(
+                                      `${bestSub.playerName} dipasang di ${item.inSlot}`,
+                                      `Assigned ${bestSub.playerName} to ${item.inSlot}`,
+                                    ),
                                   );
                                 }}
                                 className="px-2 py-0.5 rounded bg-emerald-500/18 text-emerald-300 border border-emerald-500/35 font-semibold cursor-pointer"
                               >
-                                {bestSub.playerName} (+{bestSub.fitGain.toFixed(1)})
+                                {bestSub.playerName} (+{bestSub.fitGain.toFixed(0)})
                               </button>
                             ) : (
-                              <span className="text-slate-500">Starter terbaik</span>
+                              <span className="text-slate-500">
+                                {t("Pilihan utama", "Best starter")}
+                              </span>
                             )}
                           </td>
                         </tr>
@@ -414,10 +438,10 @@ export function UnifiedReportDashboard({
                   <tr className="border-b border-white/10 text-slate-400">
                     <th className="py-1.5 pr-2">#</th>
                     <th className="py-1.5 pr-2">IP → OOP</th>
-                    <th className="py-1.5 pr-2">Role IP (Duty)</th>
-                    <th className="py-1.5 pr-2">Role OOP</th>
-                    <th className="py-1.5 pr-2">5 Atribut Kunci (role-profiles.json)</th>
-                    <th className="py-1.5">Target Min</th>
+                    <th className="py-1.5 pr-2">{t("Peran Menyerang", "In Possession Role")}</th>
+                    <th className="py-1.5 pr-2">{t("Peran Bertahan", "Out of Possession Role")}</th>
+                    <th className="py-1.5 pr-2">{t("Atribut Utama", "Key Attributes")}</th>
+                    <th className="py-1.5">{t("Target", "Target")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -435,10 +459,10 @@ export function UnifiedReportDashboard({
                       </td>
                       <td className="py-1.5 pr-2 text-amber-300">{bp.outRoleName}</td>
                       <td className="py-1.5 pr-2 text-slate-300 font-mono-metric">
-                        {bp.inKeyAttributes.join(", ")}
+                        {bp.inKeyAttributes.map((a) => a.replace(/_/g, " ")).join(", ")}
                       </td>
                       <td className="py-1.5 font-mono-metric font-bold text-emerald-300">
-                        ≥ {bp.minTargetAttribute} (Ideal {bp.idealTargetAttribute})
+                        {bp.minTargetAttribute}+
                       </td>
                     </tr>
                   ))}
@@ -455,18 +479,15 @@ export function UnifiedReportDashboard({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2 font-mono-metric text-[11px]">
               <span className="px-2 py-0.5 rounded bg-slate-900 text-emerald-300">
-                Cond {trainingPlan.loadMetrics.conditionDelta >= 0 ? "+" : ""}
+                {t("Kondisi", "Condition")} {trainingPlan.loadMetrics.conditionDelta >= 0 ? "+" : ""}
                 {trainingPlan.loadMetrics.conditionDelta}
               </span>
               <span className="px-2 py-0.5 rounded bg-slate-900 text-amber-300">
-                Fatigue {trainingPlan.loadMetrics.fatigueDelta >= 0 ? "+" : ""}
+                {t("Kelelahan", "Fatigue")} {trainingPlan.loadMetrics.fatigueDelta >= 0 ? "+" : ""}
                 {trainingPlan.loadMetrics.fatigueDelta}
               </span>
               <span className="px-2 py-0.5 rounded bg-slate-900 text-cyan-300">
-                Sharpness +{trainingPlan.loadMetrics.sharpnessDelta}
-              </span>
-              <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300">
-                Violations: {trainingPlan.loadMetrics.violations.length}
+                {t("Ketajaman", "Sharpness")} +{trainingPlan.loadMetrics.sharpnessDelta}
               </span>
             </div>
 
@@ -479,19 +500,22 @@ export function UnifiedReportDashboard({
                   if (ok) {
                     onNotify?.(
                       "ok",
-                      `Jadwal "${trainingPlan.schedule.name}" didorong ke Training Planner`,
+                      t(
+                        `Jadwal "${trainingPlan.schedule.name}" diterapkan`,
+                        `Applied schedule "${trainingPlan.schedule.name}"`,
+                      ),
                     );
                   }
                 }}
                 className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 text-slate-950 hover:bg-emerald-400 cursor-pointer"
               >
-                Dorong ke Training Store (1-Klik)
+                {t("Terapkan Jadwal", "Apply Schedule")}
               </button>
               <Link
                 href="/training"
                 className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-[#0B0F19] text-cyan-300 border border-cyan-500/35"
               >
-                Buka Kalender →
+                {t("Buka Latihan →", "Open Training →")}
               </Link>
             </div>
           </div>
@@ -516,18 +540,23 @@ export function UnifiedReportDashboard({
             ))}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             {trainingPlan.selectedSessions.slice(0, 6).map((s) => (
               <div
                 key={s.code}
-                className="p-2 rounded-lg bg-[#0B0F19] border border-white/8 flex items-start justify-between gap-2 text-[11px]"
+                className="p-2.5 rounded-lg bg-[#0B0F19] border border-white/8 flex flex-col gap-1 text-[11px]"
               >
-                <div>
-                  <span className="font-bold text-slate-100">{s.name}</span>{" "}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-bold text-slate-100">{s.name}</span>
                   <span className="font-mono-metric text-emerald-400">
-                    ({s.countUsed}/{s.maxSessionsPerWeek}x)
+                    {s.countUsed}x/{t("mgg", "wk")}
                   </span>
-                  <p className="text-slate-400 mt-0.5">{s.reason}</p>
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono-metric truncate">
+                  {s.trainedAttributes
+                    .slice(0, 4)
+                    .map((a) => a.replace(/_/g, " "))
+                    .join(" · ")}
                 </div>
               </div>
             ))}
@@ -535,30 +564,26 @@ export function UnifiedReportDashboard({
         </div>
       )}
 
-      {/* TAB 4: STAFF STAR */}
+      {/* TAB 4: STAFF */}
       {activeTab === "staff" && (
         <div className="flex flex-col gap-2.5 text-xs">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-[11px] text-slate-400">
-              Rekomendasi pelatih &amp; free agent berdasarkan bobot DDM + kategori latihan taktik aktif:
-            </span>
-            <span
-              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                staffPlan.dataSource === "Live dari File Save .fm"
-                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                  : "bg-amber-500/15 text-amber-300 border border-amber-500/40"
-              }`}
-            >
-              {staffPlan.dataSource === "Live dari File Save .fm"
-                ? `Sumber: ${staffPlan.dataSource}`
-                : "Menunggu Impor File Save .fm (0% Data Sample)"}
-            </span>
-          </div>
           {staffPlan.dataSource !== "Live dari File Save .fm" && !staffPlan.hasClubStaff ? (
-            <div className="rounded-xl border border-dashed border-slate-700 bg-[#0B0F19] p-5 text-center text-xs text-slate-400">
-              Unggah file save karier <code className="text-emerald-300">.fm</code> untuk melihat
-              rating staf klub &amp; rekomendasi free agent asli dari dunia karier Anda (data sample
-              statis dinonaktifkan).
+            <div className="rounded-xl border border-dashed border-slate-700 bg-[#0B0F19] p-6 text-center space-y-2.5">
+              <p className="text-xs text-slate-300">
+                {t(
+                  "Muat save karier (.fm) untuk melihat rating staf pelatih klub Anda & rekomendasi pelatih baru.",
+                  "Load a career save (.fm) to view your club coaching ratings & recommended staff.",
+                )}
+              </p>
+              {onRequestLoadFm && (
+                <button
+                  type="button"
+                  onClick={onRequestLoadFm}
+                  className="rounded-lg bg-emerald-500 px-3.5 py-1.5 text-xs font-bold text-slate-950 hover:bg-emerald-400 cursor-pointer"
+                >
+                  {t("Muat Save .fm", "Load .fm Save")}
+                </button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
@@ -569,21 +594,17 @@ export function UnifiedReportDashboard({
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-bold text-slate-100">{cat.label}</span>
-                    <div className="flex items-center gap-1.5 font-mono-metric text-[11px]">
-                      {cat.clubCurrentStars !== null && (
-                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">
-                          Klub {cat.clubCurrentStars.toFixed(1)}★
-                        </span>
-                      )}
-                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300">
-                        Prio {cat.priorityWeight}
+                    {cat.clubCurrentStars !== null && (
+                      <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono-metric text-[11px]">
+                        {t("Klub", "Club")} {cat.clubCurrentStars.toFixed(1)}★
                       </span>
-                    </div>
+                    )}
                   </div>
-                  <p className="text-[11px] text-slate-400">{cat.rationale}</p>
                   <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
                     <div>
-                      <div className="text-[10px] uppercase font-bold text-cyan-400">Top Staff</div>
+                      <div className="text-[10px] uppercase font-bold text-cyan-400">
+                        {t("Pelatih Terbaik", "Top Coaches")}
+                      </div>
                       {cat.topStaff.slice(0, 2).map((st) => (
                         <div key={st.uid} className="truncate text-slate-200">
                           {st.name} ({st.club}) ·{" "}
@@ -595,7 +616,7 @@ export function UnifiedReportDashboard({
                     </div>
                     <div>
                       <div className="text-[10px] uppercase font-bold text-emerald-400">
-                        Free Agents
+                        Free Agent
                       </div>
                       {cat.topFreeAgents.slice(0, 2).map((fa) => (
                         <div key={fa.uid} className="truncate text-slate-200">
@@ -603,7 +624,7 @@ export function UnifiedReportDashboard({
                           <span className="font-mono-metric text-emerald-300">
                             {fa.stars.toFixed(1)}★
                           </span>{" "}
-                          (€{(fa.wageEstimateEurWeekly / 1000).toFixed(0)}k/w)
+                          (€{(fa.wageEstimateEurWeekly / 1000).toFixed(0)}k)
                         </div>
                       ))}
                     </div>
@@ -618,26 +639,23 @@ export function UnifiedReportDashboard({
       {/* TAB 5: WONDERKIDS */}
       {activeTab === "wonderkids" && (
         <div className="flex flex-col gap-2.5 text-xs">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-[11px] text-slate-400">
-              Kandidat U-21 eksternal terbaik per slot IP/OOP (pemain milik klub sendiri dikecualikan otomatis):
-            </span>
-            <span
-              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                wonderkidPlan.dataSource === "Live dari File Save .fm"
-                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                  : "bg-amber-500/15 text-amber-300 border border-amber-500/40"
-              }`}
-            >
-              {wonderkidPlan.dataSource === "Live dari File Save .fm"
-                ? `Sumber: ${wonderkidPlan.dataSource}`
-                : "Menunggu Impor File Save .fm (0% Data Sample)"}
-            </span>
-          </div>
           {wonderkidPlan.dataSource !== "Live dari File Save .fm" ? (
-            <div className="rounded-xl border border-dashed border-slate-700 bg-[#0B0F19] p-5 text-center text-xs text-slate-400">
-              Unggah file save karier <code className="text-emerald-300">.fm</code> untuk melihat
-              target Wonderkids U-21 asli dari dunia karier Anda (data sample statis dinonaktifkan).
+            <div className="rounded-xl border border-dashed border-slate-700 bg-[#0B0F19] p-6 text-center space-y-2.5">
+              <p className="text-xs text-slate-300">
+                {t(
+                  "Muat save karier (.fm) untuk melihat target wonderkid U-21 dari dunia karier Anda.",
+                  "Load a career save (.fm) to discover U-21 wonderkid targets from your save.",
+                )}
+              </p>
+              {onRequestLoadFm && (
+                <button
+                  type="button"
+                  onClick={onRequestLoadFm}
+                  className="rounded-lg bg-emerald-500 px-3.5 py-1.5 text-xs font-bold text-slate-950 hover:bg-emerald-400 cursor-pointer"
+                >
+                  {t("Muat Save .fm", "Load .fm Save")}
+                </button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[420px] overflow-y-auto pr-1">
@@ -655,7 +673,7 @@ export function UnifiedReportDashboard({
                     </span>
                     {slotPlan.isPriorityWeakSlot && (
                       <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-200 text-[10px] font-bold">
-                        Prioritas Lemah
+                        {t("Prioritas", "Priority")}
                       </span>
                     )}
                   </div>
@@ -681,17 +699,22 @@ export function UnifiedReportDashboard({
                                   : "bg-slate-800 text-slate-300 hover:bg-slate-700"
                               }`}
                             >
-                              {inShortlist ? "Shortlisted" : "+ Shortlist"}
+                              {inShortlist ? "✓" : "+ Shortlist"}
                             </button>
                           </div>
                           <div className="flex flex-wrap gap-2 font-mono-metric text-[10px] text-slate-300">
-                            <span className="text-emerald-300">Fit {wk.roleFitScore.toFixed(1)}</span>
-                            <span className="text-cyan-300">Val {wk.valueRatio.toFixed(1)}</span>
-                            <span className="text-amber-300">€{wk.estimatedPriceEurM.toFixed(1)}M</span>
+                            <span className="text-emerald-300">
+                              {t("Kecocokan", "Fit")} {wk.roleFitScore.toFixed(0)}
+                            </span>
+                            <span className="text-amber-300">
+                              €{wk.estimatedPriceEurM.toFixed(1)}M
+                            </span>
                             <span>PA {wk.paRange}</span>
                           </div>
                           <div className="text-[10px] text-slate-400 font-mono-metric truncate">
-                            {wk.keyAttributes.map((ka) => `${ka.attribute}:${ka.value}`).join(" · ")}
+                            {wk.keyAttributes
+                              .map((ka) => `${ka.attribute.replace(/_/g, " ")}:${ka.value}`)
+                              .join(" · ")}
                           </div>
                         </div>
                       );

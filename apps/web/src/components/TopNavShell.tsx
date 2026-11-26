@@ -7,15 +7,16 @@ import { listPatchVersions } from "@fm27/fm-data";
 import { ClubPickerModal } from "@/components/ClubPickerModal";
 import { importAnySupportedFile } from "@/lib/file-importer";
 import { useFolderSyncStore } from "@/stores/useFolderSyncStore";
+import { useLocale } from "@/stores/useLocaleStore";
 import { useTacticStore } from "@/stores/useTacticStore";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Pitch Board" },
-  { href: "/squad", label: "Squad Audit" },
-  { href: "/wonderkids", label: "Wonderkids" },
-  { href: "/staff", label: "Staff Stars" },
-  { href: "/training", label: "Training" },
-  { href: "/community", label: "Community" },
+  { href: "/", idSlug: "pitch-board", labelId: "Papan Taktik", labelEn: "Tactics" },
+  { href: "/squad", idSlug: "squad-audit", labelId: "Skuad", labelEn: "Squad" },
+  { href: "/wonderkids", idSlug: "wonderkids", labelId: "Wonderkids", labelEn: "Wonderkids" },
+  { href: "/staff", idSlug: "staff-stars", labelId: "Staf Pelatih", labelEn: "Staff" },
+  { href: "/training", idSlug: "training", labelId: "Latihan", labelEn: "Training" },
+  { href: "/community", idSlug: "community", labelId: "Komunitas", labelEn: "Community" },
 ] as const;
 
 export function TopNavShell() {
@@ -24,6 +25,8 @@ export function TopNavShell() {
   const globalFileRef = useRef<HTMLInputElement | null>(null);
   const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [importingGlobal, setImportingGlobal] = useState(false);
+
+  const { locale, setLocale, hydrateLocale, t } = useLocale();
 
   const {
     tactic,
@@ -46,8 +49,9 @@ export function TopNavShell() {
   } = useFolderSyncStore();
 
   useEffect(() => {
+    hydrateLocale();
     void hydrateFromIndexedDb();
-  }, [hydrateFromIndexedDb]);
+  }, [hydrateFromIndexedDb, hydrateLocale]);
 
   useEffect(() => {
     return () => {
@@ -72,7 +76,9 @@ export function TopNavShell() {
     } catch (err) {
       showGlobalToast(
         "error",
-        err instanceof Error ? err.message : `Gagal memproses ${file.name}`,
+        err instanceof Error
+          ? err.message
+          : t(`Gagal membuka ${file.name}`, `Could not open ${file.name}`),
       );
     } finally {
       setImportingGlobal(false);
@@ -103,7 +109,7 @@ export function TopNavShell() {
                   FM27 TACTICS
                 </span>
                 <span className="text-[10px] font-mono-metric text-emerald-400 mt-0.5">
-                  DUAL-PHASE STUDIO
+                  TACTICAL STUDIO
                 </span>
               </div>
             </Link>
@@ -118,27 +124,27 @@ export function TopNavShell() {
                   <Link
                     key={item.href}
                     href={item.href}
-                    id={`nav-link-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                    id={`nav-link-${item.idSlug}`}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap ${
                       active
                         ? "bg-slate-800/90 text-slate-50 border border-white/12"
                         : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/60"
                     }`}
                   >
-                    {item.label}
+                    {locale === "id" ? item.labelId : item.labelEn}
                   </Link>
                 );
               })}
             </nav>
           </div>
 
-          {/* Right Controls: Global File Import + Live .fm Club Switcher + Patch Selector + Local FM27 Folder Sync */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          {/* Right Controls */}
+          <div className="flex items-center gap-2 shrink-0">
             <input
               ref={globalFileRef}
               id="global-any-file-input"
               type="file"
-              accept=".fm,.fmf,.tac,.json,.fm27.json,.csv,.html,.htm"
+              accept=".fm,.fmf,.tac"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -152,10 +158,11 @@ export function TopNavShell() {
               type="button"
               disabled={importingGlobal}
               onClick={() => globalFileRef.current?.click()}
-              title="Unggah Save Karier (.fm), Taktik/Jadwal (.fmf), atau Ekspor CSV/HTML dari halaman mana saja"
               className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition cursor-pointer disabled:opacity-50"
             >
-              {importingGlobal ? "Memproses..." : "Impor .fm / .fmf"}
+              {importingGlobal
+                ? t("Memuat...", "Loading...")
+                : t("Muat .fm / .fmf", "Load .fm / .fmf")}
             </button>
 
             {liveFmSave && (
@@ -163,20 +170,21 @@ export function TopNavShell() {
                 id="header-switch-club-btn"
                 type="button"
                 onClick={() => setClubPickerOpen(true)}
-                title="Ganti klub dari sesi file save .fm tanpa membaca ulang file"
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-cyan-500/15 border border-cyan-500/40 text-xs font-bold text-cyan-200 hover:bg-cyan-500/25 transition cursor-pointer"
               >
                 <span className="w-2 h-2 rounded-full bg-cyan-400" />
                 <span className="max-w-[140px] truncate">
-                  {activeClub ? activeClub.shortName || activeClub.name : "Pilih Klub"}
+                  {activeClub
+                    ? activeClub.shortName || activeClub.name
+                    : t("Pilih Klub", "Select Club")}
                 </span>
                 <span className="text-[10px] uppercase tracking-wide text-cyan-300 underline">
-                  Ganti Klub
+                  {t("Ganti", "Switch")}
                 </span>
               </button>
             )}
 
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#111827] border border-white/10">
+            <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#111827] border border-white/10">
               <span className="text-[11px] text-slate-400">Patch</span>
               <select
                 id="global-patch-selector"
@@ -194,16 +202,16 @@ export function TopNavShell() {
             </div>
 
             {status === "connected" && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/12 border border-emerald-500/35">
+              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/12 border border-emerald-500/35">
                 <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                <span className="text-xs font-semibold text-emerald-200 max-w-[160px] truncate">
-                  {folderName} ({tacticFiles.length} .fmf · {saveGameFiles.length} .fm)
+                <span className="text-xs font-semibold text-emerald-200 max-w-[150px] truncate">
+                  {folderName} ({tacticFiles.length + saveGameFiles.length})
                 </span>
                 <button
                   id="disconnect-folder-btn"
                   type="button"
                   onClick={() => void disconnectFolder()}
-                  title="Disconnect local FM27 folder"
+                  title={t("Putuskan folder FM27", "Disconnect FM27 folder")}
                   className="ml-1 text-[11px] text-slate-400 hover:text-rose-300 cursor-pointer"
                 >
                   ×
@@ -216,9 +224,9 @@ export function TopNavShell() {
                 id="reconnect-folder-btn"
                 type="button"
                 onClick={() => void reconnectSavedFolder()}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/35 hover:bg-amber-500/25 transition cursor-pointer"
+                className="hidden sm:inline-flex px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/35 hover:bg-amber-500/25 transition cursor-pointer"
               >
-                Reconnect {folderName ?? "FM27 Folder"}
+                {t("Sambung Ulang Folder", "Reconnect Folder")}
               </button>
             )}
 
@@ -227,21 +235,42 @@ export function TopNavShell() {
                 id="connect-folder-btn"
                 type="button"
                 onClick={() => void connectNewFolder()}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/35 hover:bg-emerald-500/25 transition cursor-pointer"
+                className="hidden sm:inline-flex px-2.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/35 hover:bg-emerald-500/25 transition cursor-pointer"
               >
-                Connect FM27 Folder
+                {t("Folder FM27", "FM27 Folder")}
               </button>
             )}
 
-            {status === "unsupported" && (
-              <span
-                id="folder-fallback-badge"
-                title="Browser uses standard file download & drag-and-drop mode"
-                className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-slate-900 text-slate-400 border border-white/8"
+            {/* ID | EN Language Switcher */}
+            <div
+              id="language-switcher"
+              role="group"
+              aria-label="Language"
+              className="flex items-center rounded-lg bg-[#111827] border border-white/10 p-0.5 text-[11px] font-bold"
+            >
+              <button
+                type="button"
+                onClick={() => setLocale("id")}
+                className={`px-2 py-1 rounded-md transition cursor-pointer ${
+                  locale === "id"
+                    ? "bg-emerald-500 text-slate-950"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
               >
-                Download / Drop Mode
-              </span>
-            )}
+                ID
+              </button>
+              <button
+                type="button"
+                onClick={() => setLocale("en")}
+                className={`px-2 py-1 rounded-md transition cursor-pointer ${
+                  locale === "en"
+                    ? "bg-emerald-500 text-slate-950"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                EN
+              </button>
+            </div>
           </div>
         </div>
       </header>

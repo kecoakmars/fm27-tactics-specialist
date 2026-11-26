@@ -8,6 +8,7 @@ import {
 } from "@fm27/fm-engine";
 import type { StaffCategoryId, StaffMember } from "@fm27/shared-types";
 import { importAnySupportedFile } from "../../lib/file-importer";
+import { useLocale } from "../../stores/useLocaleStore";
 import { useTacticStore } from "../../stores/useTacticStore";
 
 interface StaffOptimizerTableProps {
@@ -21,16 +22,10 @@ export function StaffOptimizerTable({
 }: StaffOptimizerTableProps) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const formulas = getStaffFormulas(patchVersion);
+  const { t } = useLocale();
 
-  const {
-    clubStaff,
-    worldStaffPool,
-    liveFmSave,
-    selectedClubUid,
-    setClubPickerOpen,
-  } = useTacticStore();
+  const { clubStaff, worldStaffPool } = useTacticStore();
 
-  const [customStaff, setCustomStaff] = useState<StaffMember[] | null>(null);
   const [freeAgentsOnly, setFreeAgentsOnly] = useState(false);
   const [clubStaffOnly, setClubStaffOnly] = useState(false);
   const [focusCategory, setFocusCategory] =
@@ -38,27 +33,15 @@ export function StaffOptimizerTable({
   const [selectedPoolUids, setSelectedPoolUids] = useState<number[]>([]);
   const [importError, setImportError] = useState<string | null>(null);
 
-  // Sync Club Coaching Pool strictly from real uploaded club staff (.fm or CSV/HTML), NEVER from static seed
   useEffect(() => {
-    if (customStaff && customStaff.length > 0) {
-      setSelectedPoolUids(customStaff.slice(0, 12).map((s) => s.uid));
-    } else if (clubStaff.length > 0) {
+    if (clubStaff.length > 0) {
       setSelectedPoolUids(clubStaff.slice(0, 12).map((s) => s.uid));
     } else {
       setSelectedPoolUids([]);
     }
-  }, [clubStaff, customStaff]);
+  }, [clubStaff]);
 
-  const hasLiveDirectory =
-    Boolean(customStaff && customStaff.length > 0) ||
-    clubStaff.length > 0 ||
-    worldStaffPool.length > 0;
-
-  const dataSourceLabel = customStaff
-    ? "Impor CSV / HTML Kustom"
-    : hasLiveDirectory
-      ? `Live .fm: ${liveFmSave?.saveName ?? "Save Aktif"} (${liveFmSave?.gameDate ?? ""})`
-      : "Menunggu Impor File Save .fm / CSV (0% Data Sample)";
+  const hasLiveDirectory = clubStaff.length > 0 || worldStaffPool.length > 0;
 
   const clubStaffUidSet = useMemo(
     () => new Set(clubStaff.map((s) => s.uid)),
@@ -66,7 +49,6 @@ export function StaffOptimizerTable({
   );
 
   const activeDirectory = useMemo(() => {
-    if (customStaff) return customStaff;
     if (worldStaffPool.length > 0 || clubStaff.length > 0) {
       const merged = new Map<number, StaffMember>();
       for (const s of clubStaff) merged.set(s.uid, s);
@@ -76,7 +58,7 @@ export function StaffOptimizerTable({
       return Array.from(merged.values());
     }
     return [];
-  }, [clubStaff, customStaff, worldStaffPool]);
+  }, [clubStaff, worldStaffPool]);
 
   const staffByUid = useMemo(
     () => new Map(activeDirectory.map((s) => [s.uid, s])),
@@ -124,16 +106,15 @@ export function StaffOptimizerTable({
     [poolMembers, patchVersion],
   );
 
-  async function handleImportStaffFile(file: File) {
+  async function handleImportSaveFile(file: File) {
     setImportError(null);
     try {
-      const res = await importAnySupportedFile(file);
-      if (res.kind === "fm-save" || res.kind === "staff") {
-        setCustomStaff(null);
-      }
+      await importAnySupportedFile(file);
     } catch (err) {
       setImportError(
-        err instanceof Error ? err.message : "Gagal memproses file ekspor staf",
+        err instanceof Error
+          ? err.message
+          : t("Gagal membuka file save .fm", "Failed to open .fm save"),
       );
     }
   }
@@ -148,19 +129,27 @@ export function StaffOptimizerTable({
 
   return (
     <div className="space-y-5">
-      {assignmentPlan ? (
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".fm"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void handleImportSaveFile(file);
+          e.target.value = "";
+        }}
+      />
+
+      {assignmentPlan && (
         <section className="rounded-xl border border-emerald-500/30 bg-[#111827] p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 className="text-sm font-semibold text-emerald-300">
-                Auto-Assign Coaching Workload Optimizer ({poolMembers.length} Pelatih di Pool Klub)
-              </h3>
-              <p className="text-xs text-slate-400">
-                Memaksimalkan bintang tiap kategori latihan sekaligus menjaga beban kerja Light / Average.
-              </p>
-            </div>
+            <h3 className="text-sm font-semibold text-emerald-300">
+              {t("Pembagian Tugas Pelatih Klub", "Club Coaching Assignments")} (
+              {poolMembers.length})
+            </h3>
             <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-3 py-1 font-mono text-xs font-bold text-emerald-300">
-              Avg Rating: {assignmentPlan.averageStars.toFixed(2)} *
+              {t("Rata-rata:", "Avg:")} {assignmentPlan.averageStars.toFixed(1)}★
             </div>
           </div>
 
@@ -181,17 +170,17 @@ export function StaffOptimizerTable({
                       {labelByCat.get(item.categoryId)}
                     </span>
                     <span className="font-mono font-bold text-emerald-300">
-                      {item.effectiveStars.toFixed(1)} *
+                      {item.effectiveStars.toFixed(1)}★
                     </span>
                   </div>
-                  <div className="mt-1.5 text-xs font-medium text-cyan-300">
-                    Lead: {lead?.name ?? `#${item.leadStaffUid}`}
+                  <div className="mt-1.5 text-xs font-medium text-cyan-300 truncate">
+                    {lead?.name ?? `#${item.leadStaffUid}`}
                   </div>
                   <div className="mt-1 flex items-center justify-between text-[11px]">
                     <span className="text-slate-500">
                       {supports.length > 0
-                        ? `+${supports.length} support`
-                        : "Solo lead"}
+                        ? `+${supports.length} ${t("asisten", "support")}`
+                        : t("Utama", "Lead")}
                     </span>
                     <span
                       className={`rounded px-1.5 py-0.5 font-mono text-[10px] ${
@@ -210,47 +199,17 @@ export function StaffOptimizerTable({
             })}
           </div>
         </section>
-      ) : (
-        <section
-          id="staff-club-empty-state"
-          className="rounded-xl border border-dashed border-slate-700 bg-[#111827]/70 p-6 text-center"
-        >
-          <h3 className="text-sm font-bold text-slate-200">
-            Belum Ada Staf Klub yang Dimuat ke Workload Optimizer
-          </h3>
-          <p className="mx-auto mt-1 max-w-xl text-xs text-slate-400 leading-relaxed">
-            Unggah file save karier <code className="text-emerald-300">.fm</code> (diproses 100%
-            lokal di browser) atau ekspor <code className="text-cyan-300">Staff CSV / HTML</code>{" "}
-            untuk memuat jajaran pelatih asli klub Anda tanpa data sampel buatan, atau centang
-            pelatih dari direktori di bawah untuk simulasi manual.
-          </p>
-        </section>
       )}
 
       <section className="rounded-xl border border-slate-800 bg-[#111827] p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-sm font-semibold text-slate-100">
-                Direktori Pelatih, Free Agents &amp; Importer ({filteredDirectory.length})
-              </h3>
-              <span
-                className={`rounded px-2 py-0.5 text-[10px] font-bold ${
-                  hasLiveDirectory
-                    ? "border border-emerald-500/40 bg-emerald-500/20 text-emerald-300"
-                    : "border border-amber-500/40 bg-amber-500/15 text-amber-300"
-                }`}
-              >
-                {dataSourceLabel}
-              </span>
-            </div>
-            <p className="mt-0.5 text-xs text-slate-400">
-              Centang pelatih untuk dimasukkan ke Pool Optimizer klub, atau klik Load Sliders untuk kalkulasi detail.
-            </p>
-          </div>
+          <h3 className="text-sm font-semibold text-slate-100">
+            {t("Daftar Pelatih & Free Agent", "Coaches & Free Agents")} (
+            {filteredDirectory.length})
+          </h3>
 
           <div className="flex flex-wrap items-center gap-2">
-            {clubStaff.length > 0 && !customStaff && (
+            {clubStaff.length > 0 && (
               <label className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-[#0B0F19] px-2.5 py-1.5 text-xs text-slate-200 cursor-pointer">
                 <input
                   type="checkbox"
@@ -258,7 +217,7 @@ export function StaffOptimizerTable({
                   onChange={(e) => setClubStaffOnly(e.target.checked)}
                   className="accent-cyan-400"
                 />
-                Staf Klub Saja ({clubStaff.length})
+                {t("Staf Klub", "Club Staff")} ({clubStaff.length})
               </label>
             )}
 
@@ -269,7 +228,7 @@ export function StaffOptimizerTable({
             >
               {formulas.categories.map((cat) => (
                 <option key={cat.id} value={cat.id}>
-                  Sort by: {cat.label}
+                  {cat.label}
                 </option>
               ))}
             </select>
@@ -281,49 +240,16 @@ export function StaffOptimizerTable({
                 onChange={(e) => setFreeAgentsOnly(e.target.checked)}
                 className="accent-emerald-400"
               />
-              Free Agents Only
+              Free Agent
             </label>
 
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".fm,.csv,.html,.htm"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void handleImportStaffFile(file);
-                e.target.value = "";
-              }}
-            />
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
               className="rounded-lg border border-emerald-500/40 bg-emerald-500/20 px-3 py-1.5 text-xs font-bold text-emerald-300 hover:bg-emerald-500/30 cursor-pointer"
             >
-              Unggah Save .fm / Staff CSV
+              {t("Pilih Save (.fm)", "Choose Save (.fm)")}
             </button>
-            {liveFmSave && (
-              <button
-                type="button"
-                onClick={() => setClubPickerOpen(true)}
-                className="rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-2.5 py-1.5 text-xs font-bold text-cyan-300 hover:bg-cyan-500/25 cursor-pointer"
-              >
-                Ganti Klub (
-                {liveFmSave.clubs.find((c) => c.uid === selectedClubUid)?.shortName ?? "Pilih"})
-              </button>
-            )}
-            {customStaff && (
-              <button
-                type="button"
-                onClick={() => {
-                  setCustomStaff(null);
-                  setSelectedPoolUids(clubStaff.slice(0, 12).map((s) => s.uid));
-                }}
-                className="rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs text-slate-300 cursor-pointer"
-              >
-                Reset Kustom
-              </button>
-            )}
           </div>
         </div>
 
@@ -337,12 +263,10 @@ export function StaffOptimizerTable({
             className="mt-4 rounded-xl border border-dashed border-slate-700 bg-[#0B0F19]/80 p-8 text-center space-y-3"
           >
             <p className="text-sm font-bold text-slate-100">
-              Belum Ada Data Staf Pelatih yang Dimuat (0% Data Sample)
-            </p>
-            <p className="mx-auto max-w-xl text-xs text-slate-400 leading-relaxed">
-              Unggah file save karier <code className="text-emerald-300">.fm</code> untuk memuat
-              jajaran pelatih klub Anda dan 200 pelatih/free agent terbaik langsung dari dunia
-              karier Anda, atau unggah ekspor <code className="text-cyan-300">Staff CSV / HTML</code>.
+              {t(
+                "Muat save karier (.fm) untuk melihat staf pelatih klub Anda & kandidat pelatih terbaik.",
+                "Load a career save (.fm) to inspect your club staff & top available coaches.",
+              )}
             </p>
             <div>
               <button
@@ -350,84 +274,78 @@ export function StaffOptimizerTable({
                 onClick={() => fileRef.current?.click()}
                 className="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-400 cursor-pointer"
               >
-                Unggah File Save .fm / Staff CSV
+                {t("Pilih File Save (.fm)", "Choose Save File (.fm)")}
               </button>
             </div>
           </div>
         ) : (
-        <div className="mt-3 max-h-96 overflow-y-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-slate-800 text-[11px] uppercase text-slate-400">
-                <th className="py-2 pr-2">Pool</th>
-                <th className="py-2 pr-3">Name</th>
-                <th className="py-2 pr-3">Preferred Role</th>
-                <th className="py-2 pr-3">Club</th>
-                <th className="py-2 pr-3">Est. Wage</th>
-                <th className="py-2 pr-3">DDM</th>
-                <th className="py-2 pr-3">Target Cat *</th>
-                <th className="py-2 text-right">Sliders</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/70">
-              {filteredDirectory.map(({ member, targetStars }) => {
-                const inPool = selectedPoolUids.includes(member.uid);
-                const ddm =
-                  member.attributes.determination +
-                  member.attributes.level_of_discipline +
-                  member.attributes.motivating;
+          <div className="mt-3 max-h-96 overflow-y-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-800 text-[11px] uppercase text-slate-400">
+                  <th className="py-2 pr-2">{t("Tim", "Pool")}</th>
+                  <th className="py-2 pr-3">{t("Nama", "Name")}</th>
+                  <th className="py-2 pr-3">{t("Jabatan", "Role")}</th>
+                  <th className="py-2 pr-3">{t("Klub", "Club")}</th>
+                  <th className="py-2 pr-3">{t("Gaji", "Est. Wage")}</th>
+                  <th className="py-2 pr-3">{t("Bintang", "Stars")}</th>
+                  <th className="py-2 text-right">{t("Cek", "Inspect")}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/70">
+                {filteredDirectory.map(({ member, targetStars }) => {
+                  const inPool = selectedPoolUids.includes(member.uid);
 
-                return (
-                  <tr key={member.uid} className="hover:bg-slate-800/40">
-                    <td className="py-2 pr-2">
-                      <input
-                        type="checkbox"
-                        checked={inPool}
-                        onChange={() => toggleCoachInPool(member.uid)}
-                        aria-label={`Include ${member.name} in coaching pool`}
-                        className="accent-emerald-400"
-                      />
-                    </td>
-                    <td className="py-2 pr-3 font-medium text-slate-100">
-                      {member.name}{" "}
-                      <span className="font-mono text-[11px] text-slate-500">
-                        ({member.age}yo · {member.nationality})
-                      </span>
-                    </td>
-                    <td className="py-2 pr-3 text-slate-300">
-                      {member.preferredRole}
-                    </td>
-                    <td className="py-2 pr-3">
-                      {member.isFreeAgent ? (
-                        <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[11px] font-medium text-emerald-300">
-                          Free Agent
+                  return (
+                    <tr key={member.uid} className="hover:bg-slate-800/40">
+                      <td className="py-2 pr-2">
+                        <input
+                          type="checkbox"
+                          checked={inPool}
+                          onChange={() => toggleCoachInPool(member.uid)}
+                          aria-label={member.name}
+                          className="accent-emerald-400"
+                        />
+                      </td>
+                      <td className="py-2 pr-3 font-medium text-slate-100">
+                        {member.name}{" "}
+                        <span className="font-mono text-[11px] text-slate-500">
+                          ({member.age} · {member.nationality})
                         </span>
-                      ) : (
-                        <span className="text-slate-300">{member.club}</span>
-                      )}
-                    </td>
-                    <td className="py-2 pr-3 font-mono text-slate-400">
-                      EUR {(member.wageEstimateEurWeekly / 1000).toFixed(1)}K/w
-                    </td>
-                    <td className="py-2 pr-3 font-mono text-cyan-300">{ddm}</td>
-                    <td className="py-2 pr-3 font-mono font-bold text-emerald-300">
-                      {targetStars.toFixed(1)} *
-                    </td>
-                    <td className="py-2 text-right">
-                      <button
-                        type="button"
-                        onClick={() => onInspectCoach(member)}
-                        className="rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-[11px] text-slate-200 hover:border-cyan-500/40 hover:text-cyan-300 cursor-pointer"
-                      >
-                        Load Sliders
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                      <td className="py-2 pr-3 text-slate-300">
+                        {member.preferredRole}
+                      </td>
+                      <td className="py-2 pr-3">
+                        {member.isFreeAgent ? (
+                          <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[11px] font-medium text-emerald-300">
+                            Free Agent
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">{member.club}</span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-3 font-mono text-slate-400">
+                        €{(member.wageEstimateEurWeekly / 1000).toFixed(1)}K/{t("mgg", "w")}
+                      </td>
+                      <td className="py-2 pr-3 font-mono font-bold text-emerald-300">
+                        {targetStars.toFixed(1)}★
+                      </td>
+                      <td className="py-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => onInspectCoach(member)}
+                          className="rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-[11px] text-slate-200 hover:border-cyan-500/40 hover:text-cyan-300 cursor-pointer"
+                        >
+                          {t("Lihat", "View")}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>

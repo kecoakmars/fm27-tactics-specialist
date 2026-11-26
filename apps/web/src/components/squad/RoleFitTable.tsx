@@ -6,6 +6,7 @@ import type {
   Player,
   SquadAuditResult,
 } from "@fm27/shared-types";
+import { useLocale } from "../../stores/useLocaleStore";
 
 interface RoleFitTableProps {
   audit: SquadAuditResult | null;
@@ -32,6 +33,7 @@ export function RoleFitTable({
   onToggleMustStart,
   onSetSlotLock,
 }: RoleFitTableProps) {
+  const { t } = useLocale();
   const catalog = getPitchCatalog(patchVersion);
   const lockByUid = new Map(lineupPreferences.map((lp) => [lp.playerUid, lp]));
   const weakSet = new Set(audit?.weakestThreeSlotIndices ?? []);
@@ -41,19 +43,19 @@ export function RoleFitTable({
       {audit && (
         <section className="rounded-xl border border-slate-800 bg-[#111827] p-4">
           <h3 className="text-sm font-semibold text-slate-100">
-            Active XI Role Fit Breakdown (11 Starters)
+            {t("Starting XI Aktif", "Active Starting XI")}
           </h3>
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-800 text-[11px] uppercase text-slate-400">
-                  <th className="py-2 pr-3">Slot</th>
-                  <th className="py-2 pr-3">Starter</th>
-                  <th className="py-2 pr-3">IP Role (Qual)</th>
-                  <th className="py-2 pr-3">OOP Role (Qual)</th>
-                  <th className="py-2 pr-3">Role Fit</th>
-                  <th className="py-2 pr-3">Better Role Option</th>
-                  <th className="py-2 text-right">Action</th>
+                  <th className="py-2 pr-3">{t("Posisi", "Position")}</th>
+                  <th className="py-2 pr-3">{t("Pemain", "Player")}</th>
+                  <th className="py-2 pr-3">{t("Peran IP", "IP Role")}</th>
+                  <th className="py-2 pr-3">{t("Peran OOP", "OOP Role")}</th>
+                  <th className="py-2 pr-3">{t("Kecocokan", "Fit")}</th>
+                  <th className="py-2 pr-3">{t("Saran Peran", "Role Suggestion")}</th>
+                  <th className="py-2 text-right">{t("Opsi", "Options")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/70">
@@ -72,18 +74,8 @@ export function RoleFitTable({
                       <td className="py-2 pr-3 font-medium text-slate-100">
                         {row.playerName}
                       </td>
-                      <td className="py-2 pr-3 text-slate-300">
-                        {row.inRoleId}{" "}
-                        <span className="font-mono text-cyan-400">
-                          ({row.inRoleQuality.toFixed(1)})
-                        </span>
-                      </td>
-                      <td className="py-2 pr-3 text-slate-300">
-                        {row.outRoleId}{" "}
-                        <span className="font-mono text-amber-400">
-                          ({row.outRoleQuality.toFixed(1)})
-                        </span>
-                      </td>
+                      <td className="py-2 pr-3 text-slate-300">{row.inRoleId}</td>
+                      <td className="py-2 pr-3 text-slate-300">{row.outRoleId}</td>
                       <td className="py-2 pr-3 font-mono font-semibold">
                         <span
                           className={
@@ -94,7 +86,7 @@ export function RoleFitTable({
                                 : "text-rose-300"
                           }
                         >
-                          {row.fitScore.toFixed(1)}
+                          {row.fitScore.toFixed(0)}
                         </span>
                       </td>
                       <td className="py-2 pr-3">
@@ -108,22 +100,24 @@ export function RoleFitTable({
                                 bestAlt.roleId,
                               )
                             }
-                            className="rounded border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[11px] text-cyan-300 hover:bg-cyan-500/20"
+                            className="rounded border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[11px] text-cyan-300 hover:bg-cyan-500/20 cursor-pointer"
                           >
-                            Switch {bestAlt.phase} {"->"} {bestAlt.roleId} (
-                            {bestAlt.projectedFit.toFixed(1)})
+                            {bestAlt.phase} → {bestAlt.roleId} (
+                            {bestAlt.projectedFit.toFixed(0)})
                           </button>
                         ) : (
-                          <span className="text-slate-500">Optimal role</span>
+                          <span className="text-slate-500">
+                            {t("Sudah pas", "Optimal")}
+                          </span>
                         )}
                       </td>
                       <td className="py-2 text-right">
                         <button
                           type="button"
                           onClick={() => onInspectSlot(row.slotIndex)}
-                          className="rounded border border-slate-700 bg-slate-900 px-2.5 py-1 text-[11px] text-slate-200 hover:border-emerald-500/50 hover:text-emerald-300"
+                          className="rounded border border-slate-700 bg-slate-900 px-2.5 py-1 text-[11px] text-slate-200 hover:border-emerald-500/50 hover:text-emerald-300 cursor-pointer"
                         >
-                          Replace ({row.betterInternalReplacements.length})
+                          {t("Ganti", "Replace")} ({row.betterInternalReplacements.length})
                         </button>
                       </td>
                     </tr>
@@ -137,17 +131,12 @@ export function RoleFitTable({
 
       <section className="rounded-xl border border-slate-800 bg-[#111827] p-4">
         <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-100">
-              Full Squad Pool &amp; Lineup Locks ({players.length} Players)
-            </h3>
-            <p className="text-xs text-slate-400">
-              Locked starters receive <code className="font-mono text-emerald-300">+10000</code>{" "}
-              weight in the Hungarian assignment solver.
-            </p>
-          </div>
+          <h3 className="text-sm font-semibold text-slate-100">
+            {t("Daftar Pemain", "Squad List")} ({players.length})
+          </h3>
           <span className="font-mono text-xs text-emerald-300">
-            Locked: {lineupPreferences.filter((l) => l.mustStart).length} / 11
+            {t("Wajib Starter:", "Locked Starters:")}{" "}
+            {lineupPreferences.filter((l) => l.mustStart).length} / 11
           </span>
         </div>
 
@@ -155,12 +144,12 @@ export function RoleFitTable({
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-slate-800 text-[11px] uppercase text-slate-400">
-                <th className="py-1.5 pr-2">Lock</th>
-                <th className="py-1.5 pr-2">Player</th>
-                <th className="py-1.5 pr-2">Age</th>
-                <th className="py-1.5 pr-2">Natural Positions</th>
-                <th className="py-1.5 pr-2">Lock IP Slot</th>
-                <th className="py-1.5">Lock OOP Slot</th>
+                <th className="py-1.5 pr-2">{t("Kunci XI", "Lock XI")}</th>
+                <th className="py-1.5 pr-2">{t("Pemain", "Player")}</th>
+                <th className="py-1.5 pr-2">{t("Usia", "Age")}</th>
+                <th className="py-1.5 pr-2">{t("Posisi Alami", "Positions")}</th>
+                <th className="py-1.5 pr-2">{t("Posisi IP", "IP Position")}</th>
+                <th className="py-1.5">{t("Posisi OOP", "OOP Position")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
@@ -178,7 +167,7 @@ export function RoleFitTable({
                         type="checkbox"
                         checked={Boolean(pref?.mustStart)}
                         onChange={() => onToggleMustStart(p.uid)}
-                        aria-label={`Lock ${p.name} as starter`}
+                        aria-label={`Lock ${p.name}`}
                         className="h-3.5 w-3.5 accent-emerald-500"
                       />
                     </td>
@@ -212,7 +201,7 @@ export function RoleFitTable({
                         onChange={(e) => onSetSlotLock(p.uid, "ip", e.target.value)}
                         className="rounded border border-slate-700 bg-[#0B0F19] px-1.5 py-0.5 text-[11px] text-slate-200"
                       >
-                        <option value="">Any IP</option>
+                        <option value="">{t("Bebas", "Any")}</option>
                         {catalog.Positions.map((pos) => (
                           <option key={pos.Id} value={pos.Id}>
                             {pos.Id}
@@ -226,7 +215,7 @@ export function RoleFitTable({
                         onChange={(e) => onSetSlotLock(p.uid, "oop", e.target.value)}
                         className="rounded border border-slate-700 bg-[#0B0F19] px-1.5 py-0.5 text-[11px] text-slate-200"
                       >
-                        <option value="">Any OOP</option>
+                        <option value="">{t("Bebas", "Any")}</option>
                         {catalog.Positions.map((pos) => (
                           <option key={pos.Id} value={pos.Id}>
                             {pos.Id}

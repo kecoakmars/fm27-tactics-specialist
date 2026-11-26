@@ -1,11 +1,13 @@
 "use client";
 
 import type { LoadMetrics } from "@fm27/shared-types";
+import { useLocale } from "../../stores/useLocaleStore";
 
 export function LoadMeterBar({ metrics }: { metrics: LoadMetrics }) {
+  const { t } = useLocale();
   const meters = [
     {
-      label: "Condition Delta",
+      label: t("Kondisi Fisik", "Condition"),
       val: `${metrics.conditionDelta >= 0 ? "+" : ""}${metrics.conditionDelta}`,
       pct: Math.min(100, Math.max(8, 55 + metrics.conditionDelta * 1.4)),
       tone:
@@ -14,7 +16,7 @@ export function LoadMeterBar({ metrics }: { metrics: LoadMetrics }) {
           : "bg-amber-500 text-amber-300",
     },
     {
-      label: "Weekly Fatigue",
+      label: t("Kelelahan", "Fatigue"),
       val: `${metrics.fatigueDelta >= 0 ? "+" : ""}${metrics.fatigueDelta}`,
       pct: Math.min(100, Math.max(5, 25 + metrics.fatigueDelta * 1.6)),
       tone:
@@ -23,8 +25,8 @@ export function LoadMeterBar({ metrics }: { metrics: LoadMetrics }) {
           : "bg-rose-500 text-rose-300",
     },
     {
-      label: "Injury Risk",
-      val: `${metrics.injuryRiskScore.toFixed(1)}`,
+      label: t("Risiko Cedera", "Injury Risk"),
+      val: `${metrics.injuryRiskScore.toFixed(0)}`,
       pct: Math.min(100, Math.max(5, metrics.injuryRiskScore * 2.2)),
       tone:
         metrics.injuryRiskScore <= 26
@@ -34,13 +36,13 @@ export function LoadMeterBar({ metrics }: { metrics: LoadMetrics }) {
             : "bg-rose-500 text-rose-300",
     },
     {
-      label: "Match Sharpness",
+      label: t("Ketajaman Laga", "Match Sharpness"),
       val: `${metrics.sharpnessDelta >= 0 ? "+" : ""}${metrics.sharpnessDelta}`,
       pct: Math.min(100, Math.max(8, 35 + metrics.sharpnessDelta * 1.8)),
       tone: "bg-cyan-500 text-cyan-300",
     },
     {
-      label: "Squad Happiness",
+      label: t("Moral Tim", "Squad Morale"),
       val: `${metrics.happinessDelta >= 0 ? "+" : ""}${metrics.happinessDelta}`,
       pct: Math.min(100, Math.max(8, 50 + metrics.happinessDelta * 2.5)),
       tone:
@@ -79,11 +81,11 @@ export function LoadMeterBar({ metrics }: { metrics: LoadMetrics }) {
 
       {metrics.violations.length > 0 && (
         <div className="mt-3 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3.5 py-2 text-xs text-rose-200">
-          <strong>Session Limit Exceeded: </strong>
+          <strong>{t("Melebihi Batas Mingguan: ", "Weekly Limit Exceeded: ")}</strong>
           {metrics.violations.map((v, i) => (
             <span key={v.code} className="font-mono">
               {i > 0 ? " · " : ""}
-              {v.code} ({v.count}x / max {v.maxAllowed}x per week)
+              {v.code} ({v.count}x / {t("maks", "max")} {v.maxAllowed}x)
             </span>
           ))}
         </div>

@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo } from "react";
+import { useLocale } from "../../stores/useLocaleStore";
 import { useTacticStore } from "../../stores/useTacticStore";
 import { useTrainingStore } from "../../stores/useTrainingStore";
 
 export function TrendingStrip({ patchVersion }: { patchVersion: string }) {
   void patchVersion;
+  const { t } = useLocale();
   const worldWonderkids = useTacticStore((s) => s.worldWonderkids);
   const clubPlayers = useTacticStore((s) => s.clubPlayers);
   const shortlistUids = useTrainingStore((s) => s.shortlistUids);
@@ -38,8 +40,10 @@ export function TrendingStrip({ patchVersion }: { patchVersion: string }) {
   if (items.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-700 bg-[#111827]/70 p-6 text-center text-xs text-slate-400">
-        Unggah file save karier <code className="text-emerald-300">.fm</code> untuk melihat daftar
-        Top Prospek U-21 asli dari dunia karier Anda.
+        {t(
+          "Muat save karier (.fm) untuk melihat prospek U-21 terbaik.",
+          "Load a career save (.fm) to view top U-21 prospects.",
+        )}
       </div>
     );
   }
@@ -63,14 +67,14 @@ export function TrendingStrip({ patchVersion }: { patchVersion: string }) {
                 </span>
               </div>
               <div className="mt-1 text-xs text-slate-400">
-                {entry.wonderkid.age}yo · {entry.wonderkid.club} ({entry.wonderkid.nationality}) ·{" "}
+                {entry.wonderkid.age} · {entry.wonderkid.club} ({entry.wonderkid.nationality}) ·{" "}
                 <span className="font-mono text-cyan-300">
                   {entry.wonderkid.positions.join("/")}
                 </span>
               </div>
               <div className="mt-1 font-mono text-[11px] text-slate-500">
                 CA <strong className="text-emerald-300">{entry.wonderkid.currentAbilityEstimate}</strong> · PA{" "}
-                <strong className="text-cyan-300">{entry.wonderkid.paRange}</strong> · Est. EUR{" "}
+                <strong className="text-cyan-300">{entry.wonderkid.paRange}</strong> · €
                 {entry.wonderkid.estimatedPriceEurM.toFixed(1)}M
               </div>
             </div>
@@ -84,7 +88,7 @@ export function TrendingStrip({ patchVersion }: { patchVersion: string }) {
                   : "border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
               }`}
             >
-              {inShortlist ? "Saved" : "+ Shortlist"}
+              {inShortlist ? "✓ Shortlist" : "+ Shortlist"}
             </button>
           </div>
         );

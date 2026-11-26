@@ -13,11 +13,13 @@ import {
   auditSquadInWorker,
   gradeImportedTacticInWorker,
 } from "../../lib/worker-client";
+import { useLocale } from "../../stores/useLocaleStore";
 import { useSquadStore } from "../../stores/useSquadStore";
 import { useTacticStore } from "../../stores/useTacticStore";
 
 export default function SquadAuditPage() {
   const router = useRouter();
+  const { t } = useLocale();
   const tactic = useTacticStore((s) => s.tactic);
   const loadTactic = useTacticStore((s) => s.loadTactic);
   const setSlotRole = useTacticStore((s) => s.setSlotRole);
@@ -76,7 +78,6 @@ export default function SquadAuditPage() {
     return ftU21.length >= 11 ? ftU21 : players;
   }, [hasTeamSlots, players, squadTierFilter]);
 
-  // Auto-run Audit Active Tactic + initial 13x16 recommendations whenever active squad slice updates
   useEffect(() => {
     if (activePlayers.length < 11) {
       setAuditResult(null);
@@ -97,14 +98,18 @@ export default function SquadAuditPage() {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Squad audit failed");
+          setError(
+            err instanceof Error
+              ? err.message
+              : t("Gagal menganalisis skuad", "Squad check failed"),
+          );
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [activePlayers, tactic, setAuditResult, setError]);
+  }, [activePlayers, tactic, setAuditResult, setError, t]);
 
   useEffect(() => {
     if (activePlayers.length < 11 || generatedPlans.length > 0) return;
@@ -121,7 +126,7 @@ export default function SquadAuditPage() {
           setGeneratedPlans(plans);
         }
       } catch {
-        // Non-fatal if squad lacks a GK
+        // Ignore if squad lacks GK
       }
     })();
     return () => {
@@ -150,7 +155,11 @@ export default function SquadAuditPage() {
       });
       setGeneratedPlans(plans);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Hungarian solver failed");
+      setError(
+        err instanceof Error
+          ? err.message
+          : t("Gagal menyusun rekomendasi formasi", "Could not generate tactics"),
+      );
     } finally {
       setBusy(false);
     }
@@ -171,36 +180,30 @@ export default function SquadAuditPage() {
   return (
     <main className="mx-auto max-w-[1600px] space-y-5 px-4 py-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+        <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-xl font-bold text-slate-100">
-            Squad Audit &amp; Hungarian Tactic Generator
+            {t("Skuad & Rekomendasi Taktik", "Squad & Tactic Finder")}
           </h1>
-          <p className="text-xs text-slate-400">
-            Active Board Tactic:{" "}
-            <span className="font-semibold text-cyan-300">{tactic.title}</span> (IP{" "}
+          <span className="rounded-lg border border-white/10 bg-[#111827] px-2.5 py-1 text-xs text-slate-300">
+            <strong className="text-cyan-300">{tactic.title}</strong> (IP{" "}
             {tactic.inFormation} / OOP {tactic.outFormation})
-          </p>
+          </span>
         </div>
 
         {gradedCurrent && (
           <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-[#111827] px-3.5 py-2">
-            <div className="text-xs">
-              <span className="text-slate-400">Active RankingFit: </span>
-              <span className="font-mono font-bold text-emerald-300">
-                {gradedCurrent.rankingFit.toFixed(2)}
-              </span>
-              <span className="ml-2 text-slate-500">
-                (Cover {gradedCurrent.coverFit.toFixed(1)} · CoachAdj{" "}
-                {gradedCurrent.coachingAdjustment >= 0 ? "+" : ""}
-                {gradedCurrent.coachingAdjustment.toFixed(2)})
-              </span>
-            </div>
+            <span className="text-xs text-slate-300">
+              {t("Kecocokan Taktik:", "Tactic Fit:")}{" "}
+              <strong className="font-mono text-emerald-300">
+                {gradedCurrent.rankingFit.toFixed(0)}
+              </strong>
+            </span>
             <button
               type="button"
               onClick={() => loadTactic(gradedCurrent.tactic)}
-              className="rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-500/25"
+              className="rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-500/25 cursor-pointer"
             >
-              Apply Auto-Improved Roles/TI
+              {t("Optimalkan Peran", "Optimize Roles")}
             </button>
           </div>
         )}
@@ -210,18 +213,15 @@ export default function SquadAuditPage() {
 
       {hasTeamSlots && (
         <section className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-800 bg-[#111827] px-4 py-2.5">
-          <div className="text-xs text-slate-300">
-            <span className="font-semibold text-slate-100">Filter Tim Klub (.fm):</span>{" "}
-            <span className="text-slate-400">
-              Pisahkan pemain Tim Utama dari U21/U18 agar audit &amp; solver lebih akurat.
-            </span>
-          </div>
+          <span className="text-xs font-semibold text-slate-200">
+            {t("Kelompok Skuad", "Squad Group")}
+          </span>
           <div className="flex items-center gap-1 rounded-lg border border-slate-800 bg-[#0B0F19] p-1 text-xs">
             {(
               [
-                ["first-team", `First Team (${firstTeamCount})`],
-                ["first-and-u21", `First Team + U21 (${firstAndU21Count})`],
-                ["all", `Semua Klub (${players.length})`],
+                ["first-team", `${t("Tim Utama", "First Team")} (${firstTeamCount})`],
+                ["first-and-u21", `${t("Tim Utama + U21", "First Team + U21")} (${firstAndU21Count})`],
+                ["all", `${t("Semua Pemain", "All Players")} (${players.length})`],
               ] as const
             ).map(([key, label]) => (
               <button
@@ -253,14 +253,11 @@ export default function SquadAuditPage() {
           className="rounded-xl border border-dashed border-slate-700 bg-[#111827]/70 p-8 text-center"
         >
           <h2 className="text-sm font-bold text-slate-200">
-            Belum Ada Data Skuad Klub yang Dimuat
+            {t(
+              "Muat save karier (.fm) untuk melihat starting XI terbaik & rekomendasi formasi.",
+              "Load a career save (.fm) to see your best XI & recommended formations.",
+            )}
           </h2>
-          <p className="mx-auto mt-1.5 max-w-xl text-xs text-slate-400 leading-relaxed">
-            Unggah file save karier <code className="text-emerald-300">.fm</code> (diproses 100%
-            lokal di Web Worker browser tanpa unggah server) atau file ekspor{" "}
-            <code className="text-cyan-300">CSV / HTML</code> di atas untuk membuka Audit Starter
-            XI, 3 Posisi Terlemah, dan Hungarian 13×16 Tactic Generator tanpa data sampel buatan.
-          </p>
         </section>
       )}
 
@@ -270,15 +267,15 @@ export default function SquadAuditPage() {
             <div className="flex flex-wrap items-end gap-3">
               <div>
                 <label className="block text-[11px] text-slate-400">
-                  Target Style (13 Presets or All)
+                  {t("Gaya Bermain", "Tactical Style")}
                 </label>
                 <select
                   value={styleFilter}
                   onChange={(e) => setStyleFilter(e.target.value)}
                   className="mt-1 rounded-lg border border-slate-700 bg-[#0B0F19] px-2.5 py-1.5 text-xs text-slate-100"
                 >
-                  <option value="">All 13 Styles x 16 Dual-Shapes</option>
-                  <option value="__auto__">Auto Murni (8 Dual-Shapes)</option>
+                  <option value="">{t("Semua Gaya Bermain", "All Tactical Styles")}</option>
+                  <option value="__auto__">{t("Otomatis", "Automatic")}</option>
                   {stylesCatalog.TacticalStyles.map((st) => (
                     <option key={st.Id} value={st.Id}>
                       {st.Name}
@@ -289,7 +286,7 @@ export default function SquadAuditPage() {
 
               <div>
                 <label className="block text-[11px] text-slate-400">
-                  Tactical Objective
+                  {t("Pendekatan Laga", "Match Approach")}
                 </label>
                 <select
                   value={priorities.objective}
@@ -304,16 +301,16 @@ export default function SquadAuditPage() {
                   }
                   className="mt-1 rounded-lg border border-slate-700 bg-[#0B0F19] px-2.5 py-1.5 text-xs text-slate-100"
                 >
-                  <option value="Balanced">Balanced</option>
-                  <option value="WinNow">Win Now (Aggressive)</option>
-                  <option value="ProtectLead">Protect Lead (Compact)</option>
-                  <option value="Underdog">Underdog (Counter Resilience)</option>
+                  <option value="Balanced">{t("Seimbang", "Balanced")}</option>
+                  <option value="WinNow">{t("Menyerang Penuh", "Attacking")}</option>
+                  <option value="ProtectLead">{t("Amankan Keunggulan", "Protect Lead")}</option>
+                  <option value="Underdog">{t("Tim Underdog", "Underdog")}</option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-[11px] text-slate-400">
-                  Risk Offset ({priorities.riskOffset >= 0 ? "+" : ""}
+                  {t("Keberanian Risiko", "Risk Level")} ({priorities.riskOffset >= 0 ? "+" : ""}
                   {priorities.riskOffset})
                 </label>
                 <input
@@ -332,11 +329,11 @@ export default function SquadAuditPage() {
               type="button"
               disabled={isBusy}
               onClick={() => void handleAutoGenerateBestTactics()}
-              className="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-50"
+              className="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-50 cursor-pointer"
             >
               {isBusy
-                ? "Solving Hungarian Matrix..."
-                : "Auto-Generate Best Tactic (Hungarian Solver)"}
+                ? t("Menyusun Formasi...", "Finding Best Tactics...")
+                : t("Cari Formasi Terbaik", "Find Best Tactics")}
             </button>
           </div>
 
@@ -350,31 +347,22 @@ export default function SquadAuditPage() {
                   <div>
                     <div className="flex items-center justify-between gap-2">
                       <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 font-mono text-[11px] font-bold text-emerald-300">
-                        Rank #{idx + 1} · {plan.rankingFit.toFixed(2)}
+                        #{idx + 1} · {t("Skor", "Fit")} {plan.rankingFit.toFixed(0)}
                       </span>
-                      {plan.nearTieWithNext && (
-                        <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
-                          Near-Tie (&lt;0.1)
-                        </span>
-                      )}
                     </div>
                     <div className="mt-1.5 text-sm font-semibold text-slate-100">
                       {plan.tactic.title}
                     </div>
                     <div className="mt-0.5 font-mono text-[11px] text-slate-400">
-                      IP {plan.tactic.inFormation} {"->"} OOP {plan.tactic.outFormation}
-                    </div>
-                    <div className="mt-1 font-mono text-[11px] text-slate-500">
-                      StartFit {plan.startingFit.toFixed(1)} · Cover{" "}
-                      {plan.coverFit.toFixed(1)} · Pen -{plan.instructionPenalty.toFixed(2)}
+                      IP {plan.tactic.inFormation} → OOP {plan.tactic.outFormation}
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => handleLoadPlanToBoard(plan)}
-                    className="mt-3 w-full rounded-md border border-cyan-500/40 bg-cyan-500/15 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/25"
+                    className="mt-3 w-full rounded-md border border-cyan-500/40 bg-cyan-500/15 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/25 cursor-pointer"
                   >
-                    Load to Pitch Board {"->"}
+                    {t("Buka di Papan Taktik →", "Open on Tactics Board →")}
                   </button>
                 </div>
               ))}

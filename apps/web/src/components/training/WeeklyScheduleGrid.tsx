@@ -2,6 +2,7 @@
 
 import { getTrainingSessions } from "@fm27/fm-data";
 import type { LoadMetrics, WeeklySchedule } from "@fm27/shared-types";
+import { useLocale } from "../../stores/useLocaleStore";
 import type { SlotColumnKey } from "../../stores/useTrainingStore";
 
 interface WeeklyScheduleGridProps {
@@ -17,12 +18,6 @@ interface WeeklyScheduleGridProps {
     toSlot: SlotColumnKey,
   ) => void;
 }
-
-const SLOT_COLUMNS: Array<{ key: SlotColumnKey; label: string }> = [
-  { key: "s1", label: "Session 1 (Morning)" },
-  { key: "s2", label: "Session 2 (Afternoon)" },
-  { key: "extra", label: "Extra Slot" },
-];
 
 const CATEGORY_BADGE: Record<string, string> = {
   attacking: "border-cyan-500/40 bg-cyan-500/10 text-cyan-200",
@@ -45,38 +40,37 @@ export function WeeklyScheduleGrid({
   onAssignSlot,
   onSwapSlots,
 }: WeeklyScheduleGridProps) {
+  const { t } = useLocale();
   const catalog = getTrainingSessions(patchVersion);
   const byCode = new Map(catalog.Sessions.map((s) => [s.code, s]));
   const violatedSet = new Set(metrics.violations.map((v) => v.code));
 
+  const slotColumns: Array<{ key: SlotColumnKey; label: string }> = [
+    { key: "s1", label: t("Sesi 1 (Pagi)", "Session 1 (Morning)") },
+    { key: "s2", label: t("Sesi 2 (Sore)", "Session 2 (Afternoon)") },
+    { key: "extra", label: t("Sesi Tambahan", "Extra") },
+  ];
+
+  const activeBrushName = activeBrushCode ? byCode.get(activeBrushCode)?.name : null;
+
   return (
     <div className="rounded-xl border border-slate-800 bg-[#111827] p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-semibold text-slate-100">
-            Interactive 7 Days x 3 Slots Schedule Grid
-          </h3>
-          <p className="text-xs text-slate-400">
-            {activeBrushCode ? (
-              <>
-                Paint Brush Active:{" "}
-                <strong className="font-mono text-emerald-300">
-                  {activeBrushCode}
-                </strong>{" "}
-                (click any slot to apply)
-              </>
-            ) : (
-              "Drag cells to swap sessions, drop from palette, or change any dropdown directly."
-            )}
-          </p>
-        </div>
+        <h3 className="text-sm font-semibold text-slate-100">
+          {t("Kalender Mingguan", "Weekly Calendar")}
+        </h3>
+        {activeBrushName && (
+          <span className="rounded bg-emerald-500/15 border border-emerald-500/35 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">
+            {t("Dipilih:", "Selected:")} {activeBrushName}
+          </span>
+        )}
       </div>
 
       <div className="mt-3 overflow-x-auto">
         <div className="min-w-[680px] space-y-2">
           <div className="grid grid-cols-[72px_1fr_1fr_1fr] gap-2 px-1 text-[11px] font-semibold uppercase text-slate-400">
-            <div>Day</div>
-            {SLOT_COLUMNS.map((col) => (
+            <div>{t("Hari", "Day")}</div>
+            {slotColumns.map((col) => (
               <div key={col.key}>{col.label}</div>
             ))}
           </div>
@@ -90,7 +84,7 @@ export function WeeklyScheduleGrid({
                 {dayRow.day}
               </div>
 
-              {SLOT_COLUMNS.map((col) => {
+              {slotColumns.map((col) => {
                 const code = dayRow[col.key];
                 const session = byCode.get(code);
                 const catStyle =
@@ -163,15 +157,6 @@ export function WeeklyScheduleGrid({
                         </option>
                       ))}
                     </select>
-                    {session && (
-                      <div className="mt-1 flex items-center justify-between font-mono text-[10px] text-slate-400">
-                        <span>{session.category}</span>
-                        <span>
-                          Cond {session.impact.condition >= 0 ? "+" : ""}
-                          {session.impact.condition}
-                        </span>
-                      </div>
-                    )}
                   </div>
                 );
               })}

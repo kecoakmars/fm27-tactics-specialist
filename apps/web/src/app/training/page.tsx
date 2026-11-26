@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { exportScheduleJson } from "@fm27/fm-codec";
 import { getTrainingPresets } from "@fm27/fm-data";
 import { LoadMeterBar } from "../../components/training/LoadMeterBar";
 import { SessionPalette } from "../../components/training/SessionPalette";
@@ -13,6 +12,7 @@ import {
 } from "../../lib/local-folder-sync";
 import { exportScheduleFmfInWorker } from "../../lib/worker-client";
 import { useFolderSyncStore } from "../../stores/useFolderSyncStore";
+import { useLocale } from "../../stores/useLocaleStore";
 import { useTacticStore } from "../../stores/useTacticStore";
 import { useTrainingStore } from "../../stores/useTrainingStore";
 
@@ -20,6 +20,7 @@ export default function TrainingPage() {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [activeBrushCode, setActiveBrushCode] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const { t } = useLocale();
 
   const tactic = useTacticStore((s) => s.tactic);
   const refreshUnifiedReport = useTacticStore((s) => s.refreshUnifiedReport);
@@ -46,20 +47,13 @@ export default function TrainingPage() {
     const bytes = await exportScheduleFmfInWorker(schedule);
     const fileName = sanitizeFileName(schedule.name, ".fmf");
     triggerBrowserDownload(fileName, bytes);
-    setStatusMsg(`Downloaded ${fileName}`);
+    setStatusMsg(t(`${fileName} diunduh`, `Downloaded ${fileName}`));
   }
 
   async function handleSaveFolderFmf() {
     const bytes = await exportScheduleFmfInWorker(schedule);
     const saved = await saveScheduleFmfDirect(schedule.name, bytes);
-    setStatusMsg(`Synced to ${saved}`);
-  }
-
-  function handleExportJson() {
-    const json = exportScheduleJson(schedule);
-    const fileName = sanitizeFileName(schedule.name, ".fm27-schedule.json");
-    triggerBrowserDownload(fileName, json, "application/json");
-    setStatusMsg(`Exported ${fileName}`);
+    setStatusMsg(t(`Tersimpan ke ${saved}`, `Saved to ${saved}`));
   }
 
   async function handleImportFile(file: File) {
@@ -68,7 +62,9 @@ export default function TrainingPage() {
       setStatusMsg(res.message);
     } catch (err) {
       setStatusMsg(
-        err instanceof Error ? err.message : "Failed to import schedule",
+        err instanceof Error
+          ? err.message
+          : t("Gagal membuka jadwal latihan", "Failed to open schedule"),
       );
     }
   }
@@ -77,35 +73,33 @@ export default function TrainingPage() {
     refreshUnifiedReport();
     const ok = pushTrainingPlanToStore();
     if (ok) {
-      setStatusMsg(`Jadwal latihan disinkronkan ke taktik aktif "${tactic.title}"`);
+      setStatusMsg(
+        t(
+          `Disesuaikan dengan taktik "${tactic.title}"`,
+          `Synced with tactic "${tactic.title}"`,
+        ),
+      );
     }
   }
 
   return (
     <main className="mx-auto max-w-[1600px] space-y-5 px-4 py-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-100">
-              Adaptive Training Recommender &amp; 7x3 Weekly Schedule Builder
-            </h1>
-            <span
-              className={`rounded px-2 py-0.5 text-[10px] font-bold ${
-                syncedTacticTitle && !isManuallyEdited
-                  ? "border border-emerald-500/40 bg-emerald-500/20 text-emerald-300"
-                  : "border border-cyan-500/40 bg-cyan-500/15 text-cyan-300"
-              }`}
-            >
-              {syncedTacticTitle && !isManuallyEdited
-                ? `Tersinkron: ${syncedTacticTitle}`
-                : `Taktik Aktif: ${tactic.title}`}
-            </span>
-          </div>
-          <p className="text-xs text-slate-400">
-            Presets calibrated to <code className="text-cyan-300">fm-scoring</code>{" "}
-            FM27 attribute progression &amp; binary <code className="text-emerald-300">.tsc / .fmf</code>{" "}
-            export.
-          </p>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h1 className="text-xl font-bold text-slate-100">
+            {t("Jadwal Latihan", "Training Schedule")}
+          </h1>
+          <span
+            className={`rounded px-2 py-0.5 text-[11px] font-bold ${
+              syncedTacticTitle && !isManuallyEdited
+                ? "border border-emerald-500/40 bg-emerald-500/20 text-emerald-300"
+                : "border border-cyan-500/40 bg-cyan-500/15 text-cyan-300"
+            }`}
+          >
+            {syncedTacticTitle && !isManuallyEdited
+              ? `${syncedTacticTitle}`
+              : `${tactic.title}`}
+          </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -114,12 +108,12 @@ export default function TrainingPage() {
             onClick={handleResyncFromActiveTactic}
             className="rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-3 py-1.5 text-xs font-bold text-cyan-300 hover:bg-cyan-500/25 cursor-pointer"
           >
-            Sinkronkan dari Taktik Aktif
+            {t("Sesuaikan Taktik Aktif", "Match Active Tactic")}
           </button>
           <input
             ref={fileRef}
             type="file"
-            accept=".fmf,.json"
+            accept=".fmf"
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -130,32 +124,25 @@ export default function TrainingPage() {
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs text-slate-200 hover:border-cyan-500/40"
+            className="rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs text-slate-200 hover:border-cyan-500/40 cursor-pointer"
           >
-            Import .fmf / JSON
-          </button>
-          <button
-            type="button"
-            onClick={handleExportJson}
-            className="rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs text-slate-200 hover:border-emerald-500/40"
-          >
-            Export .json
+            {t("Muat Jadwal (.fmf)", "Load Schedule (.fmf)")}
           </button>
           {folderStatus === "connected" && (
             <button
               type="button"
               onClick={() => void handleSaveFolderFmf()}
-              className="rounded-lg border border-emerald-500/40 bg-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/30"
+              className="rounded-lg border border-emerald-500/40 bg-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/30 cursor-pointer"
             >
-              Save to /schedules/
+              {t("Simpan ke FM27", "Save to FM27")}
             </button>
           )}
           <button
             type="button"
             onClick={() => void handleExportFmf()}
-            className="rounded-lg bg-emerald-500 px-3.5 py-1.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400"
+            className="rounded-lg bg-emerald-500 px-3.5 py-1.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400 cursor-pointer"
           >
-            Export .fmf Schedule
+            {t("Unduh Jadwal (.fmf)", "Download Schedule (.fmf)")}
           </button>
         </div>
       </div>
@@ -165,7 +152,7 @@ export default function TrainingPage() {
           <div className="flex flex-wrap items-end gap-3">
             <div>
               <label className="block text-[11px] text-slate-400">
-                Schedule Name
+                {t("Nama Jadwal", "Schedule Name")}
               </label>
               <input
                 type="text"
@@ -183,7 +170,7 @@ export default function TrainingPage() {
                     key={preset.id}
                     type="button"
                     onClick={() => applyPreset(preset.id, patchVersion)}
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition cursor-pointer ${
                       active
                         ? "border-emerald-500/50 bg-emerald-500/20 text-emerald-300"
                         : "border-slate-700 bg-[#0B0F19] text-slate-300 hover:border-cyan-500/40"

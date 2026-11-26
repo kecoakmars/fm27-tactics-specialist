@@ -5,12 +5,10 @@ import { useStore } from "zustand";
 import {
   decodeTacticFromUrlHash,
   encodeTacticToUrlHash,
-  exportFm27Json,
   exportFmf,
 } from "@fm27/fm-codec";
 import { getPitchCatalog, getTacticalStyles } from "@fm27/fm-data";
 import { computeTacticalBalance } from "@fm27/fm-engine";
-import { AiAdvisorDrawer } from "@/components/analytics/AiAdvisorDrawer";
 import { BalanceRadar } from "@/components/analytics/BalanceRadar";
 import { CoachingFindingsList } from "@/components/analytics/CoachingFindingsList";
 import {
@@ -31,11 +29,14 @@ import {
 import { sanitizeFileName, triggerBrowserDownload } from "@/lib/local-folder-sync";
 import { exportDualPhasePngCard } from "@/lib/svg-card-exporter";
 import { useFolderSyncStore } from "@/stores/useFolderSyncStore";
+import { useLocale } from "@/stores/useLocaleStore";
 import { useTacticStore } from "@/stores/useTacticStore";
 
 export default function TacticalBoardWorkspacePage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { t } = useLocale();
+
   const {
     tactic,
     unifiedReport,
@@ -49,10 +50,7 @@ export default function TacticalBoardWorkspacePage() {
     applyPresetStyle,
     applyDualShape,
     loadTactic,
-    setClubPickerOpen,
     clubPlayers,
-    liveFmSave,
-    selectedClubUid,
     refreshUnifiedReport,
   } = useTacticStore();
 
@@ -72,7 +70,6 @@ export default function TacticalBoardWorkspacePage() {
   } = useFolderSyncStore();
 
   const [heatmapMode, setHeatmapMode] = useState<HeatmapOverlayMode>("off");
-  const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [inspectorTab, setInspectorTab] = useState<"instructions" | "analytics">("analytics");
   const [toast, setToast] = useState<{
     tone: "ok" | "error";
@@ -146,18 +143,26 @@ export default function TacticalBoardWorkspacePage() {
       try {
         const decoded = decodeTacticFromUrlHash(hash);
         loadTactic(decoded, { fromUserTactic: true });
-        notify("ok", `Loaded shared tactic "${decoded.title}" from URL`);
+        notify(
+          "ok",
+          t(
+            `Taktik "${decoded.title}" dimuat dari tautan`,
+            `Loaded shared tactic "${decoded.title}"`,
+          ),
+        );
       } catch (err) {
         notify(
           "error",
-          err instanceof Error ? err.message : "Failed to decode shared tactic link",
+          err instanceof Error
+            ? err.message
+            : t("Tautan taktik tidak valid", "Invalid shared tactic link"),
         );
       }
     };
     tryHydrateFromHash();
     window.addEventListener("hashchange", tryHydrateFromHash);
     return () => window.removeEventListener("hashchange", tryHydrateFromHash);
-  }, [loadTactic, notify]);
+  }, [loadTactic, notify, t]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -193,52 +198,65 @@ export default function TacticalBoardWorkspacePage() {
       try {
         const outcome = await importFmSaveArrayBuffer(fileName, arrayBuffer);
         if (outcome.cancelled) {
-          notify("ok", `Pembacaan file ${fileName} dibatalkan.`);
+          notify("ok", t(`Pembacaan ${fileName} dibatalkan.`, `Cancelled ${fileName}.`));
           return;
         }
         const { parsed, selectedClub, report } = outcome;
         if (selectedClub && report) {
           notify(
             "ok",
-            `Save "${parsed.saveName}" dimuat 100% lokal! Klub: ${selectedClub.name} (${selectedClub.playerCount} pemain, ${selectedClub.staffCount} pelatih) · Rekomendasi #1: ${report.tacticAdvice.recommendedTactic.title} (IP ${report.tacticAdvice.recommendedTactic.inFormation} → OOP ${report.tacticAdvice.recommendedTactic.outFormation})`,
+            t(
+              `${selectedClub.name} dimuat · Taktik: ${report.tacticAdvice.recommendedTactic.title}`,
+              `${selectedClub.name} loaded · Tactic: ${report.tacticAdvice.recommendedTactic.title}`,
+            ),
           );
         } else {
           notify(
             "ok",
-            `Save "${parsed.saveName}" berhasil diekstrak (${parsed.stats.totalClubs.toLocaleString()} klub, ${parsed.worldWonderkids.length} U-21 wonderkids). Silakan pilih klub Anda.`,
+            t(
+              `Save "${parsed.saveName}" berhasil dibuka. Silakan pilih klub Anda.`,
+              `Save "${parsed.saveName}" opened. Please select your club.`,
+            ),
           );
         }
       } catch (err) {
         notify(
           "error",
-          `Gagal impor save ${fileName}: ${err instanceof Error ? err.message : String(err)}`,
+          err instanceof Error
+            ? err.message
+            : t(`Gagal membuka ${fileName}`, `Could not open ${fileName}`),
         );
       } finally {
         setBusyAction(null);
       }
     },
-    [notify],
+    [notify, t],
   );
 
   const handleImportBytes = useCallback(
     async (fileName: string, bytes: Uint8Array) => {
       setBusyAction("import");
       try {
-        const { tactic: imported, byteLength } = await importTacticBytes(fileName, bytes);
+        const { tactic: imported } = await importTacticBytes(fileName, bytes);
         notify(
           "ok",
-          `Imported "${imported.title}" (IP ${imported.inFormation} → OOP ${imported.outFormation}) dari ${fileName} (${byteLength} B)`,
+          t(
+            `Taktik "${imported.title}" (${imported.inFormation} → ${imported.outFormation}) dimuat`,
+            `Loaded "${imported.title}" (${imported.inFormation} → ${imported.outFormation})`,
+          ),
         );
       } catch (err) {
         notify(
           "error",
-          `Gagal impor ${fileName}: ${err instanceof Error ? err.message : String(err)}`,
+          err instanceof Error
+            ? err.message
+            : t(`Gagal membuka ${fileName}`, `Could not open ${fileName}`),
         );
       } finally {
         setBusyAction(null);
       }
     },
-    [notify],
+    [notify, t],
   );
 
   const handleImportPickedFile = useCallback(
@@ -250,30 +268,33 @@ export default function TacticalBoardWorkspacePage() {
       } catch (err) {
         notify(
           "error",
-          `Gagal impor ${file.name}: ${err instanceof Error ? err.message : String(err)}`,
+          err instanceof Error
+            ? err.message
+            : t(`Gagal membuka ${file.name}`, `Could not open ${file.name}`),
         );
       } finally {
         setBusyAction(null);
       }
     },
-    [notify],
+    [notify, t],
   );
 
   const handleDownloadFmf = () => {
     setBusyAction("export-fmf");
     try {
-      // Run exportFmf directly on main thread and trigger <a download="NamaTaktik.fmf"> Blob download
       const bytes = exportFmf(tactic);
       const fileName = sanitizeFileName(tactic.title, ".fmf");
       triggerBrowserDownload(fileName, bytes);
       notify(
         "ok",
-        `Berhasil ekspor ${fileName} (IP ${tactic.inFormation} → OOP ${tactic.outFormation}, ${bytes.byteLength} B)`,
+        t(`Taktik ${fileName} berhasil diunduh`, `Downloaded ${fileName}`),
       );
     } catch (err) {
       notify(
         "error",
-        `Gagal ekspor .fmf: ${err instanceof Error ? err.message : String(err)}`,
+        err instanceof Error
+          ? err.message
+          : t("Gagal mengunduh taktik .fmf", "Failed to download .fmf"),
       );
     } finally {
       setBusyAction(null);
@@ -287,38 +308,34 @@ export default function TacticalBoardWorkspacePage() {
       const fileName = sanitizeFileName(tactic.title, ".fmf");
       if (folderStatus !== "connected") {
         triggerBrowserDownload(fileName, bytes);
-        notify("ok", `Folder lokal belum ditautkan — mengunduh ${fileName} (${bytes.byteLength} B)`);
+        notify("ok", t(`Mengunduh ${fileName}`, `Downloading ${fileName}`));
         return;
       }
       try {
         const savedPath = await saveTacticFmfDirect(tactic.title, bytes);
-        notify("ok", `Tersimpan langsung ke folder FM27: ${savedPath} (${bytes.byteLength} B)`);
-      } catch (diskErr) {
-        triggerBrowserDownload(fileName, bytes);
-        const reason = diskErr instanceof Error ? diskErr.message : String(diskErr);
         notify(
-          "error",
-          `Gagal tulis ke folder lokal (${reason}) — ${fileName} diunduh via browser`,
+          "ok",
+          t(
+            `Tersimpan ke folder FM27: ${savedPath}`,
+            `Saved to FM27 folder: ${savedPath}`,
+          ),
+        );
+      } catch {
+        triggerBrowserDownload(fileName, bytes);
+        notify(
+          "ok",
+          t(`${fileName} diunduh melalui browser`, `Downloaded ${fileName}`),
         );
       }
     } catch (err) {
       notify(
         "error",
-        `Gagal ekspor .fmf: ${err instanceof Error ? err.message : String(err)}`,
+        err instanceof Error
+          ? err.message
+          : t("Gagal menyimpan taktik .fmf", "Failed to save .fmf"),
       );
     } finally {
       setBusyAction(null);
-    }
-  };
-
-  const handleExportJson = () => {
-    try {
-      const jsonText = exportFm27Json(tactic);
-      const fileName = sanitizeFileName(tactic.title, ".fm27.json");
-      triggerBrowserDownload(fileName, jsonText, "application/json");
-      notify("ok", `Exported ${fileName}`);
-    } catch (err) {
-      notify("error", err instanceof Error ? err.message : "JSON export failed");
     }
   };
 
@@ -328,9 +345,12 @@ export default function TacticalBoardWorkspacePage() {
       window.history.replaceState(null, "", hash);
       const fullUrl = `${window.location.origin}${window.location.pathname}${hash}`;
       await navigator.clipboard.writeText(fullUrl);
-      notify("ok", "Compressed #t=... Share URL copied to clipboard");
-    } catch (err) {
-      notify("error", err instanceof Error ? err.message : "Could not copy Share URL");
+      notify(
+        "ok",
+        t("Tautan taktik disalin", "Tactic link copied to clipboard"),
+      );
+    } catch {
+      notify("error", t("Gagal menyalin tautan", "Could not copy link"));
     }
   };
 
@@ -338,9 +358,12 @@ export default function TacticalBoardWorkspacePage() {
     setBusyAction("png");
     try {
       await exportDualPhasePngCard(tactic);
-      notify("ok", "Downloaded 1600×900 Dual-Phase PNG tactical card");
-    } catch (err) {
-      notify("error", err instanceof Error ? err.message : "PNG export failed");
+      notify(
+        "ok",
+        t("Gambar taktik berhasil diunduh", "Tactical image downloaded"),
+      );
+    } catch {
+      notify("error", t("Gagal menyimpan gambar", "Image download failed"));
     } finally {
       setBusyAction(null);
     }
@@ -407,15 +430,13 @@ export default function TacticalBoardWorkspacePage() {
       )}
 
       {isDraggingFile && (
-        <div className="fixed inset-4 z-50 rounded-2xl bg-emerald-950/80 border-2 border-dashed border-emerald-400 flex items-center justify-center pointer-events-none">
-          <div className="text-center">
-            <p className="text-lg font-extrabold text-emerald-200">
-              Drop .fmf Tactic, .fm Career Save, or .fm27.json
-            </p>
-            <p className="text-xs text-emerald-300/80 mt-1">
-              Diproses 100% lokal di browser (tidak diunggah ke server) · Mendukung .fm Zstd, fmf., afe., &amp; .fm27.json
-            </p>
-          </div>
+        <div className="fixed inset-4 z-50 rounded-2xl bg-emerald-950/85 border-2 border-dashed border-emerald-400 flex items-center justify-center pointer-events-none">
+          <p className="text-lg font-extrabold text-emerald-200">
+            {t(
+              "Lepaskan file Save (.fm) atau Taktik (.fmf)",
+              "Drop Career Save (.fm) or Tactic (.fmf)",
+            )}
+          </p>
         </div>
       )}
 
@@ -424,11 +445,11 @@ export default function TacticalBoardWorkspacePage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-[260px] flex-1">
             <div>
-              <h1 className="sr-only">FM27 Dual-Phase Tactical Board</h1>
+              <h1 className="sr-only">FM27 Tactical Board</h1>
               <input
                 id="tactic-title-input"
                 type="text"
-                aria-label="Tactic Title"
+                aria-label={t("Nama Taktik", "Tactic Name")}
                 value={tactic.title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="text-lg sm:text-xl font-extrabold bg-transparent border-b border-transparent hover:border-white/15 focus:border-cyan-400 focus:outline-none text-slate-50 w-full max-w-md"
@@ -439,13 +460,13 @@ export default function TacticalBoardWorkspacePage() {
                 <span className="text-amber-400 font-bold">OOP {tactic.outFormation}</span>
                 <span className="text-slate-600">|</span>
                 <span className="text-emerald-400 font-bold">
-                  Balance {balanceReport.overallScore.toFixed(0)}/100
+                  {t("Skor", "Score")} {balanceReport.overallScore.toFixed(0)}/100
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Undo/Redo + Import/Export + Unified 5-Tab + AI Advisor */}
+          {/* Primary Actions */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center rounded-lg bg-[#0B0F19] border border-white/10 p-0.5">
               <button
@@ -456,7 +477,7 @@ export default function TacticalBoardWorkspacePage() {
                 title="Undo (Ctrl+Z)"
                 className="px-2.5 py-1.5 rounded-md text-xs font-semibold text-slate-300 disabled:text-slate-600 hover:bg-slate-800/80 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed"
               >
-                Undo ({pastCount})
+                Undo
               </button>
               <button
                 id="redo-tactic-btn"
@@ -466,7 +487,7 @@ export default function TacticalBoardWorkspacePage() {
                 title="Redo (Ctrl+Y)"
                 className="px-2.5 py-1.5 rounded-md text-xs font-semibold text-slate-300 disabled:text-slate-600 hover:bg-slate-800/80 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed"
               >
-                Redo ({futureCount})
+                Redo
               </button>
             </div>
 
@@ -474,7 +495,7 @@ export default function TacticalBoardWorkspacePage() {
               ref={fileInputRef}
               id="import-tactic-file-input"
               type="file"
-              accept=".fmf,.fm,.tac,.json,.fm27.json,.csv,.html,.htm"
+              accept=".fmf,.fm,.tac"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -489,22 +510,10 @@ export default function TacticalBoardWorkspacePage() {
               type="button"
               disabled={busyAction !== null}
               onClick={() => fileInputRef.current?.click()}
-              title="Impor taktik .fmf atau file save karier .fm (100% diproses lokal di browser)"
               className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#0B0F19] hover:bg-slate-800 text-slate-200 border border-white/12 cursor-pointer disabled:opacity-50"
             >
-              Import .fmf / .fm Save
+              {t("Muat .fm / .fmf", "Load .fm / .fmf")}
             </button>
-
-            {liveFmSave && (
-              <button
-                id="board-switch-club-btn"
-                type="button"
-                onClick={() => setClubPickerOpen(true)}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-500/18 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/28 transition cursor-pointer"
-              >
-                Ganti Klub ({liveFmSave.clubs.find((c) => c.uid === selectedClubUid)?.shortName ?? "Pilih"})
-              </button>
-            )}
 
             {folderStatus === "connected" && (
               <button
@@ -514,7 +523,7 @@ export default function TacticalBoardWorkspacePage() {
                 onClick={() => void handleSaveDirectToFm27Folder()}
                 className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition cursor-pointer"
               >
-                Save to FM27 /tactics
+                {t("Simpan ke FM27", "Save to FM27")}
               </button>
             )}
 
@@ -523,18 +532,9 @@ export default function TacticalBoardWorkspacePage() {
               type="button"
               disabled={busyAction !== null}
               onClick={handleDownloadFmf}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/18 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/28 transition cursor-pointer"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition cursor-pointer disabled:opacity-50"
             >
-              Export .fmf
-            </button>
-
-            <button
-              id="export-json-btn"
-              type="button"
-              onClick={handleExportJson}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-[#0B0F19] hover:bg-slate-800 text-slate-300 border border-white/10 cursor-pointer"
-            >
-              .fm27.json
+              {t("Unduh .fmf", "Download .fmf")}
             </button>
 
             <button
@@ -544,7 +544,7 @@ export default function TacticalBoardWorkspacePage() {
               onClick={() => void handleExportPngCard()}
               className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-[#0B0F19] hover:bg-slate-800 text-slate-300 border border-white/10 cursor-pointer"
             >
-              PNG Card
+              {t("Gambar PNG", "PNG Image")}
             </button>
 
             <button
@@ -553,7 +553,7 @@ export default function TacticalBoardWorkspacePage() {
               onClick={() => void handleCopyShareLink()}
               className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-[#0B0F19] hover:bg-slate-800 text-cyan-300 border border-cyan-500/30 cursor-pointer"
             >
-              Share URL
+              {t("Bagikan", "Share")}
             </button>
 
             {!unifiedReport && (
@@ -563,27 +563,18 @@ export default function TacticalBoardWorkspacePage() {
                 onClick={() => refreshUnifiedReport()}
                 className="px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 transition cursor-pointer"
               >
-                5-Tab Analisis (0% AI)
+                {t("Ringkasan Tim", "Team Summary")}
               </button>
             )}
-
-            <button
-              id="open-ai-advisor-btn"
-              type="button"
-              onClick={() => setAiDrawerOpen(true)}
-              className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition cursor-pointer"
-            >
-              AI Tactical Advisor
-            </button>
           </div>
         </div>
 
-        {/* Presets + 18-Zone Heatmap Toggle + View Mode Switcher */}
+        {/* Style, Formation, Pitch Zones & View Mode */}
         <div className="pt-2.5 border-t border-white/8 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2.5">
             <div className="flex items-center gap-1.5">
               <label htmlFor="preset-style-select" className="text-xs font-semibold text-slate-400">
-                Style:
+                {t("Gaya:", "Style:")}
               </label>
               <select
                 id="preset-style-select"
@@ -601,7 +592,7 @@ export default function TacticalBoardWorkspacePage() {
 
             <div className="flex items-center gap-1.5">
               <label htmlFor="dual-shape-select" className="text-xs font-semibold text-slate-400">
-                Shape:
+                {t("Formasi:", "Shape:")}
               </label>
               <select
                 id="dual-shape-select"
@@ -611,7 +602,7 @@ export default function TacticalBoardWorkspacePage() {
               >
                 {activeShapeId === "custom" && (
                   <option value="custom">
-                    Custom IP {tactic.inFormation} → OOP {tactic.outFormation}
+                    IP {tactic.inFormation} → OOP {tactic.outFormation}
                   </option>
                 )}
                 {stylesCatalog.StyleShapes.map((sh) => (
@@ -625,7 +616,7 @@ export default function TacticalBoardWorkspacePage() {
 
             <div className="flex items-center gap-1.5">
               <label htmlFor="heatmap-mode-select" className="text-xs font-semibold text-slate-400">
-                18-Zone Heatmap:
+                {t("Area:", "Zones:")}
               </label>
               <select
                 id="heatmap-mode-select"
@@ -633,10 +624,10 @@ export default function TacticalBoardWorkspacePage() {
                 onChange={(e) => setHeatmapMode(e.target.value as HeatmapOverlayMode)}
                 className="px-2.5 py-1.5 rounded-lg bg-[#0B0F19] border border-white/12 text-xs font-semibold text-emerald-300 cursor-pointer"
               >
-                <option value="off">Off</option>
-                <option value="ip">Phase Density (IP / OOP)</option>
-                <option value="oop">Out-of-Possession Block</option>
-                <option value="transition">Transition Exposure</option>
+                <option value="off">{t("Mati", "Off")}</option>
+                <option value="ip">{t("Saat Menyerang", "In Possession")}</option>
+                <option value="oop">{t("Saat Bertahan", "Out of Possession")}</option>
+                <option value="transition">{t("Transisi", "Transition")}</option>
               </select>
             </div>
           </div>
@@ -650,15 +641,15 @@ export default function TacticalBoardWorkspacePage() {
                 onChange={(e) => setShowTransitionVectors(e.target.checked)}
                 className="accent-emerald-400 rounded cursor-pointer"
               />
-              <span>Vectors</span>
+              <span>{t("Arah Gerak", "Movement")}</span>
             </label>
 
             <div className="flex items-center p-1 rounded-lg bg-[#0B0F19] border border-white/10">
               {(
                 [
-                  ["split", "Split View"],
-                  ["ip", "In-Possession"],
-                  ["oop", "Out-of-Possession"],
+                  ["split", t("2 Fase", "Split View")],
+                  ["ip", t("Menyerang (IP)", "In Possession")],
+                  ["oop", t("Bertahan (OOP)", "Out of Possession")],
                 ] as const
               ).map(([mode, label]) => (
                 <button
@@ -682,31 +673,15 @@ export default function TacticalBoardWorkspacePage() {
             </div>
           </div>
         </div>
-
-        {toast && (
-          <div
-            role="status"
-            className={`px-3.5 py-2 rounded-lg text-xs font-medium flex items-center justify-between ${
-              toast.tone === "ok"
-                ? "bg-emerald-500/12 border border-emerald-500/30 text-emerald-200"
-                : "bg-rose-500/15 border border-rose-500/35 text-rose-200"
-            }`}
-          >
-            <span>{toast.text}</span>
-            <button
-              type="button"
-              onClick={() => setToast(null)}
-              className="text-slate-400 hover:text-slate-100 ml-3 cursor-pointer"
-            >
-              ×
-            </button>
-          </div>
-        )}
       </section>
 
-      {/* Auto-Displayed 5-Tab Deterministic Unified Dashboard (0% AI) */}
+      {/* Team Summary Dashboard */}
       {unifiedReport && (
-        <UnifiedReportDashboard report={unifiedReport} onNotify={notify} />
+        <UnifiedReportDashboard
+          report={unifiedReport}
+          onNotify={notify}
+          onRequestLoadFm={() => fileInputRef.current?.click()}
+        />
       )}
 
       {/* Main Tactical Grid */}
@@ -725,15 +700,9 @@ export default function TacticalBoardWorkspacePage() {
               />
             </div>
           )}
-
-          <p className="text-xs text-slate-400 px-1">
-            Drag tokens across the 24 official snap points (or click a dashed marker while a player
-            is selected). Double-click any player token to edit Role, Duty, and 43-bit Player
-            Instructions.
-          </p>
         </div>
 
-        {/* Right Inspector: Selected Slot + Analytics / Instructions Tabs */}
+        {/* Right Inspector */}
         <aside className="lg:col-span-4 flex flex-col gap-3.5">
           {selectedSlot && (
             <section className="tactical-surface rounded-xl p-3.5 flex flex-col gap-2.5">
@@ -743,7 +712,8 @@ export default function TacticalBoardWorkspacePage() {
                     #{selectedSlot.slotIndex + 1}
                   </span>
                   <span className="text-sm font-bold text-slate-100">
-                    {selectedSlot.playerName ?? `Player #${selectedSlot.slotIndex + 1}`}
+                    {selectedSlot.playerName ??
+                      `${t("Pemain", "Player")} #${selectedSlot.slotIndex + 1}`}
                   </span>
                 </div>
                 <button
@@ -752,7 +722,7 @@ export default function TacticalBoardWorkspacePage() {
                   onClick={() => setPlayerModalOpen(true)}
                   className="px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-500/18 text-cyan-300 border border-cyan-500/35 hover:bg-cyan-500/28 transition cursor-pointer"
                 >
-                  Edit Role &amp; PI
+                  {t("Ubah Peran", "Edit Role")}
                 </button>
               </div>
 
@@ -791,7 +761,7 @@ export default function TacticalBoardWorkspacePage() {
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              Balance &amp; Gaps ({balanceReport.alerts.length})
+              {t("Keseimbangan", "Balance")} ({balanceReport.alerts.length})
             </button>
             <button
               id="inspector-tab-instructions"
@@ -803,7 +773,7 @@ export default function TacticalBoardWorkspacePage() {
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              Mentality &amp; 29 TI
+              {t("Instruksi Tim", "Team Instructions")}
             </button>
           </div>
 
@@ -823,7 +793,7 @@ export default function TacticalBoardWorkspacePage() {
             <section className="tactical-surface rounded-xl p-3.5 flex flex-col gap-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                  Local /tactics ({tacticFiles.length}) &amp; /games ({saveGameFiles.length})
+                  FM27 /tactics ({tacticFiles.length}) &amp; /games ({saveGameFiles.length})
                 </span>
                 <button
                   id="refresh-local-tactics-btn"
@@ -831,14 +801,14 @@ export default function TacticalBoardWorkspacePage() {
                   onClick={() => void refreshTacticFiles()}
                   className="text-xs text-slate-400 hover:text-slate-200 cursor-pointer"
                 >
-                  Refresh
+                  {t("Segarkan", "Refresh")}
                 </button>
               </div>
 
               {saveGameFiles.length > 0 && (
                 <div className="flex flex-col gap-1.5 pb-2 border-b border-white/8">
                   <span className="text-[11px] font-semibold text-cyan-300">
-                    Career Saves di /games (100% Lokal di Browser):
+                    {t("Save Karier (/games):", "Career Saves (/games):")}
                   </span>
                   <div className="flex flex-col gap-1.5 max-h-32 overflow-y-auto">
                     {saveGameFiles.map((sf) => (
@@ -855,7 +825,7 @@ export default function TacticalBoardWorkspacePage() {
                               "error",
                               err instanceof Error
                                 ? err.message
-                                : "Gagal membaca file save dari folder /games",
+                                : t("Gagal membuka file save", "Could not open save file"),
                             );
                           }
                         }}
@@ -875,7 +845,10 @@ export default function TacticalBoardWorkspacePage() {
 
               {tacticFiles.length === 0 ? (
                 <p className="text-xs text-slate-400">
-                  No .fmf files in /tactics yet. Click &ldquo;Save to FM27 /tactics&rdquo; above.
+                  {t(
+                    "Belum ada taktik .fmf di folder /tactics.",
+                    "No .fmf tactics found in /tactics yet.",
+                  )}
                 </p>
               ) : (
                 <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto">
@@ -890,7 +863,9 @@ export default function TacticalBoardWorkspacePage() {
                         } catch (err) {
                           notify(
                             "error",
-                            err instanceof Error ? err.message : "Failed to read local file",
+                            err instanceof Error
+                              ? err.message
+                              : t("Gagal membaca file taktik", "Failed to read tactic file"),
                           );
                         }
                       }}
@@ -912,7 +887,6 @@ export default function TacticalBoardWorkspacePage() {
       </div>
 
       <PlayerInstructionModal />
-      <AiAdvisorDrawer open={aiDrawerOpen} onClose={() => setAiDrawerOpen(false)} />
     </main>
   );
 }

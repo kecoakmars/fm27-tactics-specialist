@@ -10,11 +10,13 @@ import {
   parseShortlistFmfInWorker,
 } from "../../lib/worker-client";
 import { useFolderSyncStore } from "../../stores/useFolderSyncStore";
+import { useLocale } from "../../stores/useLocaleStore";
 import { useTrainingStore } from "../../stores/useTrainingStore";
 
 export function ShortlistExporter() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const { t } = useLocale();
 
   const shortlistTitle = useTrainingStore((s) => s.shortlistTitle);
   const shortlistUids = useTrainingStore((s) => s.shortlistUids);
@@ -32,14 +34,14 @@ export function ShortlistExporter() {
     const bytes = await exportShortlistFmfInWorker(shortlistTitle, shortlistUids);
     const fileName = sanitizeFileName(shortlistTitle, ".fmf");
     triggerBrowserDownload(fileName, bytes);
-    setStatusMsg(`Downloaded ${fileName} (${shortlistUids.length} UIDs)`);
+    setStatusMsg(t(`${fileName} diunduh`, `Downloaded ${fileName}`));
   }
 
   async function handleSaveToFolder() {
     if (shortlistUids.length === 0) return;
     const bytes = await exportShortlistFmfInWorker(shortlistTitle, shortlistUids);
     const saved = await saveShortlistFmfDirect(shortlistTitle, bytes);
-    setStatusMsg(`Synced to ${saved}`);
+    setStatusMsg(t(`Tersimpan ke ${saved}`, `Saved to ${saved}`));
   }
 
   async function handleImportShortlistFile(file: File) {
@@ -48,11 +50,16 @@ export function ShortlistExporter() {
       const parsed = await parseShortlistFmfInWorker(new Uint8Array(ab));
       setShortlist(parsed.title, parsed.playerUids);
       setStatusMsg(
-        `Imported "${parsed.title}" (${parsed.playerUids.length} players)`,
+        t(
+          `Shortlist "${parsed.title}" (${parsed.playerUids.length} pemain) dimuat`,
+          `Loaded "${parsed.title}" (${parsed.playerUids.length} players)`,
+        ),
       );
     } catch (err) {
       setStatusMsg(
-        err instanceof Error ? err.message : "Failed to parse .fmf shortlist",
+        err instanceof Error
+          ? err.message
+          : t("Gagal membaca shortlist .fmf", "Failed to read .fmf shortlist"),
       );
     }
   }
@@ -63,7 +70,7 @@ export function ShortlistExporter() {
         <div className="flex flex-wrap items-center gap-3">
           <div>
             <label className="block text-[11px] text-slate-400">
-              Active FM27 Shortlist (.slf / .fmf)
+              {t("Nama Shortlist", "Shortlist Name")}
             </label>
             <input
               type="text"
@@ -73,7 +80,7 @@ export function ShortlistExporter() {
             />
           </div>
           <div className="rounded-lg border border-slate-800 bg-[#0B0F19] px-3 py-1.5 font-mono text-xs text-amber-300">
-            Selected: <strong>{shortlistUids.length}</strong> Wonderkids
+            <strong>{shortlistUids.length}</strong> {t("Pemain Dipilih", "Selected")}
           </div>
           {statusMsg && (
             <span className="font-mono text-xs text-emerald-300">
@@ -97,9 +104,9 @@ export function ShortlistExporter() {
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs text-slate-200 hover:border-cyan-500/40"
+            className="rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs text-slate-200 hover:border-cyan-500/40 cursor-pointer"
           >
-            Import .fmf Shortlist
+            {t("Muat Shortlist (.fmf)", "Load Shortlist (.fmf)")}
           </button>
 
           {folderStatus === "connected" && (
@@ -107,9 +114,9 @@ export function ShortlistExporter() {
               type="button"
               disabled={shortlistUids.length === 0}
               onClick={() => void handleSaveToFolder()}
-              className="rounded-lg border border-emerald-500/40 bg-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/30 disabled:opacity-40"
+              className="rounded-lg border border-emerald-500/40 bg-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/30 disabled:opacity-40 cursor-pointer"
             >
-              Save to /shortlists/
+              {t("Simpan ke FM27", "Save to FM27")}
             </button>
           )}
 
@@ -117,18 +124,18 @@ export function ShortlistExporter() {
             type="button"
             disabled={shortlistUids.length === 0}
             onClick={() => void handleDownloadFmf()}
-            className="rounded-lg bg-emerald-500 px-3.5 py-1.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-40"
+            className="rounded-lg bg-emerald-500 px-3.5 py-1.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-40 cursor-pointer"
           >
-            Export .fmf Shortlist
+            {t("Unduh Shortlist (.fmf)", "Download Shortlist (.fmf)")}
           </button>
 
           {shortlistUids.length > 0 && (
             <button
               type="button"
               onClick={clearShortlist}
-              className="rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs text-slate-400 hover:text-rose-300"
+              className="rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs text-slate-400 hover:text-rose-300 cursor-pointer"
             >
-              Clear
+              {t("Kosongkan", "Clear")}
             </button>
           )}
         </div>

@@ -12,11 +12,13 @@ import {
 import type { CommunityTacticRecord } from "../../../lib/supabase-client";
 import { exportFmfInWorker } from "../../../lib/worker-client";
 import { useFolderSyncStore } from "../../../stores/useFolderSyncStore";
+import { useLocale } from "../../../stores/useLocaleStore";
 import { useTacticStore } from "../../../stores/useTacticStore";
 
 export default function CommunityDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const { t } = useLocale();
   const loadTactic = useTacticStore((s) => s.loadTactic);
   const folderStatus = useFolderSyncStore((s) => s.status);
   const saveTacticFmfDirect = useFolderSyncStore((s) => s.saveTacticFmfDirect);
@@ -65,12 +67,14 @@ export default function CommunityDetailPage() {
   if (notFound) {
     return (
       <main className="mx-auto max-w-4xl px-4 py-10 text-center">
-        <p className="text-sm text-rose-300">Community tactic not found.</p>
+        <p className="text-sm text-rose-300">
+          {t("Taktik tidak ditemukan.", "Tactic not found.")}
+        </p>
         <Link
           href="/community"
           className="mt-3 inline-block text-xs text-cyan-300 underline"
         >
-          {"<-"} Back to Community Gallery
+          ← {t("Kembali ke Komunitas", "Back to Community")}
         </Link>
       </main>
     );
@@ -79,7 +83,7 @@ export default function CommunityDetailPage() {
   if (!item) {
     return (
       <main className="mx-auto max-w-4xl px-4 py-10 text-center text-xs text-slate-400">
-        Loading tactic details...
+        {t("Memuat taktik...", "Loading tactic...")}
       </main>
     );
   }
@@ -103,7 +107,7 @@ export default function CommunityDetailPage() {
     if (!item) return;
     const bytes = await exportFmfInWorker(item.tactic);
     const saved = await saveTacticFmfDirect(item.title, bytes);
-    setSyncMessage(`Saved to ${saved}`);
+    setSyncMessage(t(`Tersimpan ke ${saved}`, `Saved to ${saved}`));
   }
 
   return (
@@ -113,7 +117,7 @@ export default function CommunityDetailPage() {
           href="/community"
           className="text-xs text-slate-400 hover:text-cyan-300"
         >
-          {"<-"} Back to Community Gallery
+          ← {t("Kembali ke Komunitas", "Back to Community")}
         </Link>
         {syncMessage && (
           <span className="font-mono text-xs text-emerald-300">
@@ -130,14 +134,15 @@ export default function CommunityDetailPage() {
                 {item.playstyleTag}
               </span>
               <span className="font-mono text-xs text-slate-400">
-                FM v{item.gameVersion} · Mentality {item.mentality}/7
+                FM v{item.gameVersion}
               </span>
             </div>
             <h1 className="mt-1.5 text-xl font-bold text-slate-100">
               {item.title}
             </h1>
             <p className="text-xs text-slate-400">
-              Published by <strong>{item.authorName}</strong> · Balance Score{" "}
+              {t("Oleh", "By")} <strong>{item.authorName}</strong> ·{" "}
+              {t("Skor", "Score")}{" "}
               <strong className="font-mono text-emerald-300">
                 {item.balanceScore}/100
               </strong>
@@ -157,25 +162,25 @@ export default function CommunityDetailPage() {
                 loadTactic(item.tactic);
                 router.push("/");
               }}
-              className="rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-3.5 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/25"
+              className="rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-3.5 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/25 cursor-pointer"
             >
-              Load to Pitch Board
+              {t("Coba di Papan Taktik", "Open on Tactics Board")}
             </button>
             {folderStatus === "connected" && (
               <button
                 type="button"
                 onClick={() => void handleSaveToFolder()}
-                className="rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-3.5 py-1.5 text-xs font-medium text-emerald-300"
+                className="rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-3.5 py-1.5 text-xs font-medium text-emerald-300 cursor-pointer"
               >
-                Save to /tactics/
+                {t("Simpan ke FM27", "Save to FM27")}
               </button>
             )}
             <button
               type="button"
               onClick={() => void handleDownloadFmf()}
-              className="rounded-lg bg-emerald-500 px-3.5 py-1.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400"
+              className="rounded-lg bg-emerald-500 px-3.5 py-1.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400 cursor-pointer"
             >
-              Download .fmf
+              {t("Unduh .fmf", "Download .fmf")}
             </button>
           </div>
         </div>
@@ -190,7 +195,7 @@ export default function CommunityDetailPage() {
 
         <div className="mt-5">
           <h2 className="text-sm font-semibold text-slate-100">
-            11 Dual-Phase Slot Roles (IP {item.ipFormation} {"->"} OOP{" "}
+            {t("Susunan Peran Pemain", "Player Roles")} (IP {item.ipFormation} → OOP{" "}
             {item.oopFormation})
           </h2>
           <div className="mt-2 overflow-x-auto">
@@ -198,9 +203,9 @@ export default function CommunityDetailPage() {
               <thead>
                 <tr className="border-b border-slate-800 text-[11px] uppercase text-slate-400">
                   <th className="py-2 pr-3">#</th>
-                  <th className="py-2 pr-3">In-Possession</th>
-                  <th className="py-2 pr-3">IP Duty</th>
-                  <th className="py-2 pr-3">Out-of-Possession</th>
+                  <th className="py-2 pr-3">{t("Menyerang (IP)", "In Possession")}</th>
+                  <th className="py-2 pr-3">Duty</th>
+                  <th className="py-2 pr-3">{t("Bertahan (OOP)", "Out of Possession")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/70">

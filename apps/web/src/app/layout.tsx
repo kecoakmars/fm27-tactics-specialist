@@ -3,9 +3,9 @@ import "./globals.css";
 import { TopNavShell } from "@/components/TopNavShell";
 
 export const metadata: Metadata = {
-  title: "FM27 Tactics Generator — Dual-Phase Tactical Studio & .fmf Builder",
+  title: "FM27 Tactics Studio",
   description:
-    "Build, analyze, and export Football Manager 27 dual-phase tactics (.fmf, .fm27.json) with deterministic Kuhn-Munkres squad optimization, 29 team instructions, and local FM27 folder sync.",
+    "Football Manager 27 Dual-Phase Tactic Builder, Squad Advisor, Wonderkids Scout, Coaching Staff & Training Schedule.",
   manifest: "/manifest.json",
 };
 
@@ -15,7 +15,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="id" className="dark" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

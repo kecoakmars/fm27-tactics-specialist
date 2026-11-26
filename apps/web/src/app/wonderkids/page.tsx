@@ -9,19 +9,19 @@ import { ShortlistExporter } from "../../components/wonderkids/ShortlistExporter
 import { TrendingStrip } from "../../components/wonderkids/TrendingStrip";
 import { WonderkidCard } from "../../components/wonderkids/WonderkidCard";
 import { importAnySupportedFile } from "../../lib/file-importer";
+import { useLocale } from "../../stores/useLocaleStore";
 import { useSquadStore } from "../../stores/useSquadStore";
 import { useTacticStore } from "../../stores/useTacticStore";
 
 function WonderkidsExplorerInner() {
   const searchParams = useSearchParams();
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const { t } = useLocale();
 
   const tactic = useTacticStore((s) => s.tactic);
   const unifiedReport = useTacticStore((s) => s.unifiedReport);
-  const liveFmSave = useTacticStore((s) => s.liveFmSave);
   const worldWonderkids = useTacticStore((s) => s.worldWonderkids);
   const clubPlayers = useTacticStore((s) => s.clubPlayers);
-  const setClubPickerOpen = useTacticStore((s) => s.setClubPickerOpen);
   const squadAuditWeakest = useSquadStore(
     (s) => s.auditResult?.weakestThreeSlotIndices,
   );
@@ -70,7 +70,9 @@ function WonderkidsExplorerInner() {
       await importAnySupportedFile(file);
     } catch (err) {
       setImportError(
-        err instanceof Error ? err.message : "Gagal memproses file save .fm",
+        err instanceof Error
+          ? err.message
+          : t("Gagal membuka file save .fm", "Failed to open .fm save"),
       );
     } finally {
       setIsImporting(false);
@@ -130,32 +132,37 @@ function WonderkidsExplorerInner() {
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-100">
-              U-21 Wonderkids Scout &amp; Tactical Fit Ranker
-            </h1>
-            <span
-              className={`rounded px-2 py-0.5 text-[10px] font-bold ${
-                hasLiveData
-                  ? "border border-emerald-500/40 bg-emerald-500/20 text-emerald-300"
-                  : "border border-amber-500/40 bg-amber-500/15 text-amber-300"
-              }`}
-            >
-              {hasLiveData
-                ? `Live .fm: ${liveFmSave?.saveName ?? "Save Aktif"} (${liveFmSave?.gameDate ?? ""}) · ${worldWonderkids.length} U-21`
-                : "Menunggu Impor File Save .fm (0% Data Sample)"}
-            </span>
-          </div>
-          <p className="text-xs text-slate-400">
-            Formula:{" "}
-            <code className="font-mono text-emerald-300">
-              ValueRatio = 0.55*RoleFit + 0.30*Potential + 0.15*PriceEfficiency
-            </code>
-          </p>
-        </div>
+        <h1 className="text-xl font-bold text-slate-100">
+          {t("Wonderkids U-21", "U-21 Wonderkids")}
+        </h1>
 
         <div className="flex flex-wrap items-center gap-2">
+          {hasLiveData && (
+            <div className="flex items-center gap-1 rounded-xl border border-slate-800 bg-[#111827] p-1">
+              <button
+                type="button"
+                onClick={() => setActiveTab("best-fit")}
+                className={`rounded-lg px-3.5 py-1.5 text-xs font-medium cursor-pointer ${
+                  activeTab === "best-fit"
+                    ? "bg-emerald-500/20 text-emerald-300"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                {t("Sesuai Taktik Saya", "For My Tactic")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("trending")}
+                className={`rounded-lg px-3.5 py-1.5 text-xs font-medium cursor-pointer ${
+                  activeTab === "trending"
+                    ? "bg-cyan-500/20 text-cyan-300"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                {t("Prospek Terbaik", "Top Prospects")}
+              </button>
+            </div>
+          )}
           <button
             type="button"
             disabled={isImporting}
@@ -163,44 +170,11 @@ function WonderkidsExplorerInner() {
             className="rounded-lg border border-emerald-500/40 bg-emerald-500/20 px-3 py-1.5 text-xs font-bold text-emerald-300 hover:bg-emerald-500/30 cursor-pointer disabled:opacity-50"
           >
             {isImporting
-              ? "Memproses .fm..."
+              ? t("Memuat...", "Loading...")
               : hasLiveData
-                ? "Muat Save .fm Lain"
-                : "Unggah Save Karier .fm"}
+                ? t("Ganti File Save .fm", "Load Another .fm Save")
+                : t("Pilih File Save (.fm)", "Choose Save File (.fm)")}
           </button>
-          {liveFmSave && (
-            <button
-              type="button"
-              onClick={() => setClubPickerOpen(true)}
-              className="rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-3 py-1.5 text-xs font-bold text-cyan-300 hover:bg-cyan-500/25 cursor-pointer"
-            >
-              Ganti Klub
-            </button>
-          )}
-          <div className="flex items-center gap-1 rounded-xl border border-slate-800 bg-[#111827] p-1">
-            <button
-              type="button"
-              onClick={() => setActiveTab("best-fit")}
-              className={`rounded-lg px-3.5 py-1.5 text-xs font-medium cursor-pointer ${
-                activeTab === "best-fit"
-                  ? "bg-emerald-500/20 text-emerald-300"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              Best For My Tactic
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("trending")}
-              className={`rounded-lg px-3.5 py-1.5 text-xs font-medium cursor-pointer ${
-                activeTab === "trending"
-                  ? "bg-cyan-500/20 text-cyan-300"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              Top Prospek Save (.fm)
-            </button>
-          </div>
         </div>
       </div>
 
@@ -215,23 +189,20 @@ function WonderkidsExplorerInner() {
           id="wonderkids-live-empty-state"
           className="rounded-2xl border border-dashed border-slate-700 bg-[#111827]/70 p-10 text-center space-y-3"
         >
-          <h2 className="text-base font-bold text-slate-100">
-            Belum Ada File Save Karier (.fm) yang Dimuat
+          <h2 className="text-sm font-bold text-slate-100">
+            {t(
+              "Muat save karier (.fm) untuk mencari wonderkid U-21 sesuai taktik Anda.",
+              "Load a career save (.fm) to scout U-21 wonderkids for your tactic.",
+            )}
           </h2>
-          <p className="mx-auto max-w-xl text-xs text-slate-400 leading-relaxed">
-            Data sample/seed statis dinonaktifkan agar seluruh daftar Wonderkids U-21 yang tampil{" "}
-            <strong className="text-emerald-300">100% asli dari dunia karier Football Manager Anda</strong>{" "}
-            (lengkap dengan klub terkini, umur, atribut, dan potensi di save Anda). Diproses 100%
-            lokal di browser tanpa unggah ke server.
-          </p>
-          <div className="pt-1">
+          <div>
             <button
               type="button"
               disabled={isImporting}
               onClick={() => fileRef.current?.click()}
-              className="rounded-lg bg-emerald-500 px-5 py-2.5 text-xs font-bold text-slate-950 hover:bg-emerald-400 cursor-pointer disabled:opacity-50"
+              className="rounded-lg bg-emerald-500 px-5 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-400 cursor-pointer disabled:opacity-50"
             >
-              Unggah File Save .fm Sekarang
+              {t("Pilih File Save (.fm)", "Choose Save File (.fm)")}
             </button>
           </div>
         </section>
@@ -245,7 +216,7 @@ function WonderkidsExplorerInner() {
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
                   <div>
                     <label className="block text-[11px] text-slate-400">
-                      Target Active Tactic Slot
+                      {t("Posisi Taktik", "Tactic Slot")}
                     </label>
                     <select
                       value={slotIndex}
@@ -263,14 +234,16 @@ function WonderkidsExplorerInner() {
 
                   <div>
                     <label className="block text-[11px] text-slate-400">
-                      Position Filter
+                      {t("Filter Posisi", "Position")}
                     </label>
                     <select
                       value={posFilter}
                       onChange={(e) => setPosFilter(e.target.value)}
                       className="mt-1 w-full rounded-lg border border-slate-700 bg-[#0B0F19] px-2.5 py-1.5 text-xs text-slate-100"
                     >
-                      <option value="">Auto ({targetSlot.inPossession.positionId})</option>
+                      <option value="">
+                        {t("Otomatis", "Auto")} ({targetSlot.inPossession.positionId})
+                      </option>
                       {POSITION_14_KEYS.map((pk) => (
                         <option key={pk} value={pk}>
                           {pk}
@@ -281,7 +254,8 @@ function WonderkidsExplorerInner() {
 
                   <div>
                     <label className="block text-[11px] text-slate-400">
-                      Max Age: <strong className="font-mono text-cyan-300">{maxAge}</strong>
+                      {t("Usia Maks:", "Max Age:")}{" "}
+                      <strong className="font-mono text-cyan-300">{maxAge}</strong>
                     </label>
                     <input
                       type="range"
@@ -295,9 +269,9 @@ function WonderkidsExplorerInner() {
 
                   <div>
                     <label className="block text-[11px] text-slate-400">
-                      Max Budget:{" "}
+                      {t("Batas Harga:", "Max Budget:")}{" "}
                       <strong className="font-mono text-emerald-300">
-                        {maxBudget >= 300 ? "Tanpa Batas" : `EUR ${maxBudget}M`}
+                        {maxBudget >= 300 ? t("Semua", "Any") : `€${maxBudget}M`}
                       </strong>
                     </label>
                     <input
@@ -313,14 +287,14 @@ function WonderkidsExplorerInner() {
 
                   <div>
                     <label className="block text-[11px] text-slate-400">
-                      Tactical Style Synergy
+                      {t("Gaya Bermain", "Tactical Style")}
                     </label>
                     <select
                       value={styleId}
                       onChange={(e) => setStyleId(e.target.value)}
                       className="mt-1 w-full rounded-lg border border-slate-700 bg-[#0B0F19] px-2.5 py-1.5 text-xs text-slate-100"
                     >
-                      <option value="">Neutral Style</option>
+                      <option value="">{t("Semua Gaya", "Any Style")}</option>
                       {stylesCatalog.TacticalStyles.map((st) => (
                         <option key={st.Id} value={st.Id}>
                           {st.Name}
@@ -331,11 +305,11 @@ function WonderkidsExplorerInner() {
 
                   <div>
                     <label className="block text-[11px] text-slate-400">
-                      Search Name / Club / Nation
+                      {t("Cari Pemain / Klub", "Search Player / Club")}
                     </label>
                     <input
                       type="search"
-                      placeholder="e.g. Barcelona, ESP, Yamal..."
+                      placeholder="Barcelona, ESP, Yamal..."
                       value={searchText}
                       onChange={(e) => setSearchText(e.target.value)}
                       className="mt-1 w-full rounded-lg border border-slate-700 bg-[#0B0F19] px-2.5 py-1.5 text-xs text-slate-100"
@@ -346,8 +320,10 @@ function WonderkidsExplorerInner() {
 
               {ranked.length === 0 ? (
                 <div className="rounded-xl border border-slate-800 bg-[#111827] p-6 text-center text-xs text-slate-400">
-                  Tidak ada wonderkid U-21 dari save .fm yang cocok dengan filter saat ini. Coba
-                  longgarkan filter posisi, budget, atau pencarian.
+                  {t(
+                    "Tidak ada pemain U-21 yang cocok dengan filter saat ini.",
+                    "No U-21 players match the current filters.",
+                  )}
                 </div>
               ) : (
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -375,7 +351,7 @@ export default function WonderkidsPage() {
     <Suspense
       fallback={
         <main className="mx-auto max-w-[1600px] px-4 py-8 text-xs text-slate-400">
-          Loading U-21 Wonderkids Scout...
+          Loading...
         </main>
       }
     >

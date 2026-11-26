@@ -8,6 +8,12 @@ import {
   type ExtendedDirectoryHandle,
 } from "@/lib/local-folder-sync";
 import { buildDualPhaseTacticCardSvg } from "@/lib/svg-card-exporter";
+import {
+  formatFmSaveStage,
+  localizeTacticalAlert,
+  tr,
+  useLocaleStore,
+} from "@/stores/useLocaleStore";
 import { buildPresetTactic, useTacticStore } from "@/stores/useTacticStore";
 
 function createInMemoryDirectoryHandle(name: string): ExtendedDirectoryHandle {
@@ -143,5 +149,28 @@ describe("Phase 2 — Dual-Phase Pitch Store, SVG Card & Local Folder Sync", () 
     expect(svg).toContain("IN POSSESSION");
     expect(svg).toContain("OUT OF POSSESSION");
     expect(svg).toContain(tactic.inFormation);
+  });
+
+  it("switches ID | EN locale cleanly and formats FM player messages without technical jargon", () => {
+    useLocaleStore.getState().setLocale("id");
+    expect(tr("Papan Taktik", "Tactics")).toBe("Papan Taktik");
+    expect(formatFmSaveStage(25, "id")).toBe("Membaca database karier...");
+    expect(
+      localizeTacticalAlert(
+        {
+          id: "gap-zone14-vacuum",
+          severity: "warning",
+          title: "Low Zone 14 Occupation (11.2 vs target 14)",
+          detail: "Technical detail",
+          citations: [],
+        },
+        "id",
+      ).title,
+    ).toBe("Area Depan Kotak Penalti Kosong");
+
+    useLocaleStore.getState().setLocale("en");
+    expect(tr("Papan Taktik", "Tactics")).toBe("Tactics");
+    expect(formatFmSaveStage(25, "en")).toBe("Reading career database...");
+    useLocaleStore.getState().setLocale("id");
   });
 });
