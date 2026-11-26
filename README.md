@@ -1,29 +1,43 @@
-# FM27 Tactics Studio (Dual-Phase Web Platform)
+# FM27 Tactics Studio
 
-Browser-based tactical companion for **Football Manager 27**: load your `.fm` career save or `.fmf` tactic directly in the browser (zero server upload), get instant dual-phase (`In Possession` & `Out of Possession`) formation and role recommendations tailored to your squad, audit your players, optimize coaching staff & 7×3 training schedules, scout live U-21 wonderkids from your save world, and download ready-to-use `.fmf` files.
+**FM27 Tactics Studio** adalah platform web pendamping taktik **Football Manager 27** untuk menyusun formasi dua fase (**Saat Menguasai Bola / IP** & **Saat Bertahan / OOP**), menganalisis kecocokan skuad asli dari file save karier (`.fm`), mengoptimalkan peran pemain, staf pelatih, jadwal latihan mingguan, hingga berburu *wonderkids* U-21 langsung dari browser.
 
-## Highlights
+---
 
-- **100% Client-Side `.fm` Career Save & `.fmf` Binary Codec (`@fm27/fm-codec`):** Parses 50–400 MB `.fm` Zstandard career saves locally in a standalone Web Worker (`fm-save-worker.js`) and round-trips `.fmf` tactics (`.tac`), training schedules (`.tsc`), and shortlists (`.slf`) — plus optional 1-click sync to your local `Football Manager 27` folder (`File System Access API`).
-- **REA-Calibrated Deterministic Tactical Engine (`@fm27/fm-engine`):** Evaluates `13 Tactical Styles × 16 Dual-Phase Shapes`, isolates `First Team` vs `U21`/`U18`, matches Starting XI + 1-to-1 bench depth via Hungarian optimization, respects dominant foot sides & FM27 role eligibility, and maps 18-zone spatial pitch coverage with a dynamic color legend.
-- **100% Live Save Data & Bilingual UI (`ID | EN`):** Zero fake/sample player leakage — Squad, Staff Stars, and U-21 Wonderkids reflect the real clubs, regens, and transfer world inside your `.fm` save, with instant Indonesian / English switching while preserving authentic in-game FM27 role & style names.
-- **Patch-Ready Registry (`@fm27/fm-data`):** Data-driven FM27 `v27.0` catalog validated via `pnpm data:validate`; scaffold new patches with `pnpm data:new-patch`.
+## Fitur Utama
 
-## Quick Start
+1. **Pembaca Langsung File Save Karier (`.fm`) & Taktik (`.fmf`)**
+   - Membuka langsung file save karier `.fm` berukuran besar maupun file taktik `.fmf` buatan sendiri.
+   - Mendukung fitur **Ganti Klub** instan untuk mengecek dan menganalisis klub mana pun yang ada di dalam dunia save Anda tanpa perlu memuat ulang file.
 
-```bash
-git clone https://github.com/kecoakmars/fm27-tactics-specialist.git
-cd fm27-tactics-specialist
-pnpm install
-pnpm data:validate
-pnpm test
-pnpm dev
-```
+2. **Rekomendasi Formasi & Peran Otomatis Dua Fase (IP & OOP)**
+   - Mengevaluasi **13 Gaya Bermain × 16 Bentuk Formasi** untuk menemukan sistem terbaik yang paling sesuai dengan komposisi **Tim Utama (*First Team*)** klub Anda.
+   - Menempatkan 11 starter terbaik beserta *Role* dan *Duty* (*Defend / Support / Attack*) yang paling pas berdasarkan atribut kunci tiap peran, kemampuan pemain, kedalaman bangku cadangan, dan kecocokan kaki kiri/kanan.
 
-## Documentation
+3. **Papan Taktik Interaktif & Ekspor `.fmf` Siap Pakai**
+   - Atur posisi pemain secara terpisah saat menyerang (IP) dan saat bertahan (OOP) di atas papan lapangan interaktif, lengkap dengan pengaturan mentalitas, instruksi tim, dan instruksi individu.
+   - Dilengkapi peta kepadatan area lapangan beserta keterangan warna ringkas, skor keseimbangan taktik, ekspor **Gambar PNG**, tautan **Bagikan**, dan unduhan file **`.fmf`** yang langsung siap dimasukkan ke dalam Football Manager 27.
 
-- [Session Handoff & Volunteer Testing Guide](HANDOFF.md)
-- [Architecture & ADRs](docs/ARCHITECTURE.md)
-- [Binary `.fmf` / `.tac` / `details.aom` Specification](docs/BINARY_FMF_SPEC.md)
-- [Patch Update & Maintenance Workflow](docs/MAINTENANCE_WORKFLOW.md)
-- [Master Specification](MASTER_SPEC.md)
+4. **Audit Skuad, Kunci Pemain Inti, & Optimasi Peran Sekali Klik**
+   - Memisahkan otomatis daftar pemain **Tim Utama**, **U21**, dan **U18**.
+   - Menampilkan nilai kecocokan setiap pemain di taktik aktif, menandai **3 posisi terlemah** yang paling butuh peningkatan, menyediakan fitur kunci pemain wajib starter, pencarian pelapis internal, serta tombol **Optimalkan Peran** otomatis.
+
+5. **Pencari Wonderkids U-21 *Live* dari Dunia Save Anda**
+   - Menampilkan daftar talenta muda U-21 asli sesuai kondisi musim berjalan di dalam file save `.fm` Anda (termasuk pemain *regen/newgen* pada musim jauh).
+   - Otomatis memprioritaskan kandidat yang cocok untuk menambal posisi terlemah tim Anda dan dapat diekspor menjadi file **Shortlist `.fmf`**.
+
+6. **Kalkulator Bintang Staf Pelatih & Perencana Latihan Mingguan**
+   - Menghitung rating bintang kepelatihan (0.5–5.0 bintang) di 10 kategori latihan dari staf pelatih asli klub Anda serta daftar pelatih/*free agent* di dalam save.
+   - Menyusun jadwal latihan mingguan 7 hari yang tersinkron dengan gaya taktik aktif Anda dan dapat diunduh sebagai file jadwal **`.fmf`**.
+
+7. **Dwi-Bahasa Instan (`ID | EN`)**
+   - Tersedia tombol ganti bahasa **Bahasa Indonesia** dan **English** sekali klik, dengan tetap mempertahankan istilah resmi *Role* dan *Style* Football Manager agar mudah dicocokkan di dalam game.
+
+---
+
+## Keunggulan
+
+- **Rekomendasi Murni Berbasis Data Asli Game (Tanpa Tebakan/Karangan):** Seluruh perhitungan formasi, pemilihan pemain, peran, latihan, staf, dan *wonderkids* dihitung secara matematis dari aturan posisi resmi FM27 dan atribut asli pemain di file save Anda — tanpa data contoh palsu.
+- **Cepat & Privasi Terjaga Tanpa Unggah Server:** File save karier `.fm` Anda dibaca langsung di perangkat Anda sendiri sehingga prosesnya cepat, aman, dan tidak dibatasi kuota unggahan server.
+- **Dirancang Khusus untuk Pemain Football Manager:** Tampilan bersih, ringkas, dan fokus pada keputusan manajerial sepak bola tanpa istilah pemrograman atau rumus teknis yang membingungkan.
+- **Alur Terpadu Sekali Muat:** Cukup muat file save `.fm` satu kali, seluruh halaman — mulai dari Papan Taktik, Skuad, Wonderkids, Staf Pelatih, hingga Latihan — langsung terisi dan tersinkron otomatis.
