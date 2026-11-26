@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { rankWonderkidsForSlot } from "@fm27/fm-engine";
 import type { SlotAssignment, SlotAuditItem } from "@fm27/shared-types";
+import { useTacticStore } from "../../stores/useTacticStore";
 import { useTrainingStore } from "../../stores/useTrainingStore";
 
 interface ReplacementModalProps {
@@ -28,18 +29,25 @@ export function ReplacementModal({
   onSwapInternalStarter,
 }: ReplacementModalProps) {
   const [tab, setTab] = useState<"internal" | "wonderkids">("internal");
+  const worldWonderkids = useTacticStore((s) => s.worldWonderkids);
+  const clubPlayers = useTacticStore((s) => s.clubPlayers);
   const shortlistUids = useTrainingStore((s) => s.shortlistUids);
   const toggleShortlistUid = useTrainingStore((s) => s.toggleShortlistUid);
 
-  const wonderkidMatches = useMemo(
-    () =>
-      rankWonderkidsForSlot(slotAssignment, {
+  const wonderkidMatches = useMemo(() => {
+    if (worldWonderkids.length === 0) return [];
+    const squadUidSet = new Set(clubPlayers.map((p) => p.uid));
+    const liveExternalPool = worldWonderkids.filter((wk) => !squadUidSet.has(wk.uid));
+    return rankWonderkidsForSlot(
+      slotAssignment,
+      {
         styleId,
         patchVersion,
         limit: 8,
-      }),
-    [slotAssignment, styleId, patchVersion],
-  );
+      },
+      liveExternalPool,
+    );
+  }, [clubPlayers, patchVersion, slotAssignment, styleId, worldWonderkids]);
 
   return (
     <div
@@ -156,49 +164,57 @@ export function ReplacementModal({
           </div>
         ) : (
           <div className="mt-3 space-y-2 max-h-80 overflow-y-auto">
-            {wonderkidMatches.map((item) => {
-              const inShortlist = shortlistUids.includes(item.wonderkid.uid);
-              return (
-                <div
-                  key={item.wonderkid.uid}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-800 bg-[#0B0F19] p-3"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-slate-100">
-                        {item.wonderkid.name}
-                      </span>
-                      <span className="font-mono text-[11px] text-slate-400">
-                        {item.wonderkid.age}yo · {item.wonderkid.club} · PA{" "}
-                        {item.wonderkid.paRange}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 font-mono text-xs text-slate-400">
-                      Role Fit:{" "}
-                      <span className="text-cyan-300">
-                        {item.roleFitScore.toFixed(1)}
-                      </span>{" "}
-                      · Value Ratio:{" "}
-                      <span className="text-emerald-300">
-                        {item.valueRatio.toFixed(1)}
-                      </span>{" "}
-                      · Est. EUR {item.wonderkid.estimatedPriceEurM.toFixed(1)}M
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => toggleShortlistUid(item.wonderkid.uid)}
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${
-                      inShortlist
-                        ? "border-amber-500/50 bg-amber-500/20 text-amber-300"
-                        : "border-cyan-500/40 bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25"
-                    }`}
+            {wonderkidMatches.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-slate-700 bg-[#0B0F19] p-4 text-xs text-slate-400">
+                {worldWonderkids.length === 0
+                  ? "Unggah file save karier .fm untuk menampilkan target pengganti Wonderkids U-21 asli dari dunia karier Anda (data sample dinonaktifkan)."
+                  : "Tidak ada target U-21 eksternal yang cocok pada slot ini dari save .fm aktif."}
+              </p>
+            ) : (
+              wonderkidMatches.map((item) => {
+                const inShortlist = shortlistUids.includes(item.wonderkid.uid);
+                return (
+                  <div
+                    key={item.wonderkid.uid}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-800 bg-[#0B0F19] p-3"
                   >
-                    {inShortlist ? "Shortlisted" : "+ Shortlist"}
-                  </button>
-                </div>
-              );
-            })}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-slate-100">
+                          {item.wonderkid.name}
+                        </span>
+                        <span className="font-mono text-[11px] text-slate-400">
+                          {item.wonderkid.age}yo · {item.wonderkid.club} · PA{" "}
+                          {item.wonderkid.paRange}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 font-mono text-xs text-slate-400">
+                        Role Fit:{" "}
+                        <span className="text-cyan-300">
+                          {item.roleFitScore.toFixed(1)}
+                        </span>{" "}
+                        · Value Ratio:{" "}
+                        <span className="text-emerald-300">
+                          {item.valueRatio.toFixed(1)}
+                        </span>{" "}
+                        · Est. EUR {item.wonderkid.estimatedPriceEurM.toFixed(1)}M
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleShortlistUid(item.wonderkid.uid)}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${
+                        inShortlist
+                          ? "border-amber-500/50 bg-amber-500/20 text-amber-300"
+                          : "border-cyan-500/40 bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25"
+                      }`}
+                    >
+                      {inShortlist ? "Shortlisted" : "+ Shortlist"}
+                    </button>
+                  </div>
+                );
+              })
+            )}
           </div>
         )}
       </div>

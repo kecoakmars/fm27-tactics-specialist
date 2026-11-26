@@ -528,62 +528,72 @@ export function UnifiedReportDashboard({
               className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                 staffPlan.dataSource === "Live dari File Save .fm"
                   ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                  : "bg-slate-800 text-cyan-300 border border-cyan-500/30"
+                  : "bg-amber-500/15 text-amber-300 border border-amber-500/40"
               }`}
             >
-              Sumber: {staffPlan.dataSource}
+              {staffPlan.dataSource === "Live dari File Save .fm"
+                ? `Sumber: ${staffPlan.dataSource}`
+                : "Menunggu Impor File Save .fm (0% Data Sample)"}
             </span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-          {staffPlan.categories.slice(0, 6).map((cat) => (
-            <div
-              key={cat.categoryId}
-              className="rounded-xl p-3 bg-[#0B0F19] border border-white/8 flex flex-col gap-1.5"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-bold text-slate-100">{cat.label}</span>
-                <div className="flex items-center gap-1.5 font-mono-metric text-[11px]">
-                  {cat.clubCurrentStars !== null && (
-                    <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">
-                      Klub {cat.clubCurrentStars.toFixed(1)}★
-                    </span>
-                  )}
-                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300">
-                    Prio {cat.priorityWeight}
-                  </span>
-                </div>
-              </div>
-              <p className="text-[11px] text-slate-400">{cat.rationale}</p>
-              <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
-                <div>
-                  <div className="text-[10px] uppercase font-bold text-cyan-400">Top Staff</div>
-                  {cat.topStaff.slice(0, 2).map((st) => (
-                    <div key={st.uid} className="truncate text-slate-200">
-                      {st.name} ({st.club}) ·{" "}
-                      <span className="font-mono-metric text-amber-300">
-                        {st.stars.toFixed(1)}★
+          {staffPlan.dataSource !== "Live dari File Save .fm" && !staffPlan.hasClubStaff ? (
+            <div className="rounded-xl border border-dashed border-slate-700 bg-[#0B0F19] p-5 text-center text-xs text-slate-400">
+              Unggah file save karier <code className="text-emerald-300">.fm</code> untuk melihat
+              rating staf klub &amp; rekomendasi free agent asli dari dunia karier Anda (data sample
+              statis dinonaktifkan).
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              {staffPlan.categories.slice(0, 6).map((cat) => (
+                <div
+                  key={cat.categoryId}
+                  className="rounded-xl p-3 bg-[#0B0F19] border border-white/8 flex flex-col gap-1.5"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-slate-100">{cat.label}</span>
+                    <div className="flex items-center gap-1.5 font-mono-metric text-[11px]">
+                      {cat.clubCurrentStars !== null && (
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">
+                          Klub {cat.clubCurrentStars.toFixed(1)}★
+                        </span>
+                      )}
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300">
+                        Prio {cat.priorityWeight}
                       </span>
                     </div>
-                  ))}
-                </div>
-                <div>
-                  <div className="text-[10px] uppercase font-bold text-emerald-400">
-                    Free Agents
                   </div>
-                  {cat.topFreeAgents.slice(0, 2).map((fa) => (
-                    <div key={fa.uid} className="truncate text-slate-200">
-                      {fa.name} ·{" "}
-                      <span className="font-mono-metric text-emerald-300">
-                        {fa.stars.toFixed(1)}★
-                      </span>{" "}
-                      (€{(fa.wageEstimateEurWeekly / 1000).toFixed(0)}k/w)
+                  <p className="text-[11px] text-slate-400">{cat.rationale}</p>
+                  <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
+                    <div>
+                      <div className="text-[10px] uppercase font-bold text-cyan-400">Top Staff</div>
+                      {cat.topStaff.slice(0, 2).map((st) => (
+                        <div key={st.uid} className="truncate text-slate-200">
+                          {st.name} ({st.club}) ·{" "}
+                          <span className="font-mono-metric text-amber-300">
+                            {st.stars.toFixed(1)}★
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                    <div>
+                      <div className="text-[10px] uppercase font-bold text-emerald-400">
+                        Free Agents
+                      </div>
+                      {cat.topFreeAgents.slice(0, 2).map((fa) => (
+                        <div key={fa.uid} className="truncate text-slate-200">
+                          {fa.name} ·{" "}
+                          <span className="font-mono-metric text-emerald-300">
+                            {fa.stars.toFixed(1)}★
+                          </span>{" "}
+                          (€{(fa.wageEstimateEurWeekly / 1000).toFixed(0)}k/w)
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
-          ))}
-          </div>
+          )}
         </div>
       )}
 
@@ -598,72 +608,81 @@ export function UnifiedReportDashboard({
               className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                 wonderkidPlan.dataSource === "Live dari File Save .fm"
                   ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                  : "bg-slate-800 text-cyan-300 border border-cyan-500/30"
+                  : "bg-amber-500/15 text-amber-300 border border-amber-500/40"
               }`}
             >
-              Sumber: {wonderkidPlan.dataSource}
+              {wonderkidPlan.dataSource === "Live dari File Save .fm"
+                ? `Sumber: ${wonderkidPlan.dataSource}`
+                : "Menunggu Impor File Save .fm (0% Data Sample)"}
             </span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[420px] overflow-y-auto pr-1">
-          {wonderkidPlan.slots.map((slotPlan) => (
-            <div
-              key={slotPlan.slotIndex}
-              className={`rounded-xl p-3 bg-[#0B0F19] border flex flex-col gap-2 ${
-                slotPlan.isPriorityWeakSlot ? "border-rose-500/45" : "border-white/8"
-              }`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-mono-metric font-bold text-cyan-300">
-                  #{slotPlan.slotIndex + 1} {slotPlan.inPositionId}→{slotPlan.outPositionId} ·{" "}
-                  {slotPlan.inRoleName}
-                </span>
-                {slotPlan.isPriorityWeakSlot && (
-                  <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-200 text-[10px] font-bold">
-                    Prioritas Lemah
-                  </span>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                {slotPlan.candidates.map((wk) => {
-                  const inShortlist = shortlistUids.includes(wk.uid);
-                  return (
-                    <div
-                      key={wk.uid}
-                      className="p-2 rounded-lg bg-slate-900/80 border border-white/6 flex flex-col gap-1 text-[11px]"
-                    >
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="font-bold text-slate-100 truncate">
-                          {wk.name} ({wk.age}, {wk.club})
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => toggleShortlistUid(wk.uid)}
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
-                            inShortlist
-                              ? "bg-emerald-500 text-slate-950"
-                              : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-                          }`}
-                        >
-                          {inShortlist ? "Shortlisted" : "+ Shortlist"}
-                        </button>
-                      </div>
-                      <div className="flex flex-wrap gap-2 font-mono-metric text-[10px] text-slate-300">
-                        <span className="text-emerald-300">Fit {wk.roleFitScore.toFixed(1)}</span>
-                        <span className="text-cyan-300">Val {wk.valueRatio.toFixed(1)}</span>
-                        <span className="text-amber-300">€{wk.estimatedPriceEurM.toFixed(1)}M</span>
-                        <span>PA {wk.paRange}</span>
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-mono-metric truncate">
-                        {wk.keyAttributes.map((ka) => `${ka.attribute}:${ka.value}`).join(" · ")}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+          {wonderkidPlan.dataSource !== "Live dari File Save .fm" ? (
+            <div className="rounded-xl border border-dashed border-slate-700 bg-[#0B0F19] p-5 text-center text-xs text-slate-400">
+              Unggah file save karier <code className="text-emerald-300">.fm</code> untuk melihat
+              target Wonderkids U-21 asli dari dunia karier Anda (data sample statis dinonaktifkan).
             </div>
-          ))}
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[420px] overflow-y-auto pr-1">
+              {wonderkidPlan.slots.map((slotPlan) => (
+                <div
+                  key={slotPlan.slotIndex}
+                  className={`rounded-xl p-3 bg-[#0B0F19] border flex flex-col gap-2 ${
+                    slotPlan.isPriorityWeakSlot ? "border-rose-500/45" : "border-white/8"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono-metric font-bold text-cyan-300">
+                      #{slotPlan.slotIndex + 1} {slotPlan.inPositionId}→{slotPlan.outPositionId} ·{" "}
+                      {slotPlan.inRoleName}
+                    </span>
+                    {slotPlan.isPriorityWeakSlot && (
+                      <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-200 text-[10px] font-bold">
+                        Prioritas Lemah
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    {slotPlan.candidates.map((wk) => {
+                      const inShortlist = shortlistUids.includes(wk.uid);
+                      return (
+                        <div
+                          key={wk.uid}
+                          className="p-2 rounded-lg bg-slate-900/80 border border-white/6 flex flex-col gap-1 text-[11px]"
+                        >
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="font-bold text-slate-100 truncate">
+                              {wk.name} ({wk.age}, {wk.club})
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => toggleShortlistUid(wk.uid)}
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
+                                inShortlist
+                                  ? "bg-emerald-500 text-slate-950"
+                                  : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                              }`}
+                            >
+                              {inShortlist ? "Shortlisted" : "+ Shortlist"}
+                            </button>
+                          </div>
+                          <div className="flex flex-wrap gap-2 font-mono-metric text-[10px] text-slate-300">
+                            <span className="text-emerald-300">Fit {wk.roleFitScore.toFixed(1)}</span>
+                            <span className="text-cyan-300">Val {wk.valueRatio.toFixed(1)}</span>
+                            <span className="text-amber-300">€{wk.estimatedPriceEurM.toFixed(1)}M</span>
+                            <span>PA {wk.paRange}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-mono-metric truncate">
+                            {wk.keyAttributes.map((ka) => `${ka.attribute}:${ka.value}`).join(" · ")}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </section>

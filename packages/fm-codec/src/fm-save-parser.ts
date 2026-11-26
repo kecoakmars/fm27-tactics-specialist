@@ -1567,6 +1567,15 @@ export function parseFmSave(
     const paResolved = Math.min(200, Math.max(0, estimatePaNumeric(paRaw, caClamped)));
 
     if (isClubPlayer && clubObj) {
+      const teamIdx = clubObj.teamIds.indexOf(teamId);
+      const teamSlot =
+        teamIdx === 0
+          ? "First Team"
+          : teamIdx === 1
+            ? "U21 / Reserve"
+            : teamIdx >= 2
+              ? "U18 / Youth"
+              : "Affiliate / B";
       const playerObj: Player = {
         uid,
         name: playerName,
@@ -1575,6 +1584,7 @@ export function parseFmSave(
         clubName: clubObj.name,
         nationality,
         teamId,
+        teamSlot,
         leftFoot,
         rightFoot,
         currentAbility: caClamped,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getStaffFormulas, getStaffSeed } from "@fm27/fm-data";
+import { getStaffFormulas } from "@fm27/fm-data";
 import {
   calculateAllStaffStars,
   optimizeStaffAssignments,
@@ -23,7 +23,6 @@ export function StaffOptimizerTable({
 }: StaffOptimizerTableProps) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const formulas = getStaffFormulas(patchVersion);
-  const seedStaff = getStaffSeed(patchVersion).Staff;
 
   const {
     clubStaff,
@@ -35,6 +34,7 @@ export function StaffOptimizerTable({
 
   const [customStaff, setCustomStaff] = useState<StaffMember[] | null>(null);
   const [freeAgentsOnly, setFreeAgentsOnly] = useState(false);
+  const [clubStaffOnly, setClubStaffOnly] = useState(false);
   const [focusCategory, setFocusCategory] =
     useState<StaffCategoryId>("attacking_tactical");
   const [selectedPoolUids, setSelectedPoolUids] = useState<number[]>([]);
@@ -51,11 +51,21 @@ export function StaffOptimizerTable({
     }
   }, [clubStaff, customStaff]);
 
+  const hasLiveDirectory =
+    Boolean(customStaff && customStaff.length > 0) ||
+    clubStaff.length > 0 ||
+    worldStaffPool.length > 0;
+
   const dataSourceLabel = customStaff
     ? "Impor CSV / HTML Kustom"
-    : worldStaffPool.length > 0
-      ? "Live dari File Save .fm"
-      : "Dataset Seed Statis FM27";
+    : hasLiveDirectory
+      ? `Live .fm: ${liveFmSave?.saveName ?? "Save Aktif"} (${liveFmSave?.gameDate ?? ""})`
+      : "Menunggu Impor File Save .fm / CSV (0% Data Sample)";
+
+  const clubStaffUidSet = useMemo(
+    () => new Set(clubStaff.map((s) => s.uid)),
+    [clubStaff],
+  );
 
   const activeDirectory = useMemo(() => {
     if (customStaff) return customStaff;
@@ -67,8 +77,8 @@ export function StaffOptimizerTable({
       }
       return Array.from(merged.values());
     }
-    return seedStaff;
-  }, [clubStaff, customStaff, seedStaff, worldStaffPool]);
+    return [];
+  }, [clubStaff, customStaff, worldStaffPool]);
 
   const staffByUid = useMemo(
     () => new Map(activeDirectory.map((s) => [s.uid, s])),
@@ -77,7 +87,11 @@ export function StaffOptimizerTable({
 
   const filteredDirectory = useMemo(() => {
     const rows = activeDirectory
-      .filter((s) => (!freeAgentsOnly ? true : s.isFreeAgent))
+      .filter((s) => {
+        if (clubStaffOnly && !clubStaffUidSet.has(s.uid)) return false;
+        if (freeAgentsOnly && !s.isFreeAgent) return false;
+        return true;
+      })
       .map((member) => {
         const stars = calculateAllStaffStars(member.attributes, patchVersion);
         const targetStars =
@@ -87,7 +101,14 @@ export function StaffOptimizerTable({
       });
     rows.sort((a, b) => b.targetStars - a.targetStars || b.bestStars - a.bestStars);
     return rows;
-  }, [activeDirectory, freeAgentsOnly, focusCategory, patchVersion]);
+  }, [
+    activeDirectory,
+    clubStaffOnly,
+    clubStaffUidSet,
+    freeAgentsOnly,
+    focusCategory,
+    patchVersion,
+  ]);
 
   const poolMembers = useMemo(
     () =>
@@ -243,12 +264,12 @@ export function StaffOptimizerTable({
               </h3>
               <span
                 className={`rounded px-2 py-0.5 text-[10px] font-bold ${
-                  dataSourceLabel === "Live dari File Save .fm"
+                  hasLiveDirectory
                     ? "border border-emerald-500/40 bg-emerald-500/20 text-emerald-300"
-                    : "border border-cyan-500/30 bg-slate-800 text-cyan-300"
+                    : "border border-amber-500/40 bg-amber-500/15 text-amber-300"
                 }`}
               >
-                Sumber: {dataSourceLabel}
+                {dataSourceLabel}
               </span>
             </div>
             <p className="mt-0.5 text-xs text-slate-400">
@@ -257,6 +278,18 @@ export function StaffOptimizerTable({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {clubStaff.length > 0 && !customStaff && (
+              <label className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-[#0B0F19] px-2.5 py-1.5 text-xs text-slate-200 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={clubStaffOnly}
+                  onChange={(e) => setClubStaffOnly(e.target.checked)}
+                  className="accent-cyan-400"
+                />
+                Staf Klub Saja ({clubStaff.length})
+              </label>
+            )}
+
             <select
               value={focusCategory}
               onChange={(e) => setFocusCategory(e.target.value as StaffCategoryId)}
@@ -269,7 +302,7 @@ export function StaffOptimizerTable({
               ))}
             </select>
 
-            <label className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-[#0B0F19] px-2.5 py-1.5 text-xs text-slate-200">
+            <label className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-[#0B0F19] px-2.5 py-1.5 text-xs text-slate-200 cursor-pointer">
               <input
                 type="checkbox"
                 checked={freeAgentsOnly}
@@ -326,6 +359,30 @@ export function StaffOptimizerTable({
           <p className="mt-2 text-xs text-rose-300">{importError}</p>
         )}
 
+        {!hasLiveDirectory ? (
+          <div
+            id="staff-directory-empty-state"
+            className="mt-4 rounded-xl border border-dashed border-slate-700 bg-[#0B0F19]/80 p-8 text-center space-y-3"
+          >
+            <p className="text-sm font-bold text-slate-100">
+              Belum Ada Data Staf Pelatih yang Dimuat (0% Data Sample)
+            </p>
+            <p className="mx-auto max-w-xl text-xs text-slate-400 leading-relaxed">
+              Unggah file save karier <code className="text-emerald-300">.fm</code> untuk memuat
+              jajaran pelatih klub Anda dan 200 pelatih/free agent terbaik langsung dari dunia
+              karier Anda, atau unggah ekspor <code className="text-cyan-300">Staff CSV / HTML</code>.
+            </p>
+            <div>
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-400 cursor-pointer"
+              >
+                Unggah File Save .fm / Staff CSV
+              </button>
+            </div>
+          </div>
+        ) : (
         <div className="mt-3 max-h-96 overflow-y-auto">
           <table className="w-full text-left text-xs">
             <thead>
@@ -399,6 +456,7 @@ export function StaffOptimizerTable({
             </tbody>
           </table>
         </div>
+        )}
       </section>
     </div>
   );

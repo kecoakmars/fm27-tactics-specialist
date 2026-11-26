@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getTacticalStyles } from "@fm27/fm-data";
 import type { TacticPlanResult } from "@fm27/shared-types";
 import { ReplacementModal } from "../../components/squad/ReplacementModal";
@@ -44,12 +44,41 @@ export default function SquadAuditPage() {
 
   const [inspectSlotIdx, setInspectSlotIdx] = useState<number | null>(null);
   const [gradedCurrent, setGradedCurrent] = useState<TacticPlanResult | null>(null);
+  const [squadTierFilter, setSquadTierFilter] = useState<"first-team" | "first-and-u21" | "all">("first-team");
 
   const stylesCatalog = getTacticalStyles(tactic.patchVersion);
 
-  // Auto-run Audit Active Tactic whenever squad or active tactic updates
+  const hasTeamSlots = useMemo(
+    () => players.some((p) => p.teamSlot === "First Team"),
+    [players],
+  );
+  const firstTeamCount = useMemo(
+    () => players.filter((p) => p.teamSlot === "First Team").length,
+    [players],
+  );
+  const firstAndU21Count = useMemo(
+    () =>
+      players.filter(
+        (p) => p.teamSlot === "First Team" || p.teamSlot === "U21 / Reserve",
+      ).length,
+    [players],
+  );
+
+  const activePlayers = useMemo(() => {
+    if (!hasTeamSlots || squadTierFilter === "all") return players;
+    if (squadTierFilter === "first-team") {
+      const ft = players.filter((p) => p.teamSlot === "First Team");
+      return ft.length >= 11 ? ft : players;
+    }
+    const ftU21 = players.filter(
+      (p) => p.teamSlot === "First Team" || p.teamSlot === "U21 / Reserve",
+    );
+    return ftU21.length >= 11 ? ftU21 : players;
+  }, [hasTeamSlots, players, squadTierFilter]);
+
+  // Auto-run Audit Active Tactic whenever active squad slice or active tactic updates
   useEffect(() => {
-    if (players.length < 11) {
+    if (activePlayers.length < 11) {
       setAuditResult(null);
       setGradedCurrent(null);
       return;
@@ -58,8 +87,8 @@ export default function SquadAuditPage() {
     (async () => {
       try {
         const [audit, graded] = await Promise.all([
-          auditSquadInWorker(tactic, players),
-          gradeImportedTacticInWorker(tactic, players, true),
+          auditSquadInWorker(tactic, activePlayers),
+          gradeImportedTacticInWorker(tactic, activePlayers, true),
         ]);
         if (!cancelled) {
           setAuditResult(audit);
@@ -75,14 +104,14 @@ export default function SquadAuditPage() {
     return () => {
       cancelled = true;
     };
-  }, [players, tactic, setAuditResult, setError]);
+  }, [activePlayers, tactic, setAuditResult, setError]);
 
   async function handleAutoGenerateBestTactics() {
-    if (players.length < 11) return;
+    if (activePlayers.length < 11) return;
     setBusy(true);
     setError(null);
     try {
-      const plans = await analyzeSquadInWorker(players, {
+      const plans = await analyzeSquadInWorker(activePlayers, {
         styleId: styleFilter || undefined,
         priorities,
         lineupPreferences,
@@ -147,6 +176,39 @@ export default function SquadAuditPage() {
       </div>
 
       <SquadImporter />
+
+      {hasTeamSlots && (
+        <section className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-800 bg-[#111827] px-4 py-2.5">
+          <div className="text-xs text-slate-300">
+            <span className="font-semibold text-slate-100">Filter Tim Klub (.fm):</span>{" "}
+            <span className="text-slate-400">
+              Pisahkan pemain Tim Utama dari U21/U18 agar audit &amp; solver lebih akurat.
+            </span>
+          </div>
+          <div className="flex items-center gap-1 rounded-lg border border-slate-800 bg-[#0B0F19] p-1 text-xs">
+            {(
+              [
+                ["first-team", `First Team (${firstTeamCount})`],
+                ["first-and-u21", `First Team + U21 (${firstAndU21Count})`],
+                ["all", `Semua Klub (${players.length})`],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setSquadTierFilter(key)}
+                className={`rounded-md px-2.5 py-1 font-semibold transition cursor-pointer ${
+                  squadTierFilter === key
+                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                    : "text-slate-400 hover:text-slate-200 border border-transparent"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {errorMessage && (
         <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-2.5 text-xs text-rose-200">
@@ -296,10 +358,10 @@ export default function SquadAuditPage() {
         />
       )}
 
-      {players.length > 0 && (
+      {activePlayers.length > 0 && (
         <RoleFitTable
           audit={auditResult}
-          players={players}
+          players={activePlayers}
           lineupPreferences={lineupPreferences}
           patchVersion={tactic.patchVersion}
           onInspectSlot={(idx) => setInspectSlotIdx(idx)}

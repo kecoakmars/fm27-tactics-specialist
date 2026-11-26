@@ -183,7 +183,22 @@ export function RoleFitTable({
                       />
                     </td>
                     <td className="py-1.5 pr-2 font-medium text-slate-100">
-                      {p.name}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span>{p.name}</span>
+                        {p.teamSlot && (
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                              p.teamSlot === "First Team"
+                                ? "bg-emerald-500/15 text-emerald-300"
+                                : p.teamSlot === "U21 / Reserve"
+                                  ? "bg-cyan-500/15 text-cyan-300"
+                                  : "bg-slate-800 text-slate-400"
+                            }`}
+                          >
+                            {p.teamSlot}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-1.5 pr-2 font-mono text-slate-400">
                       {p.age ?? "-"}

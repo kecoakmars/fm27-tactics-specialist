@@ -140,6 +140,7 @@ describe("FM26/FM27 Client-Side .fm Save Parser & Live World Pool", () => {
 
       const roster = parsed.playersByClub[targetClub.uid] ?? [];
       expect(roster.length).toBeGreaterThanOrEqual(11);
+      expect(roster.filter((p) => p.teamSlot === "First Team").length).toBeGreaterThanOrEqual(11);
 
       for (const player of roster) {
         for (const attr of ALL_49_ATTRIBUTES) {
