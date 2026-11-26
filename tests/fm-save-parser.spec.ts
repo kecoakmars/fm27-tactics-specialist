@@ -93,14 +93,21 @@ describe("FM26/FM27 Client-Side .fm Save Parser & Live World Pool", () => {
     mockSelf.onmessage!({ data: { type: "PING" } });
     expect(outbox[1]).toEqual({ type: "PONG" });
 
-    // PARSE_FM_SAVE forwards progress (5%) then structured error on invalid buffer without hanging
+    // PARSE_FM_SAVE forwards initial progress (>=5%) then structured error on invalid buffer without hanging
     const invalidBuf = new Uint8Array(16).buffer;
     mockSelf.onmessage!({
       data: { id: "req-1", type: "PARSE_FM_SAVE", buffer: invalidBuf },
     });
-    expect(outbox.some((m) => m.id === "req-1" && m.kind === "progress" && m.pct === 5)).toBe(
-      true,
-    );
+    expect(
+      outbox.some(
+        (m) =>
+          m.id === "req-1" &&
+          m.kind === "progress" &&
+          typeof m.pct === "number" &&
+          m.pct >= 5 &&
+          m.pct <= 15,
+      ),
+    ).toBe(true);
     const doneMsg = outbox.find((m) => m.id === "req-1" && m.kind === "done");
     expect(doneMsg?.ok).toBe(false);
     expect(String(doneMsg?.error)).toMatch(/tidak valid atau kosong/i);

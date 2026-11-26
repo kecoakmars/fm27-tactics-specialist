@@ -20,6 +20,12 @@ workerGlobal.onmessage = (event: MessageEvent<SaveWorkerRequest>) => {
 
   if (msg.type === "PARSE_FM_SAVE") {
     try {
+      workerGlobal.postMessage({
+        id: msg.id,
+        kind: "progress",
+        stage: "Worker aktif — memeriksa header .fm...",
+        pct: 9,
+      });
       const result = parseFmSave(new Uint8Array(msg.buffer), (stage, pct) => {
         workerGlobal.postMessage({
           id: msg.id,

@@ -223,6 +223,26 @@ function collectTocEntries(
   }
 }
 
+function isFmfFourCcHeaderAt(bytes: Uint8Array, offset: number): boolean {
+  if (offset < 0 || offset + 9 > bytes.byteLength) return false;
+  return (
+    bytes[offset + 2] === 0x66 &&
+    bytes[offset + 3] === 0x6d &&
+    bytes[offset + 4] === 0x66 &&
+    bytes[offset + 5] === 0x2e
+  );
+}
+
+function isAfeFourCcHeaderAt(bytes: Uint8Array, offset: number): boolean {
+  if (offset < 0 || offset + 9 > bytes.byteLength) return false;
+  return (
+    bytes[offset + 2] === 0x61 &&
+    bytes[offset + 3] === 0x66 &&
+    bytes[offset + 4] === 0x65 &&
+    bytes[offset + 5] === 0x2e
+  );
+}
+
 function readArchiveToc(
   archiveBytes: Uint8Array,
   allowAfeHeader = false,
@@ -232,8 +252,10 @@ function readArchiveToc(
   entries: RawTocEntry[];
 } {
   const reader = new BinaryReader(archiveBytes);
-  if (allowAfeHeader && isEncryptedAfeArchive(archiveBytes)) {
-    reader.expectBytes(ENCRYPTED_AFE_HEADER, "AFE ArchiveHeader");
+  if (allowAfeHeader && (isEncryptedAfeArchive(archiveBytes) || isAfeFourCcHeaderAt(archiveBytes, 0))) {
+    reader.skip(9);
+  } else if (isFmfFourCcHeaderAt(archiveBytes, 0)) {
+    reader.skip(9);
   } else {
     reader.expectBytes(FMF_ARCHIVE_HEADER, "FMF ArchiveHeader");
   }
@@ -252,7 +274,11 @@ function readArchiveToc(
   }
 
   reader.seek(secondHeaderAbsOffset);
-  reader.expectBytes(FMF_ARCHIVE_HEADER, "Trailing FMF ArchiveHeader");
+  if (isFmfFourCcHeaderAt(archiveBytes, secondHeaderAbsOffset) || isAfeFourCcHeaderAt(archiveBytes, secondHeaderAbsOffset)) {
+    reader.skip(9);
+  } else {
+    reader.expectBytes(FMF_ARCHIVE_HEADER, "Trailing FMF ArchiveHeader");
+  }
   const tocFrame = archiveBytes.subarray(reader.offset);
   const tocRaw = decodeZstdFrame(tocFrame);
 
@@ -261,6 +287,15 @@ function readArchiveToc(
   const entries: RawTocEntry[] = [];
   collectTocEntries(tocReader, "", entries);
   return { rootTitle, dataStart, entries };
+}
+
+function safeDecodeDetailsAom(detailsBytes: Uint8Array | undefined): DetailsAomMetadata | undefined {
+  if (!detailsBytes) return undefined;
+  try {
+    return decodeDetailsAom(detailsBytes);
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -298,7 +333,7 @@ export function unpackPlainFmfArchive(archiveBytes: Uint8Array): UnpackedFmfArch
   }
 
   const detailsBytes = files.get("_data/details.aom");
-  const details = detailsBytes ? decodeDetailsAom(detailsBytes) : undefined;
+  const details = safeDecodeDetailsAom(detailsBytes);
 
   return { rootTitle, files, details };
 }
@@ -334,7 +369,7 @@ export async function unpackFmfArchive(archiveBytes: Uint8Array): Promise<Unpack
       files.set(entry.fullKey, decompressed);
     }
     const detailsBytes = files.get("_data/details.aom");
-    const details = detailsBytes ? decodeDetailsAom(detailsBytes) : undefined;
+    const details = safeDecodeDetailsAom(detailsBytes);
     return { rootTitle, files, details };
   }
 
@@ -404,7 +439,25 @@ export async function parseFmf(
     }
   }
   if (!tacBytes) {
-    throw new Error("Archive does not contain any .tac tactic member");
+    const memberNames = Array.from(unpacked.files.keys());
+    if (memberNames.some((n) => n.toLowerCase().includes("game_db"))) {
+      throw new Error(
+        "File ini adalah save karier Football Manager (.fm), bukan file taktik (.fmf). Pastikan ekstensi file berakhiran .fm agar dibaca sebagai Save Karier.",
+      );
+    }
+    if (memberNames.some((n) => n.toLowerCase().endsWith(".tsc"))) {
+      throw new Error(
+        "File .fmf ini adalah jadwal latihan (.tsc), bukan file taktik (.tac). Impor melalui halaman Training.",
+      );
+    }
+    if (memberNames.some((n) => n.toLowerCase().endsWith(".slf"))) {
+      throw new Error(
+        "File .fmf ini adalah daftar shortlist (.slf), bukan file taktik (.tac).",
+      );
+    }
+    throw new Error(
+      `Arsip .fmf tidak berisi file taktik .tac (isi arsip: ${memberNames.slice(0, 5).join(", ") || "kosong"}).`,
+    );
   }
 
   const tactic = decodeTacPayload(tacBytes, options);

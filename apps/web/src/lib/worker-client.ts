@@ -29,9 +29,9 @@ import {
 type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never;
 type EngineWorkerPayload = DistributiveOmit<EngineWorkerRequest, "id">;
 
-const SAVE_WORKER_URL = "/workers/fm-save-worker.js";
-const SAVE_WORKER_HANDSHAKE_TIMEOUT_MS = 1000;
-const SAVE_WORKER_HEARTBEAT_TIMEOUT_MS = 60_000;
+const SAVE_WORKER_URL = "/workers/fm-save-worker.js?v=2";
+const SAVE_WORKER_HANDSHAKE_TIMEOUT_MS = 15_000;
+const SAVE_WORKER_HEARTBEAT_TIMEOUT_MS = 90_000;
 
 export const FM_SAVE_CANCELLED_ERROR = "DIBATALKAN_PENGGUNA";
 
@@ -42,11 +42,11 @@ type SaveWorkerIncomingMessage =
   | { id: string; kind: "done"; ok: false; error: string };
 
 let saveWorker: Worker | null = null;
+let saveWorkerBlobUrl: string | null = null;
 let saveWorkerReady = false;
-let saveWorkerBroken = false;
 let seq = 0;
 
-const readyWaiters = new Set<(ready: boolean) => void>();
+const readyWaiters = new Set<(res: { ok: boolean; error?: string }) => void>();
 
 const pendingSaveTasks = new Map<
   string,
@@ -80,23 +80,23 @@ function resetWatchdog(id: string): void {
   entry.watchdog = setTimeout(() => {
     pendingSaveTasks.delete(id);
     teardownSaveWorker(
-      "Pemrosesan file .fm tidak merespons lebih dari 60 detik (worker dihentikan).",
-      false,
+      "Pemrosesan file .fm tidak merespons lebih dari 90 detik (worker dihentikan).",
     );
   }, SAVE_WORKER_HEARTBEAT_TIMEOUT_MS);
 }
 
-function teardownSaveWorker(reason: string, markBroken: boolean): void {
+function teardownSaveWorker(reason: string): void {
   if (saveWorker) {
     saveWorker.terminate();
     saveWorker = null;
   }
-  saveWorkerReady = false;
-  if (markBroken) {
-    saveWorkerBroken = true;
+  if (saveWorkerBlobUrl) {
+    URL.revokeObjectURL(saveWorkerBlobUrl);
+    saveWorkerBlobUrl = null;
   }
+  saveWorkerReady = false;
   for (const notifyReady of readyWaiters) {
-    notifyReady(false);
+    notifyReady({ ok: false, error: reason });
   }
   readyWaiters.clear();
 
@@ -111,142 +111,183 @@ function teardownSaveWorker(reason: string, markBroken: boolean): void {
  * Cancels any active `.fm` save parsing worker immediately and frees its memory.
  */
 export function cancelActiveFmSaveImport(): void {
-  teardownSaveWorker(FM_SAVE_CANCELLED_ERROR, false);
+  teardownSaveWorker(FM_SAVE_CANCELLED_ERROR);
+}
+
+function attachWorkerHandlers(w: Worker): void {
+  w.onmessage = (event: MessageEvent<SaveWorkerIncomingMessage>) => {
+    const msg = event.data;
+    if (!msg) return;
+
+    if ("type" in msg && msg.type === "PONG") {
+      saveWorkerReady = true;
+      for (const notifyReady of readyWaiters) {
+        notifyReady({ ok: true });
+      }
+      readyWaiters.clear();
+      return;
+    }
+
+    if ("id" in msg) {
+      const entry = pendingSaveTasks.get(msg.id);
+      if (!entry) return;
+
+      if (msg.kind === "progress") {
+        resetWatchdog(msg.id);
+        entry.onProgress?.(msg.stage, msg.pct);
+        return;
+      }
+
+      clearTimeout(entry.watchdog);
+      pendingSaveTasks.delete(msg.id);
+      if (msg.ok) {
+        entry.resolve(msg.result);
+      } else {
+        entry.reject(new Error(msg.error));
+      }
+    }
+  };
+
+  w.onerror = (err) => {
+    teardownSaveWorker(
+      err.message || "Gagal menjalankan Web Worker pembaca .fm",
+    );
+  };
+  w.onmessageerror = () => {
+    teardownSaveWorker(
+      "Gagal menerima data hasil ekstraksi dari Web Worker",
+    );
+  };
+}
+
+async function waitForWorkerPong(w: Worker): Promise<{ ok: boolean; error?: string }> {
+  if (saveWorkerReady && saveWorker === w) {
+    return { ok: true };
+  }
+  return new Promise<{ ok: boolean; error?: string }>((resolve) => {
+    const timer = setTimeout(() => {
+      readyWaiters.delete(onDone);
+      resolve({
+        ok: false,
+        error: `Web Worker tidak merespons handshake PING/PONG dalam ${Math.round(SAVE_WORKER_HANDSHAKE_TIMEOUT_MS / 1000)} detik.`,
+      });
+    }, SAVE_WORKER_HANDSHAKE_TIMEOUT_MS);
+
+    const onDone = (res: { ok: boolean; error?: string }) => {
+      clearTimeout(timer);
+      readyWaiters.delete(onDone);
+      resolve(res);
+    };
+
+    readyWaiters.add(onDone);
+    try {
+      w.postMessage({ type: "PING" });
+    } catch (err) {
+      onDone({
+        ok: false,
+        error: err instanceof Error ? err.message : "Gagal mengirim PING ke Web Worker",
+      });
+    }
+  });
+}
+
+async function createBlobFallbackWorker(): Promise<Worker> {
+  const res = await fetch(SAVE_WORKER_URL, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(
+      `Gagal mengunduh script Web Worker (${SAVE_WORKER_URL}): HTTP ${res.status} ${res.statusText}. Pastikan deploy Vercel menyertakan public/workers/fm-save-worker.js.`,
+    );
+  }
+  const scriptText = await res.text();
+  const trimmed = scriptText.trimStart();
+  if (trimmed.startsWith("<!") || trimmed.startsWith("<html")) {
+    throw new Error(
+      `Respon ${SAVE_WORKER_URL} berupa HTML bukan JavaScript (kemungkinan 404/redirect Vercel).`,
+    );
+  }
+  const blob = new Blob([scriptText], { type: "application/javascript" });
+  const blobUrl = URL.createObjectURL(blob);
+  saveWorkerBlobUrl = blobUrl;
+  const w = new Worker(blobUrl);
+  saveWorker = w;
+  attachWorkerHandlers(w);
+  return w;
 }
 
 /**
  * Ensures `/workers/fm-save-worker.js` is alive and responds to `PING -> PONG`
  * BEFORE transferring any `ArrayBuffer` (preventing detached-buffer deadlocks).
+ * Automatically falls back to `fetch() + Blob Worker` if direct URL Worker fails on Vercel.
  */
-async function ensureSaveWorkerReady(): Promise<Worker | null> {
-  if (
-    saveWorkerBroken ||
-    typeof window === "undefined" ||
-    typeof Worker === "undefined"
-  ) {
-    return null;
-  }
-
+async function ensureSaveWorkerReady(): Promise<Worker> {
   if (saveWorker && saveWorkerReady) {
     return saveWorker;
   }
 
+  // Attempt 1: Direct URL Worker
   if (!saveWorker) {
     try {
       const w = new Worker(SAVE_WORKER_URL);
       saveWorker = w;
-      w.onmessage = (event: MessageEvent<SaveWorkerIncomingMessage>) => {
-        const msg = event.data;
-        if (!msg) return;
-
-        if ("type" in msg && msg.type === "PONG") {
-          saveWorkerReady = true;
-          for (const notifyReady of readyWaiters) {
-            notifyReady(true);
-          }
-          readyWaiters.clear();
-          return;
-        }
-
-        if ("id" in msg) {
-          const entry = pendingSaveTasks.get(msg.id);
-          if (!entry) return;
-
-          if (msg.kind === "progress") {
-            resetWatchdog(msg.id);
-            entry.onProgress?.(msg.stage, msg.pct);
-            return;
-          }
-
-          clearTimeout(entry.watchdog);
-          pendingSaveTasks.delete(msg.id);
-          if (msg.ok) {
-            entry.resolve(msg.result);
-          } else {
-            entry.reject(new Error(msg.error));
-          }
-        }
-      };
-
-      w.onerror = (err) => {
-        teardownSaveWorker(
-          err.message || "Gagal menjalankan Web Worker pembaca .fm",
-          true,
-        );
-      };
-      w.onmessageerror = () => {
-        teardownSaveWorker(
-          "Gagal menerima data hasil ekstraksi dari Web Worker",
-          true,
-        );
-      };
+      attachWorkerHandlers(w);
+      const firstHandshake = await waitForWorkerPong(w);
+      if (firstHandshake.ok && saveWorker === w) {
+        return w;
+      }
+      teardownSaveWorker(firstHandshake.error ?? "Direct worker handshake gagal");
     } catch {
-      saveWorker = null;
-      saveWorkerBroken = true;
-      return null;
+      teardownSaveWorker("Gagal inisialisasi direct Worker URL");
     }
-  }
-
-  if (saveWorkerReady && saveWorker) {
-    return saveWorker;
-  }
-
-  const alive = await new Promise<boolean>((resolve) => {
-    const timer = setTimeout(() => {
-      readyWaiters.delete(onDone);
-      resolve(false);
-    }, SAVE_WORKER_HANDSHAKE_TIMEOUT_MS);
-
-    const onDone = (ok: boolean) => {
-      clearTimeout(timer);
-      readyWaiters.delete(onDone);
-      resolve(ok);
-    };
-
-    readyWaiters.add(onDone);
-    try {
-      saveWorker?.postMessage({ type: "PING" });
-    } catch {
-      onDone(false);
+  } else {
+    const existingHandshake = await waitForWorkerPong(saveWorker);
+    if (existingHandshake.ok && saveWorker) {
+      return saveWorker;
     }
-  });
-
-  if (!alive || !saveWorker) {
-    teardownSaveWorker("Web Worker tidak merespons handshake awal", true);
-    return null;
+    teardownSaveWorker(existingHandshake.error ?? "Worker existing tidak merespons");
   }
 
-  return saveWorker;
+  // Attempt 2: Fetch + Blob Worker (recovers from Vercel CDN/MIME/redirect edge cases and reports exact HTTP status)
+  const blobWorker = await createBlobFallbackWorker();
+  const blobHandshake = await waitForWorkerPong(blobWorker);
+  if (!blobHandshake.ok || saveWorker !== blobWorker) {
+    const errText =
+      blobHandshake.error ?? "Web Worker gagal merespons setelah Blob fallback.";
+    teardownSaveWorker(errText);
+    throw new Error(errText);
+  }
+  return blobWorker;
 }
 
 /**
  * Parses a 50-400 MB `.fm` career save 100% client-side inside the standalone
  * `/workers/fm-save-worker.js` using zero-copy Transferable `ArrayBuffer`.
- * Verified via `PING -> PONG` handshake first; if Workers are unavailable/blocked,
- * `arrayBuffer` remains intact and falls back safely after yielding a UI paint frame.
+ * Never falls back to synchronous main-thread parsing in a browser (which would freeze the UI).
  */
 export async function parseFmSaveInWorker(
   arrayBuffer: ArrayBuffer,
   onProgress?: FmSaveProgressCallback,
 ): Promise<ParsedFmSave> {
-  const worker = await ensureSaveWorkerReady();
-
-  if (!worker) {
+  if (typeof window === "undefined" || typeof Worker === "undefined") {
     onProgress?.("Membaca file...", 5);
-    await yieldToBrowserPaint();
     return parseFmSave(new Uint8Array(arrayBuffer), onProgress);
   }
+
+  onProgress?.("Menyiapkan Web Worker lokal...", 5);
+  await yieldToBrowserPaint();
+
+  const worker = await ensureSaveWorkerReady();
+  const sizeMb = (arrayBuffer.byteLength / (1024 * 1024)).toFixed(1);
+  onProgress?.(`Mengirim buffer (${sizeMb} MB) ke Web Worker...`, 8);
 
   const id = `fm-${++seq}-${Date.now()}`;
   return new Promise<ParsedFmSave>((resolve, reject) => {
     const watchdog = setTimeout(() => {
       pendingSaveTasks.delete(id);
       teardownSaveWorker(
-        "Pemrosesan file .fm melebihi batas waktu tanpa progres (60 detik).",
-        false,
+        "Pemrosesan file .fm melebihi batas waktu tanpa progres (90 detik).",
       );
       reject(
-        new Error("Pemrosesan file .fm melebihi batas waktu tanpa progres (60 detik)."),
+        new Error("Pemrosesan file .fm melebihi batas waktu tanpa progres (90 detik)."),
       );
     }, SAVE_WORKER_HEARTBEAT_TIMEOUT_MS);
 

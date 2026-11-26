@@ -7,8 +7,6 @@ import {
   encodeTacticToUrlHash,
   exportFm27Json,
   exportFmf,
-  parseFm27Json,
-  parseFmf,
 } from "@fm27/fm-codec";
 import { getPitchCatalog, getTacticalStyles } from "@fm27/fm-data";
 import { computeTacticalBalance } from "@fm27/fm-engine";
@@ -25,12 +23,15 @@ import { PlayerInstructionModal } from "@/components/instructions/PlayerInstruct
 import { TeamInstructionPanel } from "@/components/instructions/TeamInstructionPanel";
 import { DualPhasePitch } from "@/components/pitch/DualPhasePitch";
 import { SplitViewPitch } from "@/components/pitch/SplitViewPitch";
+import {
+  importFmSaveArrayBuffer,
+  importFmSaveFile,
+  importTacticBytes,
+  importTacticFile,
+  isFmSaveFileName,
+} from "@/lib/file-importer";
 import { sanitizeFileName, triggerBrowserDownload } from "@/lib/local-folder-sync";
 import { exportDualPhasePngCard } from "@/lib/svg-card-exporter";
-import {
-  FM_SAVE_CANCELLED_ERROR,
-  parseFmSaveInWorker,
-} from "@/lib/worker-client";
 import { useFolderSyncStore } from "@/stores/useFolderSyncStore";
 import { useTacticStore } from "@/stores/useTacticStore";
 
@@ -50,8 +51,6 @@ export default function TacticalBoardWorkspacePage() {
     applyPresetStyle,
     applyDualShape,
     loadTactic,
-    ingestParsedFmSave,
-    setFmImportProgress,
     setClubPickerOpen,
     liveFmSave,
     selectedClubUid,
@@ -164,27 +163,16 @@ export default function TacticalBoardWorkspacePage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [redo, undo]);
 
-  const formatHexHeader = (bytes: Uint8Array, maxBytes = 16): string =>
-    Array.from(bytes.subarray(0, maxBytes))
-      .map((b) => b.toString(16).padStart(2, "0").toUpperCase())
-      .join(" ");
-
   const handleImportFmSaveArrayBuffer = useCallback(
     async (fileName: string, arrayBuffer: ArrayBuffer) => {
       setBusyAction("import-fm-save");
-      setFmImportProgress({
-        stage: "Membaca file...",
-        pct: 3,
-        fileName,
-      });
       try {
-        if (arrayBuffer.byteLength === 0) {
-          throw new Error("File save .fm kosong (0 bytes).");
+        const outcome = await importFmSaveArrayBuffer(fileName, arrayBuffer);
+        if (outcome.cancelled) {
+          notify("ok", `Pembacaan file ${fileName} dibatalkan.`);
+          return;
         }
-        const parsed = await parseFmSaveInWorker(arrayBuffer, (stage, pct) => {
-          setFmImportProgress({ stage, pct, fileName });
-        });
-        const { selectedClub, report } = await ingestParsedFmSave(parsed, fileName);
+        const { parsed, selectedClub, report } = outcome;
         if (selectedClub && report) {
           notify(
             "ok",
@@ -197,80 +185,94 @@ export default function TacticalBoardWorkspacePage() {
           );
         }
       } catch (err) {
-        setFmImportProgress(null);
-        const message = err instanceof Error ? err.message : String(err);
-        if (message === FM_SAVE_CANCELLED_ERROR) {
-          notify("ok", `Pembacaan file ${fileName} dibatalkan.`);
-          return;
-        }
-        notify("error", `Gagal impor save ${fileName}: ${message}`);
+        notify(
+          "error",
+          `Gagal impor save ${fileName}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       } finally {
         setBusyAction(null);
       }
     },
-    [ingestParsedFmSave, notify, setFmImportProgress],
+    [notify],
   );
 
   const handleImportFmSaveFile = useCallback(
     async (file: File) => {
       setBusyAction("import-fm-save");
-      setFmImportProgress({
-        stage: "Membaca file dari disk lokal...",
-        pct: 1,
-        fileName: file.name,
-      });
       try {
-        await new Promise((r) => setTimeout(r, 16));
-        const ab = await file.arrayBuffer();
-        await handleImportFmSaveArrayBuffer(file.name, ab);
+        const outcome = await importFmSaveFile(file);
+        if (outcome.cancelled) {
+          notify("ok", `Pembacaan file ${file.name} dibatalkan.`);
+          return;
+        }
+        const { parsed, selectedClub, report } = outcome;
+        if (selectedClub && report) {
+          notify(
+            "ok",
+            `Save "${parsed.saveName}" dimuat 100% lokal! Klub: ${selectedClub.name} (${selectedClub.playerCount} pemain, ${selectedClub.staffCount} pelatih) · Rekomendasi #1: ${report.tacticAdvice.recommendedTactic.title} (IP ${report.tacticAdvice.recommendedTactic.inFormation} → OOP ${report.tacticAdvice.recommendedTactic.outFormation})`,
+          );
+        } else {
+          notify(
+            "ok",
+            `Save "${parsed.saveName}" berhasil diekstrak (${parsed.stats.totalClubs.toLocaleString()} klub, ${parsed.worldWonderkids.length} U-21 wonderkids). Silakan pilih klub Anda.`,
+          );
+        }
       } catch (err) {
-        setFmImportProgress(null);
-        setBusyAction(null);
         notify(
           "error",
-          `Gagal membaca ${file.name}: ${err instanceof Error ? err.message : String(err)}`,
+          `Gagal impor save ${file.name}: ${err instanceof Error ? err.message : String(err)}`,
         );
+      } finally {
+        setBusyAction(null);
       }
     },
-    [handleImportFmSaveArrayBuffer, notify, setFmImportProgress],
+    [notify],
   );
 
   const handleImportBytes = useCallback(
     async (fileName: string, bytes: Uint8Array) => {
       setBusyAction("import");
-      const isJson = fileName.toLowerCase().endsWith(".json");
       try {
-        if (bytes.byteLength === 0) {
-          throw new Error("File kosong (0 bytes)");
-        }
-        if (isJson) {
-          const text = new TextDecoder().decode(bytes);
-          const imported = parseFm27Json(text);
-          loadTactic(imported);
-          notify(
-            "ok",
-            `Imported "${imported.title}" (${imported.inFormation} → ${imported.outFormation}) dari ${fileName}`,
-          );
-        } else {
-          // Run parseFmf directly on main thread to avoid Web Worker hang / BigInt DataCloneError
-          const imported = await parseFmf(bytes, { patchVersion: tactic.patchVersion });
-          loadTactic(imported);
-          notify(
-            "ok",
-            `Imported "${imported.title}" (IP ${imported.inFormation} → OOP ${imported.outFormation}) dari ${fileName} (${bytes.byteLength} B)`,
-          );
-        }
+        const { tactic: imported, byteLength } = await importTacticBytes(fileName, bytes);
+        notify(
+          "ok",
+          `Imported "${imported.title}" (IP ${imported.inFormation} → OOP ${imported.outFormation}) dari ${fileName} (${byteLength} B)`,
+        );
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        const headerSuffix = ` | Header[0..15]: ${
-          bytes.byteLength > 0 ? formatHexHeader(bytes, 16) : "(empty)"
-        }`;
-        notify("error", `Gagal impor ${fileName}: ${message}${headerSuffix}`);
+        notify(
+          "error",
+          `Gagal impor ${fileName}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       } finally {
         setBusyAction(null);
       }
     },
-    [loadTactic, notify, tactic.patchVersion],
+    [notify],
+  );
+
+  const handleImportPickedFile = useCallback(
+    async (file: File) => {
+      if (isFmSaveFileName(file.name)) {
+        await handleImportFmSaveFile(file);
+        return;
+      }
+      setBusyAction("import");
+      try {
+        const { tactic: imported, byteLength } = await importTacticFile(file);
+        notify(
+          "ok",
+          `Imported "${imported.title}" (IP ${imported.inFormation} → OOP ${imported.outFormation}) dari ${file.name} (${byteLength} B)`,
+        );
+      } catch (err) {
+        notify(
+          "error",
+          `Gagal impor ${file.name}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      } finally {
+        setBusyAction(null);
+      }
+    },
+    [handleImportFmSaveFile, notify],
   );
 
   const handleDownloadFmf = () => {
@@ -394,20 +396,7 @@ export default function TacticalBoardWorkspacePage() {
         setIsDraggingFile(false);
         const file = e.dataTransfer.files?.[0];
         if (!file) return;
-        const isFmSave = file.name.toLowerCase().endsWith(".fm");
-        if (isFmSave) {
-          void handleImportFmSaveFile(file);
-          return;
-        }
-        void file
-          .arrayBuffer()
-          .then((ab) => handleImportBytes(file.name, new Uint8Array(ab)))
-          .catch((err) =>
-            notify(
-              "error",
-              `Gagal membaca ${file.name}: ${err instanceof Error ? err.message : String(err)}`,
-            ),
-          );
+        void handleImportPickedFile(file);
       }}
       className="flex flex-col gap-4 relative"
     >
@@ -507,20 +496,7 @@ export default function TacticalBoardWorkspacePage() {
                 const f = e.target.files?.[0];
                 e.target.value = "";
                 if (!f) return;
-                const isFmSave = f.name.toLowerCase().endsWith(".fm");
-                if (isFmSave) {
-                  void handleImportFmSaveFile(f);
-                  return;
-                }
-                void f
-                  .arrayBuffer()
-                  .then((ab) => handleImportBytes(f.name, new Uint8Array(ab)))
-                  .catch((err) =>
-                    notify(
-                      "error",
-                      `Gagal membaca ${f.name}: ${err instanceof Error ? err.message : String(err)}`,
-                    ),
-                  );
+                void handleImportPickedFile(f);
               }}
             />
 

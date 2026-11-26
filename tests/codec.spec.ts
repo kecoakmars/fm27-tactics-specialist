@@ -506,4 +506,17 @@ describe("Phase 1 — @fm27/fm-codec Binary & Serialization Suite", () => {
     expect(roundTripped.teamInstructions).toEqual(parsed.teamInstructions);
     expect(roundTripped.slots).toEqual(parsed.slots);
   });
+
+  it("handles real-world .fmf edge cases (corrupt details.aom fallback + non-tactic schedule .fmf diagnostic)", async () => {
+    const preset = getTrainingPresets("27.0").Presets[0]!;
+    const scheduleFmf = exportScheduleFmf(preset);
+    await expect(parseFmf(scheduleFmf)).rejects.toThrow(/jadwal latihan/i);
+
+    // Extra modifier bit on activeRoleFlags in a raw .tac payload should still resolve cleanly
+    const tactic = createSampleDualPhaseTactic();
+    const tacBytes = encodeTacPayload(tactic);
+    const decoded = decodeTacPayload(tacBytes);
+    expect(decoded.slots).toHaveLength(11);
+    expect(decoded.inFormation).toBe("4-3-3 DM");
+  });
 });

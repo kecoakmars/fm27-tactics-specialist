@@ -1317,7 +1317,7 @@ export function parseFmSave(
   const maxWonderkids = options?.maxWonderkids ?? 500;
   const maxStaffPool = options?.maxStaffPool ?? 200;
 
-  onProgress?.("Membaca file...", 5);
+  onProgress?.("Membaca header & direktori save .fm...", 10);
   const { saveName, sections } = parseContainerDirectory(buffer);
 
   const dbSec = sections.get("game_db");

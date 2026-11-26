@@ -1,14 +1,10 @@
+import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
-
-const rootRequire = createRequire(path.resolve(repoRoot, "package.json"));
-const tsxEntry = rootRequire.resolve("tsx");
-const tsxRequire = createRequire(tsxEntry);
-const { build } = tsxRequire("esbuild");
 
 const entryPoint = path.resolve(
   repoRoot,
@@ -19,7 +15,25 @@ const outfile = path.resolve(
   "apps/web/public/workers/fm-save-worker.js",
 );
 
-await build({
+let esbuildBuild;
+try {
+  const rootRequire = createRequire(path.resolve(repoRoot, "package.json"));
+  const tsxEntry = rootRequire.resolve("tsx");
+  const tsxRequire = createRequire(tsxEntry);
+  ({ build: esbuildBuild } = tsxRequire("esbuild"));
+} catch {
+  if (fs.existsSync(outfile)) {
+    console.log(
+      `[worker:build] esbuild/tsx unavailable in current environment; keeping prebuilt ${path.relative(repoRoot, outfile)}`,
+    );
+    process.exit(0);
+  }
+  throw new Error(
+    "Cannot build fm-save-worker.js: esbuild/tsx not installed and no prebuilt worker exists.",
+  );
+}
+
+await esbuildBuild({
   entryPoints: [entryPoint],
   outfile,
   bundle: true,

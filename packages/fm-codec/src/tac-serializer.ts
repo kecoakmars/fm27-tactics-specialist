@@ -269,18 +269,63 @@ interface ParsedBinarySlot {
   markingPositionMask: number;
 }
 
+function resolveRoleIdFromFlags(
+  cleanActiveFlags: bigint,
+  entries: readonly { cleanRoleFlags: bigint }[],
+  phase: 0 | 1,
+  positionId: string,
+  lookupMap: Map<bigint, string>,
+  catalog: PitchCatalog,
+  roleFlagById: Map<string, bigint>,
+): string {
+  const direct = lookupMap.get(cleanActiveFlags);
+  if (direct) return direct;
+
+  for (let e = entries.length - 1; e >= 0; e--) {
+    const found = lookupMap.get(entries[e]!.cleanRoleFlags);
+    if (found) return found;
+  }
+
+  // Fallback for real FM26/FM27 exports that carry extra high modifier bits on activeRoleFlags:
+  // match the most-specific eligible role for this (positionId, phase) whose bitmask is contained in cleanActiveFlags.
+  const eligibleIds = catalog.Eligibility["0:0"]?.[positionId]?.[phase] ?? [];
+  let bestMatchId: string | null = null;
+  let bestBitScore = -1n;
+  for (const candId of eligibleIds) {
+    const candFlags = roleFlagById.get(candId);
+    if (candFlags !== undefined && candFlags > 0n && (cleanActiveFlags & candFlags) === candFlags) {
+      if (candFlags > bestBitScore) {
+        bestBitScore = candFlags;
+        bestMatchId = candId;
+      }
+    }
+  }
+  if (bestMatchId) return bestMatchId;
+
+  // Last-resort safe fallback to default eligible role for the slot rather than crashing the whole import
+  if (eligibleIds.length > 0 && eligibleIds[0]) {
+    return eligibleIds[0];
+  }
+
+  throw new Error(
+    `Unknown Role.Flags ${cleanActiveFlags.toString()} in phase ${phase} at position ${positionId}`,
+  );
+}
+
 function readBinarySlot(
   reader: BinaryReader,
   phase: 0 | 1,
   maskToPosId: Map<number, string>,
   ipFlagsToRoleId: Map<bigint, string>,
   oopFlagsToRoleId: Map<bigint, string>,
+  catalog: PitchCatalog,
+  roleFlagById: Map<string, bigint>,
 ): ParsedBinarySlot {
   reader.expectBytes(SLOT_HEADER, "SlotHeader");
   const posMask = reader.readInt32();
   reader.skip(3); // slot version (00 01 01)
   const entryCount = reader.readInt32();
-  if (entryCount < 1 || entryCount > 16) {
+  if (entryCount < 0 || entryCount > 64) {
     throw new Error(`Unexpected slot entryCount: ${entryCount}`);
   }
 
@@ -308,7 +353,7 @@ function readBinarySlot(
   const cleanActiveFlags = activeRoleFlags & CLEAR_DUTY_MASK;
 
   // Match the active role entry from the end (handles ec=2 where entry[0] is default role & entry[1] is active role)
-  let matchedEntry = entries[entries.length - 1]!;
+  let matchedEntry = entries.length > 0 ? entries[entries.length - 1]! : null;
   for (let e = entries.length - 1; e >= 0; e--) {
     if (entries[e]!.cleanRoleFlags === cleanActiveFlags) {
       matchedEntry = entries[e]!;
@@ -322,20 +367,22 @@ function readBinarySlot(
   }
 
   const lookupMap = phase === 0 ? ipFlagsToRoleId : oopFlagsToRoleId;
-  const roleId =
-    lookupMap.get(cleanActiveFlags) ?? lookupMap.get(matchedEntry.cleanRoleFlags);
-  if (!roleId) {
-    throw new Error(
-      `Unknown Role.Flags ${cleanActiveFlags.toString()} in phase ${phase} at position ${positionId}`,
-    );
-  }
+  const roleId = resolveRoleIdFromFlags(
+    cleanActiveFlags,
+    entries,
+    phase,
+    positionId,
+    lookupMap,
+    catalog,
+    roleFlagById,
+  );
 
   return {
     positionId,
     roleId,
     duty: phase === 0 ? extractDutyFromActiveRoleFlags(activeRoleFlags) : "Defend",
-    playerInstructionBits: decodePlayerInstructionBits(matchedEntry.piBitsMask),
-    markingPositionMask: matchedEntry.markPosMask,
+    playerInstructionBits: matchedEntry ? decodePlayerInstructionBits(matchedEntry.piBitsMask) : [],
+    markingPositionMask: matchedEntry ? matchedEntry.markPosMask : 0,
   };
 }
 
@@ -368,17 +415,58 @@ function seekPastPlanHeader(reader: BinaryReader, bytes: Uint8Array): void {
   reader.expectBytes(PLAN_HEADER, "PlanHeader");
 }
 
-function skipStyleSentinelBeforeSlots(reader: BinaryReader): void {
-  const marker = reader.readUint8();
-  if (marker !== 0xff) {
-    throw new Error(
-      `Invalid style sentinel marker at offset ${reader.offset - 1}: expected 0xff, got 0x${marker.toString(16).padStart(2, "0")}`,
-    );
+function hasValidSlotHeaderAt(
+  bytes: Uint8Array,
+  offset: number,
+  maskToPosId: Map<number, string>,
+): boolean {
+  if (offset < 0 || offset + 14 > bytes.byteLength) return false;
+  if (
+    bytes[offset] !== SLOT_HEADER[0] ||
+    bytes[offset + 1] !== SLOT_HEADER[1] ||
+    bytes[offset + 2] !== SLOT_HEADER[2]
+  ) {
+    return false;
   }
-  // Length-prefixed style label ("" -> 00 00 00 00 in standard exports, or e.g. "Custom" in game saves)
-  reader.readLengthPrefixedUtf8(256);
-  // 4-byte reversed FourCC (e.g. "LLUN" = 4c 4c 55 4e, or preset FourCC like "IKIT")
-  reader.skip(4);
+  const view = new DataView(bytes.buffer, bytes.byteOffset + offset + 3, 4);
+  const mask = view.getInt32(0, true);
+  return maskToPosId.has(mask);
+}
+
+function skipStyleSentinelBeforeSlots(
+  reader: BinaryReader,
+  bytes: Uint8Array,
+  maskToPosId: Map<number, string>,
+): void {
+  const startOffset = reader.offset;
+  if (bytes[startOffset] === 0xff) {
+    try {
+      reader.skip(1);
+      // Length-prefixed style label ("" -> 00 00 00 00 in standard exports, or e.g. "Custom" in game saves)
+      reader.readLengthPrefixedUtf8(256);
+      // 4-byte reversed FourCC (e.g. "LLUN" = 4c 4c 55 4e, or preset FourCC like "IKIT")
+      reader.skip(4);
+      if (hasValidSlotHeaderAt(bytes, reader.offset, maskToPosId)) {
+        return;
+      }
+    } catch {
+      // Fall through to resilient SlotHeader scan below
+    }
+  }
+
+  // Resilient scan for real FM26/FM27 exports with extra style metadata bytes before the 11 dual-phase slots
+  const scanLimit = Math.min(bytes.byteLength - 14, startOffset + 512);
+  for (let off = startOffset; off <= scanLimit; off++) {
+    if (hasValidSlotHeaderAt(bytes, off, maskToPosId)) {
+      reader.seek(off);
+      return;
+    }
+  }
+
+  const marker = bytes[startOffset] ?? 0;
+  throw new Error(
+    `Invalid style sentinel marker at offset ${startOffset}: expected 0xff or SlotHeader (44 00 02), got 0x${marker.toString(16).padStart(2, "0")}`,
+  );
 }
 
 /**
@@ -458,10 +546,12 @@ export function decodeTacPayload(
   const catalog = options?.catalog ?? getPitchCatalog(patchVersion);
 
   const maskToPosId = new Map(catalog.Positions.map((p) => [p.Mask, p.Id]));
+  const roleFlagById = new Map<string, bigint>();
   const ipFlagsToRoleId = new Map<bigint, string>();
   const oopFlagsToRoleId = new Map<bigint, string>();
   for (const r of catalog.Roles) {
     const f = BigInt(r.Flags);
+    roleFlagById.set(r.Id, f);
     if (r.Id.startsWith("OP")) {
       oopFlagsToRoleId.set(f, r.Id);
     } else {
@@ -498,15 +588,31 @@ export function decodeTacPayload(
     }
   }
 
-  skipStyleSentinelBeforeSlots(reader);
+  skipStyleSentinelBeforeSlots(reader, bytes, maskToPosId);
 
   const attackParsed: ParsedBinarySlot[] = [];
   const defenceByRawIndex: ParsedBinarySlot[] = new Array<ParsedBinarySlot>(11);
   const phaseOrderRead: number[] = [];
 
   for (let i = 0; i < 11; i++) {
-    const att = readBinarySlot(reader, 0, maskToPosId, ipFlagsToRoleId, oopFlagsToRoleId);
-    const def = readBinarySlot(reader, 1, maskToPosId, ipFlagsToRoleId, oopFlagsToRoleId);
+    const att = readBinarySlot(
+      reader,
+      0,
+      maskToPosId,
+      ipFlagsToRoleId,
+      oopFlagsToRoleId,
+      catalog,
+      roleFlagById,
+    );
+    const def = readBinarySlot(
+      reader,
+      1,
+      maskToPosId,
+      ipFlagsToRoleId,
+      oopFlagsToRoleId,
+      catalog,
+      roleFlagById,
+    );
     const orderByte = reader.readUint8();
     attackParsed.push(att);
     defenceByRawIndex[i] = def;

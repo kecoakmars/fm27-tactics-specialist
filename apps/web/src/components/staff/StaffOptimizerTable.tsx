@@ -9,10 +9,7 @@ import {
   parseStaffHtml,
 } from "@fm27/fm-engine";
 import type { StaffCategoryId, StaffMember } from "@fm27/shared-types";
-import {
-  FM_SAVE_CANCELLED_ERROR,
-  parseFmSaveInWorker,
-} from "../../lib/worker-client";
+import { importFmSaveFile, isFmSaveFileName } from "../../lib/file-importer";
 import { useTacticStore } from "../../stores/useTacticStore";
 
 interface StaffOptimizerTableProps {
@@ -33,8 +30,6 @@ export function StaffOptimizerTable({
     worldStaffPool,
     liveFmSave,
     selectedClubUid,
-    ingestParsedFmSave,
-    setFmImportProgress,
     setClubPickerOpen,
   } = useTacticStore();
 
@@ -111,27 +106,25 @@ export function StaffOptimizerTable({
   );
 
   async function handleImportStaffFile(file: File) {
-    if (file.name.toLowerCase().endsWith(".fm")) {
+    if (isFmSaveFileName(file.name)) {
       setImportError(null);
-      setFmImportProgress({
-        stage: "Membaca file dari disk lokal...",
-        pct: 1,
-        fileName: file.name,
-      });
       try {
-        await new Promise((r) => setTimeout(r, 16));
-        const ab = await file.arrayBuffer();
-        const parsed = await parseFmSaveInWorker(ab, (stage, pct) => {
-          setFmImportProgress({ stage, pct, fileName: file.name });
-        });
-        setCustomStaff(null);
-        await ingestParsedFmSave(parsed, file.name);
+        const outcome = await importFmSaveFile(file);
+        if (!outcome.cancelled) {
+          setCustomStaff(null);
+        }
       } catch (err) {
-        setFmImportProgress(null);
-        const msg = err instanceof Error ? err.message : String(err);
-        if (msg === FM_SAVE_CANCELLED_ERROR) return;
-        setImportError(msg || "Gagal memproses file save .fm");
+        setImportError(
+          err instanceof Error ? err.message : "Gagal memproses file save .fm",
+        );
       }
+      return;
+    }
+
+    if (file.name.toLowerCase().endsWith(".fmf") || file.name.toLowerCase().endsWith(".tac")) {
+      setImportError(
+        "File .fmf / .tac adalah file taktik, bukan daftar staf. Impor taktik di halaman Pitch Board, atau unggah file save karier .fm / CSV / HTML di sini.",
+      );
       return;
     }
 

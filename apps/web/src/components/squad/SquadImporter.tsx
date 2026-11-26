@@ -2,9 +2,10 @@
 
 import { useRef, useState } from "react";
 import {
-  FM_SAVE_CANCELLED_ERROR,
-  parseFmSaveInWorker,
-} from "../../lib/worker-client";
+  importFmSaveArrayBuffer,
+  importFmSaveFile,
+  isFmSaveFileName,
+} from "../../lib/file-importer";
 import { useFolderSyncStore } from "../../stores/useFolderSyncStore";
 import { useSquadStore } from "../../stores/useSquadStore";
 import { useTacticStore } from "../../stores/useTacticStore";
@@ -24,8 +25,6 @@ export function SquadImporter() {
   const {
     liveFmSave,
     selectedClubUid,
-    ingestParsedFmSave,
-    setFmImportProgress,
     setClubPickerOpen,
   } = useTacticStore();
 
@@ -38,41 +37,32 @@ export function SquadImporter() {
   async function handleFmSaveArrayBuffer(fileName: string, ab: ArrayBuffer) {
     setBusy(true);
     setError(null);
-    setFmImportProgress({
-      stage: "Membaca file...",
-      pct: 3,
-      fileName,
-    });
     try {
-      const parsed = await parseFmSaveInWorker(ab, (stage, pct) => {
-        setFmImportProgress({ stage, pct, fileName });
-      });
-      await ingestParsedFmSave(parsed, fileName);
+      await importFmSaveArrayBuffer(fileName, ab);
     } catch (err) {
-      setFmImportProgress(null);
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg === FM_SAVE_CANCELLED_ERROR) return;
-      setError(msg || "Gagal memproses file save .fm");
+      setError(err instanceof Error ? err.message : "Gagal memproses file save .fm");
     } finally {
       setBusy(false);
     }
   }
 
   async function handleFile(file: File) {
-    if (file.name.toLowerCase().endsWith(".fm")) {
+    if (isFmSaveFileName(file.name)) {
+      setBusy(true);
+      setError(null);
       try {
-        setFmImportProgress({
-          stage: "Membaca file dari disk lokal...",
-          pct: 1,
-          fileName: file.name,
-        });
-        await new Promise((r) => setTimeout(r, 16));
-        const ab = await file.arrayBuffer();
-        await handleFmSaveArrayBuffer(file.name, ab);
+        await importFmSaveFile(file);
       } catch (err) {
-        setFmImportProgress(null);
         setError(err instanceof Error ? err.message : "Gagal membaca file save .fm");
+      } finally {
+        setBusy(false);
       }
+      return;
+    }
+    if (file.name.toLowerCase().endsWith(".fmf") || file.name.toLowerCase().endsWith(".tac")) {
+      setError(
+        "File .fmf / .tac adalah file taktik, bukan daftar skuad. Impor taktik di halaman Pitch Board, atau unggah file save karier .fm / CSV / HTML di sini.",
+      );
       return;
     }
     try {
