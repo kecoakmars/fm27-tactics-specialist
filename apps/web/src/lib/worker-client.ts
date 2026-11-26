@@ -3,6 +3,7 @@
 import {
   exportFmf,
   parseFmf,
+  parseFmSave,
   type FmSaveProgressCallback,
   type ParsedFmSave,
 } from "@fm27/fm-codec";
@@ -23,182 +24,269 @@ import type {
 import {
   dispatchWorkerTask,
   type EngineWorkerRequest,
-  type EngineWorkerResponse,
 } from "../workers/engine.worker";
 
 type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never;
 type EngineWorkerPayload = DistributiveOmit<EngineWorkerRequest, "id">;
 
-const WORKER_TIMEOUT_MS = 2000;
-const SAVE_WORKER_TIMEOUT_MS = 180_000;
-const UNIFIED_WORKER_TIMEOUT_MS = 45_000;
+const SAVE_WORKER_URL = "/workers/fm-save-worker.js";
+const SAVE_WORKER_HANDSHAKE_TIMEOUT_MS = 1000;
+const SAVE_WORKER_HEARTBEAT_TIMEOUT_MS = 60_000;
 
-let sharedWorker: Worker | null = null;
-let workerDisabled = false;
+export const FM_SAVE_CANCELLED_ERROR = "DIBATALKAN_PENGGUNA";
+
+type SaveWorkerIncomingMessage =
+  | { type: "PONG" }
+  | { id: string; kind: "progress"; stage: string; pct: number }
+  | { id: string; kind: "done"; ok: true; result: ParsedFmSave }
+  | { id: string; kind: "done"; ok: false; error: string };
+
+let saveWorker: Worker | null = null;
+let saveWorkerReady = false;
+let saveWorkerBroken = false;
 let seq = 0;
-const pending = new Map<
+
+const readyWaiters = new Set<(ready: boolean) => void>();
+
+const pendingSaveTasks = new Map<
   string,
   {
-    resolve: (val: unknown) => void;
+    resolve: (val: ParsedFmSave) => void;
     reject: (err: Error) => void;
     onProgress?: FmSaveProgressCallback;
-    timer: ReturnType<typeof setTimeout>;
+    watchdog: ReturnType<typeof setTimeout>;
   }
 >();
 
-function teardownWorker(reason: string): void {
-  if (sharedWorker) {
-    sharedWorker.terminate();
-    sharedWorker = null;
+function yieldToBrowserPaint(): Promise<void> {
+  if (typeof window === "undefined") {
+    return Promise.resolve();
   }
-  workerDisabled = true;
-  for (const [, entry] of pending) {
-    clearTimeout(entry.timer);
+  return new Promise((resolve) => {
+    if (typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(() => {
+        setTimeout(resolve, 0);
+      });
+    } else {
+      setTimeout(resolve, 16);
+    }
+  });
+}
+
+function resetWatchdog(id: string): void {
+  const entry = pendingSaveTasks.get(id);
+  if (!entry) return;
+  clearTimeout(entry.watchdog);
+  entry.watchdog = setTimeout(() => {
+    pendingSaveTasks.delete(id);
+    teardownSaveWorker(
+      "Pemrosesan file .fm tidak merespons lebih dari 60 detik (worker dihentikan).",
+      false,
+    );
+  }, SAVE_WORKER_HEARTBEAT_TIMEOUT_MS);
+}
+
+function teardownSaveWorker(reason: string, markBroken: boolean): void {
+  if (saveWorker) {
+    saveWorker.terminate();
+    saveWorker = null;
+  }
+  saveWorkerReady = false;
+  if (markBroken) {
+    saveWorkerBroken = true;
+  }
+  for (const notifyReady of readyWaiters) {
+    notifyReady(false);
+  }
+  readyWaiters.clear();
+
+  for (const [, entry] of pendingSaveTasks) {
+    clearTimeout(entry.watchdog);
     entry.reject(new Error(reason));
   }
-  pending.clear();
-}
-
-function getOrCreateWorker(): Worker | null {
-  if (workerDisabled || typeof window === "undefined" || typeof Worker === "undefined") {
-    return null;
-  }
-  if (!sharedWorker) {
-    try {
-      sharedWorker = new Worker(
-        new URL("../workers/engine.worker.ts", import.meta.url),
-        { type: "module" },
-      );
-      sharedWorker.onmessage = (event: MessageEvent<EngineWorkerResponse>) => {
-        const msg = event.data;
-        const entry = pending.get(msg.id);
-        if (!entry) return;
-        if (msg.kind === "progress") {
-          entry.onProgress?.(msg.stage, msg.pct);
-          return;
-        }
-        clearTimeout(entry.timer);
-        pending.delete(msg.id);
-        if (msg.ok) {
-          entry.resolve(msg.result);
-        } else {
-          entry.reject(new Error(msg.error));
-        }
-      };
-      sharedWorker.onerror = (err) => {
-        teardownWorker(err.message || "Worker execution error");
-      };
-      sharedWorker.onmessageerror = () => {
-        teardownWorker("Worker message deserialization error");
-      };
-    } catch (initErr) {
-      sharedWorker = null;
-      workerDisabled = true;
-      console.warn("[fm27-worker] Falling back to main thread:", initErr);
-    }
-  }
-  return sharedWorker;
-}
-
-async function callEngineWorker<T>(
-  payload: EngineWorkerPayload,
-  opts?: {
-    timeoutMs?: number;
-    transfer?: Transferable[];
-    onProgress?: FmSaveProgressCallback;
-    allowMainThreadFallback?: boolean;
-  },
-): Promise<T> {
-  const id = `w-${++seq}-${Date.now()}`;
-  const fullReq = { ...payload, id } as EngineWorkerRequest;
-  const timeoutMs = opts?.timeoutMs ?? WORKER_TIMEOUT_MS;
-  const allowFallback = opts?.allowMainThreadFallback ?? true;
-  const worker = getOrCreateWorker();
-
-  if (!worker) {
-    return (await dispatchWorkerTask(fullReq, opts?.onProgress)) as T;
-  }
-
-  try {
-    return await new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        pending.delete(id);
-        teardownWorker("Worker timed out");
-        reject(new Error("Pemrosesan di Web Worker melebihi batas waktu (timeout)."));
-      }, timeoutMs);
-
-      pending.set(id, {
-        resolve: (val) => resolve(val as T),
-        reject,
-        onProgress: opts?.onProgress,
-        timer,
-      });
-
-      try {
-        if (opts?.transfer && opts.transfer.length > 0) {
-          worker.postMessage(fullReq, opts.transfer);
-        } else {
-          worker.postMessage(fullReq);
-        }
-      } catch (err) {
-        clearTimeout(timer);
-        pending.delete(id);
-        reject(err instanceof Error ? err : new Error(String(err)));
-      }
-    });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    const shouldFallback =
-      allowFallback &&
-      (workerDisabled ||
-        err instanceof DOMException ||
-        msg.includes("Worker") ||
-        msg.includes("DataCloneError") ||
-        msg.includes("BigInt"));
-    if (shouldFallback) {
-      return (await dispatchWorkerTask(fullReq, opts?.onProgress)) as T;
-    }
-    throw err;
-  }
+  pendingSaveTasks.clear();
 }
 
 /**
- * Parses a 50-400 MB `.fm` career save 100% client-side inside the Web Worker
- * using a zero-copy Transferable ArrayBuffer (never uploaded to any server).
+ * Cancels any active `.fm` save parsing worker immediately and frees its memory.
+ */
+export function cancelActiveFmSaveImport(): void {
+  teardownSaveWorker(FM_SAVE_CANCELLED_ERROR, false);
+}
+
+/**
+ * Ensures `/workers/fm-save-worker.js` is alive and responds to `PING -> PONG`
+ * BEFORE transferring any `ArrayBuffer` (preventing detached-buffer deadlocks).
+ */
+async function ensureSaveWorkerReady(): Promise<Worker | null> {
+  if (
+    saveWorkerBroken ||
+    typeof window === "undefined" ||
+    typeof Worker === "undefined"
+  ) {
+    return null;
+  }
+
+  if (saveWorker && saveWorkerReady) {
+    return saveWorker;
+  }
+
+  if (!saveWorker) {
+    try {
+      const w = new Worker(SAVE_WORKER_URL);
+      saveWorker = w;
+      w.onmessage = (event: MessageEvent<SaveWorkerIncomingMessage>) => {
+        const msg = event.data;
+        if (!msg) return;
+
+        if ("type" in msg && msg.type === "PONG") {
+          saveWorkerReady = true;
+          for (const notifyReady of readyWaiters) {
+            notifyReady(true);
+          }
+          readyWaiters.clear();
+          return;
+        }
+
+        if ("id" in msg) {
+          const entry = pendingSaveTasks.get(msg.id);
+          if (!entry) return;
+
+          if (msg.kind === "progress") {
+            resetWatchdog(msg.id);
+            entry.onProgress?.(msg.stage, msg.pct);
+            return;
+          }
+
+          clearTimeout(entry.watchdog);
+          pendingSaveTasks.delete(msg.id);
+          if (msg.ok) {
+            entry.resolve(msg.result);
+          } else {
+            entry.reject(new Error(msg.error));
+          }
+        }
+      };
+
+      w.onerror = (err) => {
+        teardownSaveWorker(
+          err.message || "Gagal menjalankan Web Worker pembaca .fm",
+          true,
+        );
+      };
+      w.onmessageerror = () => {
+        teardownSaveWorker(
+          "Gagal menerima data hasil ekstraksi dari Web Worker",
+          true,
+        );
+      };
+    } catch {
+      saveWorker = null;
+      saveWorkerBroken = true;
+      return null;
+    }
+  }
+
+  if (saveWorkerReady && saveWorker) {
+    return saveWorker;
+  }
+
+  const alive = await new Promise<boolean>((resolve) => {
+    const timer = setTimeout(() => {
+      readyWaiters.delete(onDone);
+      resolve(false);
+    }, SAVE_WORKER_HANDSHAKE_TIMEOUT_MS);
+
+    const onDone = (ok: boolean) => {
+      clearTimeout(timer);
+      readyWaiters.delete(onDone);
+      resolve(ok);
+    };
+
+    readyWaiters.add(onDone);
+    try {
+      saveWorker?.postMessage({ type: "PING" });
+    } catch {
+      onDone(false);
+    }
+  });
+
+  if (!alive || !saveWorker) {
+    teardownSaveWorker("Web Worker tidak merespons handshake awal", true);
+    return null;
+  }
+
+  return saveWorker;
+}
+
+/**
+ * Parses a 50-400 MB `.fm` career save 100% client-side inside the standalone
+ * `/workers/fm-save-worker.js` using zero-copy Transferable `ArrayBuffer`.
+ * Verified via `PING -> PONG` handshake first; if Workers are unavailable/blocked,
+ * `arrayBuffer` remains intact and falls back safely after yielding a UI paint frame.
  */
 export async function parseFmSaveInWorker(
   arrayBuffer: ArrayBuffer,
   onProgress?: FmSaveProgressCallback,
 ): Promise<ParsedFmSave> {
-  const worker = getOrCreateWorker();
+  const worker = await ensureSaveWorkerReady();
+
   if (!worker) {
-    return (await dispatchWorkerTask(
-      { id: "main-fm-save", type: "PARSE_FM_SAVE", buffer: arrayBuffer },
-      onProgress,
-    )) as ParsedFmSave;
+    onProgress?.("Membaca file...", 5);
+    await yieldToBrowserPaint();
+    return parseFmSave(new Uint8Array(arrayBuffer), onProgress);
   }
-  // Note: once transferred, `arrayBuffer` is neutered on main thread (zero-copy!)
-  return callEngineWorker<ParsedFmSave>(
-    { type: "PARSE_FM_SAVE", buffer: arrayBuffer },
-    {
-      timeoutMs: SAVE_WORKER_TIMEOUT_MS,
-      transfer: [arrayBuffer],
+
+  const id = `fm-${++seq}-${Date.now()}`;
+  return new Promise<ParsedFmSave>((resolve, reject) => {
+    const watchdog = setTimeout(() => {
+      pendingSaveTasks.delete(id);
+      teardownSaveWorker(
+        "Pemrosesan file .fm melebihi batas waktu tanpa progres (60 detik).",
+        false,
+      );
+      reject(
+        new Error("Pemrosesan file .fm melebihi batas waktu tanpa progres (60 detik)."),
+      );
+    }, SAVE_WORKER_HEARTBEAT_TIMEOUT_MS);
+
+    pendingSaveTasks.set(id, {
+      resolve,
+      reject,
       onProgress,
-      allowMainThreadFallback: false,
-    },
-  );
+      watchdog,
+    });
+
+    try {
+      worker.postMessage(
+        { id, type: "PARSE_FM_SAVE", buffer: arrayBuffer },
+        [arrayBuffer],
+      );
+    } catch (err) {
+      clearTimeout(watchdog);
+      pendingSaveTasks.delete(id);
+      reject(err instanceof Error ? err : new Error(String(err)));
+    }
+  });
 }
 
-export function analyzeUnifiedInWorker(
+async function runEngineTaskWithPaintYield<T>(
+  payload: EngineWorkerPayload,
+  onProgress?: FmSaveProgressCallback,
+): Promise<T> {
+  await yieldToBrowserPaint();
+  const fullReq = { ...payload, id: `local-${++seq}` } as EngineWorkerRequest;
+  return (await dispatchWorkerTask(fullReq, onProgress)) as T;
+}
+
+export async function analyzeUnifiedInWorker(
   params: AnalyzeUnifiedParams,
   onProgress?: FmSaveProgressCallback,
 ): Promise<UnifiedReport> {
-  return callEngineWorker<UnifiedReport>(
+  onProgress?.("Menjalankan Hungarian Solver...", 92);
+  return runEngineTaskWithPaintYield<UnifiedReport>(
     { type: "ANALYZE_UNIFIED", params },
-    {
-      timeoutMs: UNIFIED_WORKER_TIMEOUT_MS,
-      onProgress,
-    },
+    onProgress,
   );
 }
 
@@ -216,14 +304,17 @@ export async function parseFmfInWorker(
 export function computeHeatmapInWorker(
   tactic: DualPhaseTactic,
 ): Promise<Heatmap18ZoneResult> {
-  return callEngineWorker<Heatmap18ZoneResult>({ type: "COMPUTE_HEATMAP", tactic });
+  return runEngineTaskWithPaintYield<Heatmap18ZoneResult>({
+    type: "COMPUTE_HEATMAP",
+    tactic,
+  });
 }
 
 export function computeBalanceInWorker(
   tactic: DualPhaseTactic,
   squad?: Player[],
 ): Promise<TacticalBalanceReport> {
-  return callEngineWorker<TacticalBalanceReport>({
+  return runEngineTaskWithPaintYield<TacticalBalanceReport>({
     type: "COMPUTE_BALANCE",
     tactic,
     squad,
@@ -234,21 +325,18 @@ export function analyzeSquadInWorker(
   players: Player[],
   options?: SquadAnalysisOptions,
 ): Promise<TacticPlanResult[]> {
-  return callEngineWorker<TacticPlanResult[]>(
-    {
-      type: "ANALYZE_SQUAD",
-      players,
-      options,
-    },
-    { timeoutMs: UNIFIED_WORKER_TIMEOUT_MS },
-  );
+  return runEngineTaskWithPaintYield<TacticPlanResult[]>({
+    type: "ANALYZE_SQUAD",
+    players,
+    options,
+  });
 }
 
 export function auditSquadInWorker(
   tactic: DualPhaseTactic,
   players: Player[],
 ): Promise<SquadAuditResult> {
-  return callEngineWorker<SquadAuditResult>({
+  return runEngineTaskWithPaintYield<SquadAuditResult>({
     type: "AUDIT_SQUAD",
     tactic,
     players,
@@ -258,14 +346,17 @@ export function auditSquadInWorker(
 export function exportScheduleFmfInWorker(
   schedule: WeeklySchedule,
 ): Promise<Uint8Array> {
-  return callEngineWorker<Uint8Array>({ type: "EXPORT_SCHEDULE_FMF", schedule });
+  return runEngineTaskWithPaintYield<Uint8Array>({
+    type: "EXPORT_SCHEDULE_FMF",
+    schedule,
+  });
 }
 
 export function parseScheduleFmfInWorker(
   bytes: Uint8Array,
   patchVersion?: string,
 ): Promise<WeeklySchedule> {
-  return callEngineWorker<WeeklySchedule>({
+  return runEngineTaskWithPaintYield<WeeklySchedule>({
     type: "PARSE_SCHEDULE_FMF",
     bytes,
     patchVersion,
@@ -276,7 +367,7 @@ export function exportShortlistFmfInWorker(
   title: string,
   playerUids: number[],
 ): Promise<Uint8Array> {
-  return callEngineWorker<Uint8Array>({
+  return runEngineTaskWithPaintYield<Uint8Array>({
     type: "EXPORT_SHORTLIST_FMF",
     title,
     playerUids,
@@ -286,7 +377,7 @@ export function exportShortlistFmfInWorker(
 export function parseShortlistFmfInWorker(
   bytes: Uint8Array,
 ): Promise<{ title: string; playerUids: number[] }> {
-  return callEngineWorker<{ title: string; playerUids: number[] }>({
+  return runEngineTaskWithPaintYield<{ title: string; playerUids: number[] }>({
     type: "PARSE_SHORTLIST_FMF",
     bytes,
   });
@@ -297,7 +388,7 @@ export function gradeImportedTacticInWorker(
   players: Player[],
   improve = true,
 ): Promise<TacticPlanResult> {
-  return callEngineWorker<TacticPlanResult>({
+  return runEngineTaskWithPaintYield<TacticPlanResult>({
     type: "GRADE_IMPORTED",
     tactic,
     players,

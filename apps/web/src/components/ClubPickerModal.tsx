@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { cancelActiveFmSaveImport } from "@/lib/worker-client";
 import { useTacticStore } from "@/stores/useTacticStore";
 
 export function ClubPickerModal() {
@@ -10,6 +11,7 @@ export function ClubPickerModal() {
     clubPickerOpen,
     fmImportProgress,
     setClubPickerOpen,
+    setFmImportProgress,
     selectClubFromFmSave,
   } = useTacticStore();
 
@@ -61,9 +63,21 @@ export function ClubPickerModal() {
               />
             </div>
 
-            <div className="mt-1.5 flex items-center justify-between text-[11px] font-mono-metric text-slate-400">
+            <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] font-mono-metric text-slate-400">
               <span className="truncate">{fmImportProgress.fileName}</span>
-              <span>{fmImportProgress.pct}%</span>
+              <div className="flex items-center gap-2.5 shrink-0">
+                <span>{fmImportProgress.pct}%</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    cancelActiveFmSaveImport();
+                    setFmImportProgress(null);
+                  }}
+                  className="rounded border border-rose-500/40 bg-rose-500/15 px-2 py-0.5 font-sans text-[10px] font-bold text-rose-300 hover:bg-rose-500/25 cursor-pointer"
+                >
+                  Batalkan
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -401,18 +401,23 @@ function findSequence(
   fromIndex = 0,
   endIndex = buf.length,
 ): number {
+  const nLen = needle.length;
+  if (nLen === 0) return Math.max(0, fromIndex);
+  const limit = Math.min(endIndex, buf.length);
+  const maxPos = limit - nLen;
+  if (fromIndex > maxPos) return -1;
   const first = needle[0]!;
-  const maxPos = Math.min(endIndex, buf.length) - needle.length;
-  for (let i = Math.max(0, fromIndex); i <= maxPos; i++) {
-    if (buf[i] !== first) continue;
+  let i = buf.indexOf(first, Math.max(0, fromIndex));
+  while (i >= 0 && i <= maxPos) {
     let match = true;
-    for (let j = 1; j < needle.length; j++) {
+    for (let j = 1; j < nLen; j++) {
       if (buf[i + j] !== needle[j]) {
         match = false;
         break;
       }
     }
     if (match) return i;
+    i = buf.indexOf(first, i + 1);
   }
   return -1;
 }
@@ -1001,8 +1006,8 @@ function decodePersonBlockInWindow(
   const start = Math.max(0, windowStart + zeroOffsetFromBirth);
   const limit = Math.min(windowEnd, gameDb.length) - 9;
 
-  for (let z = start; z <= limit; z++) {
-    if (gameDb[z] !== 0) continue;
+  let z = gameDb.indexOf(0, start);
+  while (z >= 0 && z <= limit) {
     // Next 8 bytes must be personality values in 1..20
     let persOk = true;
     for (let k = 1; k <= 8; k++) {
@@ -1012,10 +1017,16 @@ function decodePersonBlockInWindow(
         break;
       }
     }
-    if (!persOk) continue;
+    if (!persOk) {
+      z = gameDb.indexOf(0, z + 1);
+      continue;
+    }
 
     const birthAt = z - zeroOffsetFromBirth;
-    if (birthAt < 27) continue;
+    if (birthAt < 27) {
+      z = gameDb.indexOf(0, z + 1);
+      continue;
+    }
 
     // Check 7 zero bytes before personality
     let zerosOk = true;
@@ -1025,10 +1036,16 @@ function decodePersonBlockInWindow(
         break;
       }
     }
-    if (!zerosOk) continue;
+    if (!zerosOk) {
+      z = gameDb.indexOf(0, z + 1);
+      continue;
+    }
 
     const birth = decodeFmDate(gameDb, birthAt, true);
-    if (!birth || birth.year > clock.year) continue;
+    if (!birth || birth.year > clock.year) {
+      z = gameDb.indexOf(0, z + 1);
+      continue;
+    }
 
     // Legal name length right before birthAt
     let legalLen = -1;
@@ -1044,15 +1061,19 @@ function decodePersonBlockInWindow(
         }
       }
     }
-    if (legalLen < 0) continue;
+    if (legalLen < 0) {
+      z = gameDb.indexOf(0, z + 1);
+      continue;
+    }
 
     const blockStart = birthAt - 19 - legalLen;
-    if (blockStart < 8) continue;
     if (
+      blockStart < 8 ||
       gameDb[blockStart + 4] !== 0 ||
       gameDb[blockStart + 9] !== 0 ||
       gameDb[blockStart + 14] !== 0
     ) {
+      z = gameDb.indexOf(0, z + 1);
       continue;
     }
 
@@ -1065,6 +1086,7 @@ function decodePersonBlockInWindow(
       (surnameId !== MISSING_U32 && surnameId >= idLimit) ||
       (commonId !== MISSING_U32 && commonId >= idLimit)
     ) {
+      z = gameDb.indexOf(0, z + 1);
       continue;
     }
 
@@ -1084,7 +1106,10 @@ function decodePersonBlockInWindow(
         gameDb.subarray(blockStart + 19, blockStart + 19 + legalLen),
       ).trim();
     }
-    if (!displayName) continue;
+    if (!displayName) {
+      z = gameDb.indexOf(0, z + 1);
+      continue;
+    }
 
     const age = computeAge(birth, clock);
     const nationId = readU16LE(gameDb, birthAt + nationOffset);
@@ -1743,9 +1768,9 @@ export function parseFmSave(
         const b2 = (candPid >>> 16) & 0xff;
         const b3 = (candPid >>> 24) & 0xff;
         const minPos = Math.max(namePools.endOffset, cHit - 32_768);
-        for (let h = cHit - 16; h >= minPos; h--) {
+        let h = gameDb.lastIndexOf(b0, cHit - 16);
+        while (h >= minPos) {
           if (
-            gameDb[h] === b0 &&
             gameDb[h + 1] === b1 &&
             gameDb[h + 2] === b2 &&
             gameDb[h + 3] === b3 &&
@@ -1759,6 +1784,8 @@ export function parseFmSave(
               break;
             }
           }
+          if (h === 0) break;
+          h = gameDb.lastIndexOf(b0, h - 1);
         }
       }
     }

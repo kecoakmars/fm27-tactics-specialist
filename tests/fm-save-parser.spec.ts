@@ -1,11 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
+import vm from "node:vm";
 import { describe, expect, it } from "vitest";
 import { parseFmSave, scaleFmRawAttribute } from "@fm27/fm-codec";
 import { analyzeUnified } from "@fm27/fm-engine";
 import { ALL_49_ATTRIBUTES } from "@fm27/shared-types";
 
 const SAMPLE_SAVE_PATH = path.resolve(__dirname, "fixtures/sample-real.fm");
+const STANDALONE_WORKER_PATH = path.resolve(
+  __dirname,
+  "../apps/web/public/workers/fm-save-worker.js",
+);
 
 describe("FM26/FM27 Client-Side .fm Save Parser & Live World Pool", () => {
   it("normalizes raw 0-125 internal FM attributes deterministically to 1-20 scale", () => {
@@ -35,6 +40,70 @@ describe("FM26/FM27 Client-Side .fm Save Parser & Live World Pool", () => {
     truncatedFmf.set([0x02, 0x01, 0x66, 0x6d, 0x66, 0x2e], 0);
     new DataView(truncatedFmf.buffer).setUint32(9, 999_999, true);
     expect(() => parseFmSave(truncatedFmf)).toThrow(/rusak atau terpotong/i);
+  });
+
+  it("boots standalone /workers/fm-save-worker.js IIFE bundle, replies PONG immediately, and handles PARSE_FM_SAVE", () => {
+    expect(fs.existsSync(STANDALONE_WORKER_PATH)).toBe(true);
+    const workerCode = fs.readFileSync(STANDALONE_WORKER_PATH, "utf8");
+    const outbox: Array<Record<string, unknown>> = [];
+    const mockSelf: {
+      onmessage: ((ev: { data: unknown }) => void) | null;
+      postMessage: (msg: Record<string, unknown>) => void;
+      TextDecoder: typeof TextDecoder;
+      TextEncoder: typeof TextEncoder;
+      Uint8Array: typeof Uint8Array;
+      Uint32Array: typeof Uint32Array;
+      Int32Array: typeof Int32Array;
+      DataView: typeof DataView;
+      ArrayBuffer: typeof ArrayBuffer;
+      Date: typeof Date;
+      Math: typeof Math;
+      Number: typeof Number;
+      String: typeof String;
+      Map: typeof Map;
+      Set: typeof Set;
+      Error: typeof Error;
+    } = {
+      onmessage: null,
+      postMessage: (msg) => outbox.push(msg),
+      TextDecoder,
+      TextEncoder,
+      Uint8Array,
+      Uint32Array,
+      Int32Array,
+      DataView,
+      ArrayBuffer,
+      Date,
+      Math,
+      Number,
+      String,
+      Map,
+      Set,
+      Error,
+    };
+
+    const ctx = vm.createContext(Object.assign(mockSelf, { self: mockSelf }));
+    vm.runInContext(workerCode, ctx);
+
+    // Immediate PONG emitted on script boot
+    expect(outbox[0]).toEqual({ type: "PONG" });
+    expect(typeof mockSelf.onmessage).toBe("function");
+
+    // Explicit PING -> PONG handshake
+    mockSelf.onmessage!({ data: { type: "PING" } });
+    expect(outbox[1]).toEqual({ type: "PONG" });
+
+    // PARSE_FM_SAVE forwards progress (5%) then structured error on invalid buffer without hanging
+    const invalidBuf = new Uint8Array(16).buffer;
+    mockSelf.onmessage!({
+      data: { id: "req-1", type: "PARSE_FM_SAVE", buffer: invalidBuf },
+    });
+    expect(outbox.some((m) => m.id === "req-1" && m.kind === "progress" && m.pct === 5)).toBe(
+      true,
+    );
+    const doneMsg = outbox.find((m) => m.id === "req-1" && m.kind === "done");
+    expect(doneMsg?.ok).toBe(false);
+    expect(String(doneMsg?.error)).toMatch(/tidak valid atau kosong/i);
   });
 
   it.skipIf(!fs.existsSync(SAMPLE_SAVE_PATH))(

@@ -22,7 +22,8 @@
     "data:new-patch": "node scripts/new-patch-version.mjs",
     "data:fixtures": "tsx scripts/generate-golden-fixtures.mjs",
     "db:seed": "node scripts/seed-db.mjs",
-    "generate:seed": "tsx scripts/generate-seed-from-save.ts"
+    "generate:seed": "tsx scripts/generate-seed-from-save.ts",
+    "worker:build": "node scripts/build-save-worker.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.13.0",

@@ -9,7 +9,10 @@ import {
   parseStaffHtml,
 } from "@fm27/fm-engine";
 import type { StaffCategoryId, StaffMember } from "@fm27/shared-types";
-import { parseFmSaveInWorker } from "../../lib/worker-client";
+import {
+  FM_SAVE_CANCELLED_ERROR,
+  parseFmSaveInWorker,
+} from "../../lib/worker-client";
 import { useTacticStore } from "../../stores/useTacticStore";
 
 interface StaffOptimizerTableProps {
@@ -111,11 +114,12 @@ export function StaffOptimizerTable({
     if (file.name.toLowerCase().endsWith(".fm")) {
       setImportError(null);
       setFmImportProgress({
-        stage: "Membaca file...",
-        pct: 3,
+        stage: "Membaca file dari disk lokal...",
+        pct: 1,
         fileName: file.name,
       });
       try {
+        await new Promise((r) => setTimeout(r, 16));
         const ab = await file.arrayBuffer();
         const parsed = await parseFmSaveInWorker(ab, (stage, pct) => {
           setFmImportProgress({ stage, pct, fileName: file.name });
@@ -124,9 +128,9 @@ export function StaffOptimizerTable({
         await ingestParsedFmSave(parsed, file.name);
       } catch (err) {
         setFmImportProgress(null);
-        setImportError(
-          err instanceof Error ? err.message : "Gagal memproses file save .fm",
-        );
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg === FM_SAVE_CANCELLED_ERROR) return;
+        setImportError(msg || "Gagal memproses file save .fm");
       }
       return;
     }

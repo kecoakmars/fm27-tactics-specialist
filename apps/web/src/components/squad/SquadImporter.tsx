@@ -1,7 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { parseFmSaveInWorker } from "../../lib/worker-client";
+import {
+  FM_SAVE_CANCELLED_ERROR,
+  parseFmSaveInWorker,
+} from "../../lib/worker-client";
 import { useFolderSyncStore } from "../../stores/useFolderSyncStore";
 import { useSquadStore } from "../../stores/useSquadStore";
 import { useTacticStore } from "../../stores/useTacticStore";
@@ -47,7 +50,9 @@ export function SquadImporter() {
       await ingestParsedFmSave(parsed, fileName);
     } catch (err) {
       setFmImportProgress(null);
-      setError(err instanceof Error ? err.message : "Gagal memproses file save .fm");
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg === FM_SAVE_CANCELLED_ERROR) return;
+      setError(msg || "Gagal memproses file save .fm");
     } finally {
       setBusy(false);
     }
@@ -56,9 +61,16 @@ export function SquadImporter() {
   async function handleFile(file: File) {
     if (file.name.toLowerCase().endsWith(".fm")) {
       try {
+        setFmImportProgress({
+          stage: "Membaca file dari disk lokal...",
+          pct: 1,
+          fileName: file.name,
+        });
+        await new Promise((r) => setTimeout(r, 16));
         const ab = await file.arrayBuffer();
         await handleFmSaveArrayBuffer(file.name, ab);
       } catch (err) {
+        setFmImportProgress(null);
         setError(err instanceof Error ? err.message : "Gagal membaca file save .fm");
       }
       return;

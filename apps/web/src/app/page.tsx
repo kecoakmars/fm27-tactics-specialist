@@ -27,7 +27,10 @@ import { DualPhasePitch } from "@/components/pitch/DualPhasePitch";
 import { SplitViewPitch } from "@/components/pitch/SplitViewPitch";
 import { sanitizeFileName, triggerBrowserDownload } from "@/lib/local-folder-sync";
 import { exportDualPhasePngCard } from "@/lib/svg-card-exporter";
-import { parseFmSaveInWorker } from "@/lib/worker-client";
+import {
+  FM_SAVE_CANCELLED_ERROR,
+  parseFmSaveInWorker,
+} from "@/lib/worker-client";
 import { useFolderSyncStore } from "@/stores/useFolderSyncStore";
 import { useTacticStore } from "@/stores/useTacticStore";
 
@@ -196,12 +199,40 @@ export default function TacticalBoardWorkspacePage() {
       } catch (err) {
         setFmImportProgress(null);
         const message = err instanceof Error ? err.message : String(err);
+        if (message === FM_SAVE_CANCELLED_ERROR) {
+          notify("ok", `Pembacaan file ${fileName} dibatalkan.`);
+          return;
+        }
         notify("error", `Gagal impor save ${fileName}: ${message}`);
       } finally {
         setBusyAction(null);
       }
     },
     [ingestParsedFmSave, notify, setFmImportProgress],
+  );
+
+  const handleImportFmSaveFile = useCallback(
+    async (file: File) => {
+      setBusyAction("import-fm-save");
+      setFmImportProgress({
+        stage: "Membaca file dari disk lokal...",
+        pct: 1,
+        fileName: file.name,
+      });
+      try {
+        await new Promise((r) => setTimeout(r, 16));
+        const ab = await file.arrayBuffer();
+        await handleImportFmSaveArrayBuffer(file.name, ab);
+      } catch (err) {
+        setFmImportProgress(null);
+        setBusyAction(null);
+        notify(
+          "error",
+          `Gagal membaca ${file.name}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    },
+    [handleImportFmSaveArrayBuffer, notify, setFmImportProgress],
   );
 
   const handleImportBytes = useCallback(
@@ -364,13 +395,13 @@ export default function TacticalBoardWorkspacePage() {
         const file = e.dataTransfer.files?.[0];
         if (!file) return;
         const isFmSave = file.name.toLowerCase().endsWith(".fm");
+        if (isFmSave) {
+          void handleImportFmSaveFile(file);
+          return;
+        }
         void file
           .arrayBuffer()
-          .then((ab) =>
-            isFmSave
-              ? handleImportFmSaveArrayBuffer(file.name, ab)
-              : handleImportBytes(file.name, new Uint8Array(ab)),
-          )
+          .then((ab) => handleImportBytes(file.name, new Uint8Array(ab)))
           .catch((err) =>
             notify(
               "error",
@@ -477,13 +508,13 @@ export default function TacticalBoardWorkspacePage() {
                 e.target.value = "";
                 if (!f) return;
                 const isFmSave = f.name.toLowerCase().endsWith(".fm");
+                if (isFmSave) {
+                  void handleImportFmSaveFile(f);
+                  return;
+                }
                 void f
                   .arrayBuffer()
-                  .then((ab) =>
-                    isFmSave
-                      ? handleImportFmSaveArrayBuffer(f.name, ab)
-                      : handleImportBytes(f.name, new Uint8Array(ab)),
-                  )
+                  .then((ab) => handleImportBytes(f.name, new Uint8Array(ab)))
                   .catch((err) =>
                     notify(
                       "error",
