@@ -1,7 +1,7 @@
 # HANDOFF.md — FM27 Tactics Studio (Cloud Session Continuation)
 
 - **Branch Aktif:** `main`
-- **Commit Terakhir sebelum Handoff:** `75f3b1d` (`feat(web): simplify UI for FM players and add ID/EN language switcher`)
+- **Status Terkini:** Tahap 1–5 + Optimasi Peran Skuad (`de14486`) + Legenda Warna Papan Taktik (`5581f41`) sudah live di `origin/main` (Vercel auto-deploy) dan siap untuk pengujian komunitas dengan berbagai file save `.fm`.
 - **Arsitektur Monorepo:** `pnpm` (`pnpm@12.21.0`, Node `>=22`) + Turborepo
   - `apps/web`: Next.js 15 App Router + React 19 + Tailwind + Zustand (`zundo` temporal Undo/Redo)
   - `packages/fm-codec`: Pure TypeScript binary codec untuk `.fmf` (taktik, jadwal `.tsc`, shortlist `.slf`) & `.fm` (save karier Zstandard via `fzstd`)
@@ -33,11 +33,12 @@
    - Mengganti dropdown `Gaya` (*Style*) atau `Formasi` (*Shape*) saat save `.fm` aktif otomatis menyusun ulang 11 pemain klub terbaik tanpa mengosongkan nama pemain di lapangan.
    - Impor `.fmf` buatan sendiri diikuti impor `.fm` tidak saling menimpa paksa (pemain klub dipasang ke taktik `.fmf` aktif, disertai tombol untuk mencari taktik terbaik baru).
 
-5. **Penyederhanaan UI/UX Khusus Pemain FM, Switch Bahasa `ID | EN`, & Optimasi Peran Skuad (`75f3b1d` + commit terbaru):**
+5. **Penyederhanaan UI/UX Khusus Pemain FM, Switch Bahasa `ID | EN`, Optimasi Peran & Legenda Warna (`75f3b1d`, `de14486`, `5581f41`):**
    - Tombol switch **`ID | EN`** di `TopNavShell.tsx` (`useLocaleStore.ts`, tersimpan di `localStorage`) mengubah seluruh teks antarmuka secara instan tanpa mencampur bahasa Indonesia–Inggris, sembari tetap mempertahankan istilah resmi in-game FM27 (`GK`, `DCL`, `Inside Forward`, `Gegenpress`, `Defend/Support/Attack`).
    - Seluruh opsi `.fm27.json`, `.json`, dan `CSV / HTML` telah dihapus dari UI (fokus murni `.fm` dan `.fmf`).
    - Seluruh label teknis/programmer (`Mode A/B/C`, `100% Data Deterministik (Non-AI)`, `Diproses 100% lokal di browser...`, `Zstd`, `Web Worker`, `Hungarian Solver`, rumus `ValueRatio`, `DDM`, `RankingFit`, `Eligibility Matrix Key`, `gemini-decision-1`) serta teks penjelasan/tutorial panjang telah dibersihkan dari layar.
-   - Tombol **`Optimalkan Peran`** (`Optimize Roles`) di halaman `/squad` telah diperbaiki penuh: membandingkan skor kecocokan taktik saat ini vs proyeksi optimal (`baseline` vs `improved`), menyelaraskan kandidat peran `RoleFitTable` dengan `gradeImportedTactic` (maks 1 OOP Outlet, tanpa peran *gimmick*), mempertahankan 11 starter yang sudah dipasang / dikunci (`lineupPreferences`), memperbarui *Duty* + *Player Instructions* per peran baru, menampilkan notifikasi ringkasan perubahan, dan berubah menjadi badge **`Peran Sudah Optimal ✓`** bila seluruh peran sudah maksimal.
+   - Tombol **`Optimalkan Peran`** (`Optimize Roles`) di halaman `/squad` (`de14486`) telah diperbaiki penuh: membandingkan skor kecocokan taktik saat ini vs proyeksi optimal (`baseline` vs `improved`), menyelaraskan kandidat peran `RoleFitTable` dengan `gradeImportedTactic` (maks 1 OOP Outlet, tanpa peran *gimmick*), mempertahankan 11 starter yang sudah dipasang / dikunci (`lineupPreferences`), memperbarui *Duty* + *Player Instructions* per peran baru, menampilkan notifikasi ringkasan perubahan, dan berubah menjadi badge **`Peran Sudah Optimal ✓`** bila seluruh peran sudah maksimal.
+   - Baris keterangan warna ringkas **`PitchColorLegend`** (`5581f41` di `Heatmap18Zone.tsx` & `page.tsx`) tampil tepat di bawah papan lapangan (`ID | EN`), menjelaskan arti warna lingkaran pemain (Biru IP / Oranye OOP / Hijau Kiper) serta warna kotak kepadatan area (`≥70%`, `40–69%`, `<40%`, dan kotak garis putus depan penalti) secara dinamis sesuai mode `Area` yang dipilih.
 
 ---
 
@@ -84,26 +85,29 @@
 
 ---
 
-## 4. Urutan Langkah Kerja Berikutnya Secara Spesifik
+## 4. Urutan Langkah Kerja Berikutnya & Checklist Uji Save Volunteer Komunitas
 
-1. **Langkah 1 — Amankan `pnpm test` di Cloud Environment (5 Menit Pertama):**
-   - Buka `tests/unified-analyzer.spec.ts` baris 141, tambahkan guard `const sampleFmPath = path.resolve(process.cwd(), "tests/fixtures/sample-real.fm");` dan ubah `it(...)` menjadi `it.skipIf(!fs.existsSync(sampleFmPath))(...)` agar selaras dengan `tests/fm-save-parser.spec.ts:116`.
-   - Jalankan verifikasi baseline di cloud:
-     ```bash
-     pnpm data:validate && pnpm typecheck && pnpm test && pnpm --filter @fm27/web build
-     ```
+1. **Langkah 1 — Evaluasi Hasil Uji File Save `.fm` dari Volunteer Komunitas:**
+   - Saat menguji berbagai file save `.fm` dari komunitas, perhatikan skenario *edge-case* berikut:
+     - **Save Manajer Menganggur (*Unemployed*) / Tim Nasional:** Pastikan modal pemilih klub (`ClubPickerModal`) langsung terbuka otomatis ketika `humanClubUid` tidak merujuk ke klub berpemain `>= 11`.
+     - **Klub Kasta Bawah / Semi-Pro dengan Skuad Tipis:** Jika `First Team` memiliki `< 11` pemain atau tanpa kiper senior (`GK >= 15`), pastikan fallback otomatis ke gabungan `First Team + U21 / U18` di `selectPrimarySquadPlayers` berjalan mulus tanpa error.
+     - **Save Karier Tahun Jauh (2032+) dengan Regen / Newgen & Database Custom:** Cek apakah ekstraksi blok pemain/staf pada `packages/fm-codec/src/fm-save-parser.ts` tetap akurat untuk pemain regen serta ukuran file besar (`150–400 MB`).
+     - **Variasi Gaya Klub Kecil vs Klub Elite:** Pastikan klub papan bawah (`avgTop11Ability < 11.5`) mendapat rekomendasi formasi realistis/pragmatis dan tidak dipaksa bermain *Tiki-Taka* garis tinggi.
 
-2. **Langkah 2 — Evaluasi Feedback Visual Pengguna di Deploy Vercel (`75f3b1d`):**
-   - Tanyakan atau cek bersama pengguna bagian tampilan mana setelah penyederhanaan Tahap 5 yang masih ingin dipoles (misalnya penyatuan kotak 5-Tab `UnifiedReportDashboard` dengan menu utama, perapian tampilan *mobile*, atau penyempurnaan terjemahan `ID | EN` pada istilah tertentu).
-
-3. **Langkah 3 — Bangun *First-Launch Onboarding* Ringkas (`ID | EN`):**
+2. **Langkah 2 — Bangun *First-Launch Onboarding* Ringkas (`ID | EN`):**
    - Buat komponen modal/panduan singkat 3 langkah yang hanya tampil saat kunjungan pertama (`localStorage` key mis. `fm27-onboarding-seen-v1`, dilengkapi tombol `?` kecil di `TopNavShell` jika ingin dibuka kembali):
      1. *Muat Save Karier (`.fm`) atau Taktik (`.fmf`)*
      2. *Atur Formasi Menyerang (IP) & Bertahan (OOP) serta Cek Skuad/Latihan*
      3. *Unduh File `.fmf` Siap Pakai ke Folder Football Manager 27*
 
-4. **Langkah 4 — Persistensi Sesi `.fm` di `IndexedDB` (Opsional / High-UX Impact):**
+3. **Langkah 3 — Persistensi Sesi `.fm` di `IndexedDB` (Opsional / High-UX Impact):**
    - Simpan hasil ekstraksi ringkas `ParsedFmSave` (atau klub aktif + `worldWonderkids` + `worldStaffPool`) ke `IndexedDB` browser agar pengguna tidak perlu memilih ulang file `.fm` 70–200 MB setiap kali me-refresh tab browser, lengkap dengan tombol *Hapus/Ganti Save*.
+
+4. **Langkah 4 — Baseline Verifikasi Cepat Setiap Sesi Baru:**
+   ```bash
+   pnpm data:validate && pnpm typecheck && pnpm test && pnpm --filter @fm27/web build
+   ```
+   *(Catatan: `tests/unified-analyzer.spec.ts` dan `tests/fm-save-parser.spec.ts` sudah memakai `it.skipIf(!fs.existsSync(sampleFmPath))` sehingga aman dijalankan di GitHub Actions/Cloud tanpa fixture biner 70 MB).*
 
 ---
 

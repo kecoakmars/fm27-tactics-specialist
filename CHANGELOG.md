@@ -2,6 +2,18 @@
 
 All notable changes to **FM27 Tactics Generator** are documented in this file following [Conventional Commits](https://www.conventionalcommits.org/).
 
+## [1.1.0] - 2026-11-26
+
+### Added & Improved
+- **Client-Side `.fm` Career Save Analyzer (`@fm27/fm-codec`, `@fm27/web`):**
+  - Standalone browser Web Worker (`fm-save-worker.js`) with `PING/PONG` handshake, CDN Blob Worker fallback, `Transferable ArrayBuffer`, and cancellation support for 50–400 MB `.fm` career saves without uploading files to any server.
+  - Automatic club roster separation (`First Team`, `U21 / Reserve`, `U18 / Youth`), 8 hidden personality attribute extraction, **500 Live U-21 Wonderkids**, and **200 Live Coaching Staff / Free Agents** directly from the active career save (`0%` static sample data leakage in UI).
+- **REA-Calibrated Tactical & Role Recommendation Overhaul (`@fm27/fm-engine`):**
+  - Curated solver candidate roles (`getSolverCandidateRolesForSlot`), capped OOP `Outlet` roles, 1-to-1 non-cloned bench cover matching, senior ability & accomplished familiarity compensation, dominant-foot central pairing (`DCL/DCR`, `DML/DMR`, `MCL/MCR`), and squad-aware `13 Styles × 16 Shapes` ranking.
+- **Unified Cross-Page Workflow, `ID | EN` Localization & FM-Player UI Simplification (`@fm27/web`):**
+  - Universal `.fm` / `.fmf` importer (`importAnySupportedFile`) in `TopNavShell` that automatically syncs Tactic Board, Squad Audit, 7×3 Weekly Training, Coaching Staff, and Wonderkid targets in one step.
+  - Instant `ID | EN` language switcher (`useLocaleStore`), football-native copywriting (stripped developer jargon/formulas and intermediate JSON/CSV/HTML clutter), repaired 1-click **Optimize Roles** on `/squad`, and compact **Pitch Color Legend** beneath the dual-phase pitch.
+
 ## [1.0.0] - 2026-11-25
 
 ### Added
