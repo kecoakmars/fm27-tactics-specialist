@@ -21,6 +21,7 @@ import {
 } from "@fm27/fm-engine";
 import type {
   DualPhaseTactic,
+  LineupPreference,
   Player,
   WeeklySchedule,
 } from "@fm27/shared-types";
@@ -45,6 +46,7 @@ export type EngineWorkerRequest =
       tactic: DualPhaseTactic;
       players: Player[];
       improve?: boolean;
+      lineupPreferences?: readonly LineupPreference[];
     }
   | { id: string; type: "EXPORT_SCHEDULE_FMF"; schedule: WeeklySchedule }
   | { id: string; type: "PARSE_SCHEDULE_FMF"; bytes: Uint8Array; patchVersion?: string }
@@ -93,7 +95,10 @@ export async function dispatchWorkerTask(
     case "AUDIT_SQUAD":
       return auditSquadAgainstTactic(req.tactic, req.players);
     case "GRADE_IMPORTED":
-      return gradeImportedTactic(req.tactic, req.players, { improve: req.improve });
+      return gradeImportedTactic(req.tactic, req.players, {
+        improve: req.improve,
+        lineupPreferences: req.lineupPreferences,
+      });
     case "EXPORT_SCHEDULE_FMF":
       return exportScheduleFmf(req.schedule);
     case "PARSE_SCHEDULE_FMF":

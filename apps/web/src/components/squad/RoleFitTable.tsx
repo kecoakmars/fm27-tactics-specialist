@@ -35,6 +35,7 @@ export function RoleFitTable({
 }: RoleFitTableProps) {
   const { t } = useLocale();
   const catalog = getPitchCatalog(patchVersion);
+  const roleNameById = new Map(catalog.Roles.map((r) => [r.Id, r.Name]));
   const lockByUid = new Map(lineupPreferences.map((lp) => [lp.playerUid, lp]));
   const weakSet = new Set(audit?.weakestThreeSlotIndices ?? []);
 
@@ -74,8 +75,12 @@ export function RoleFitTable({
                       <td className="py-2 pr-3 font-medium text-slate-100">
                         {row.playerName}
                       </td>
-                      <td className="py-2 pr-3 text-slate-300">{row.inRoleId}</td>
-                      <td className="py-2 pr-3 text-slate-300">{row.outRoleId}</td>
+                      <td className="py-2 pr-3 text-slate-300">
+                        {roleNameById.get(row.inRoleId) ?? row.inRoleId}
+                      </td>
+                      <td className="py-2 pr-3 text-slate-300">
+                        {roleNameById.get(row.outRoleId) ?? row.outRoleId}
+                      </td>
                       <td className="py-2 pr-3 font-mono font-semibold">
                         <span
                           className={
@@ -102,7 +107,8 @@ export function RoleFitTable({
                             }
                             className="rounded border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[11px] text-cyan-300 hover:bg-cyan-500/20 cursor-pointer"
                           >
-                            {bestAlt.phase} → {bestAlt.roleId} (
+                            {bestAlt.phase} →{" "}
+                            {roleNameById.get(bestAlt.roleId) ?? bestAlt.roleId} (
                             {bestAlt.projectedFit.toFixed(0)})
                           </button>
                         ) : (

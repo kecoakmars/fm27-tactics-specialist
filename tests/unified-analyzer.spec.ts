@@ -3,7 +3,13 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { exportFmf, parseFmSave, parseFmf } from "@fm27/fm-codec";
 import { getPatchData } from "@fm27/fm-data";
-import { analyzeUnified, isOopOutletRole, parseSquadCsv } from "@fm27/fm-engine";
+import {
+  analyzeUnified,
+  auditSquadAgainstTactic,
+  gradeImportedTactic,
+  isOopOutletRole,
+  parseSquadCsv,
+} from "@fm27/fm-engine";
 import type { Player } from "@fm27/shared-types";
 
 function buildDeterministicTestSquad(): Player[] {
@@ -138,44 +144,61 @@ describe("Unified 5-Tab Deterministic Pipeline — analyzeUnified (0% AI)", () =
     assertCatalogProvenance(run1);
   });
 
-  it("Real .fm save (Manchester United): isolates First Team, avoids underdog/outlet gimmicks, and places stars on natural foot sides", () => {
-    const rawSave = fs.readFileSync(
-      path.resolve(process.cwd(), "tests/fixtures/sample-real.fm"),
-    );
-    const save = parseFmSave(
-      new Uint8Array(rawSave.buffer, rawSave.byteOffset, rawSave.byteLength),
-    );
-    const clubUid = save.humanClubUid;
-    expect(clubUid).not.toBeNull();
-    const manUtdAll = save.playersByClub[clubUid!] ?? [];
-    expect(manUtdAll.length).toBeGreaterThan(50);
+  const realSavePath = path.resolve(process.cwd(), "tests/fixtures/sample-real.fm");
+  it.skipIf(!fs.existsSync(realSavePath))(
+    "Real .fm save (Manchester United): isolates First Team, avoids underdog/outlet gimmicks, places stars on natural foot sides, and optimizes imported .fmf roles",
+    async () => {
+      const rawSave = fs.readFileSync(realSavePath);
+      const save = parseFmSave(
+        new Uint8Array(rawSave.buffer, rawSave.byteOffset, rawSave.byteLength),
+      );
+      const clubUid = save.humanClubUid;
+      expect(clubUid).not.toBeNull();
+      const manUtdAll = save.playersByClub[clubUid!] ?? [];
+      expect(manUtdAll.length).toBeGreaterThan(50);
 
-    const report = analyzeUnified({
-      squad: manUtdAll,
-      clubStaff: save.staffByClub[clubUid!],
-      worldStaffPool: save.worldStaffPool,
-      worldWonderkids: save.worldWonderkids,
-      dataset,
-    });
+      const report = analyzeUnified({
+        squad: manUtdAll,
+        clubStaff: save.staffByClub[clubUid!],
+        worldStaffPool: save.worldStaffPool,
+        worldWonderkids: save.worldWonderkids,
+        dataset,
+      });
 
-    const rec = report.tacticAdvice.recommendedTactic;
-    expect(["Gegenpress", "ControlPossession", "VerticalTikiTaka"]).toContain(rec.styleId);
-    expect(["4-2-3-1", "4-3-3 DM"]).toContain(rec.inFormation);
+      const rec = report.tacticAdvice.recommendedTactic;
+      expect(["Gegenpress", "ControlPossession", "VerticalTikiTaka"]).toContain(rec.styleId);
+      expect(["4-2-3-1", "4-3-3 DM"]).toContain(rec.inFormation);
 
-    const starterNames = rec.slots.map((s) => s.playerName);
-    expect(starterNames).toContain("Bruno Fernandes");
-    expect(starterNames).toContain("Bryan Mbeumo");
-    expect(starterNames).toContain("Benjamin Šeško");
-    expect(starterNames).toContain("Senne Lammens");
+      const starterNames = rec.slots.map((s) => s.playerName);
+      expect(starterNames).toContain("Bruno Fernandes");
+      expect(starterNames).toContain("Bryan Mbeumo");
+      expect(starterNames).toContain("Benjamin Šeško");
+      expect(starterNames).toContain("Senne Lammens");
 
-    const dcl = rec.slots.find((s) => s.inPossession.positionId === "DCL");
-    const dcr = rec.slots.find((s) => s.inPossession.positionId === "DCR");
-    expect(dcl?.playerName).toBe("Lisandro Martínez");
-    expect(dcr?.playerName).toBe("Matthijs de Ligt");
+      const dcl = rec.slots.find((s) => s.inPossession.positionId === "DCL");
+      const dcr = rec.slots.find((s) => s.inPossession.positionId === "DCR");
+      expect(dcl?.playerName).toBe("Lisandro Martínez");
+      expect(dcr?.playerName).toBe("Matthijs de Ligt");
 
-    for (const slot of rec.slots) {
-      expect(isOopOutletRole(slot.outOfPossession.roleId)).toBe(false);
-      expect(slot.inPossession.roleId).not.toBe("NoNonsenseCentreBack");
-    }
-  }, 30_000);
+      for (const slot of rec.slots) {
+        expect(isOopOutletRole(slot.outOfPossession.roleId)).toBe(false);
+        expect(slot.inPossession.roleId).not.toBe("NoNonsenseCentreBack");
+      }
+
+      // Verify Optimize Roles (`gradeImportedTactic` improve: true) on real imported .fmf + Man Utd First Team
+      const firstTeam = manUtdAll.filter((p) => p.teamSlot === "First Team");
+      const rawFmf = fs.readFileSync(
+        path.resolve(process.cwd(), "tests/fixtures/sample-real.fmf"),
+      );
+      const importedFmf = await parseFmf(new Uint8Array(rawFmf));
+      const baseFmfGrade = gradeImportedTactic(importedFmf, firstTeam, { improve: false });
+      const optFmfGrade = gradeImportedTactic(importedFmf, firstTeam, { improve: true });
+      expect(optFmfGrade.rankingFit).toBeGreaterThan(baseFmfGrade.rankingFit + 0.7);
+      const auditAfterOpt = auditSquadAgainstTactic(optFmfGrade.tactic, firstTeam);
+      expect(
+        auditAfterOpt.starterAudits.filter((a) => a.betterRoleAlternatives.length > 0),
+      ).toHaveLength(0);
+    },
+    30_000,
+  );
 });

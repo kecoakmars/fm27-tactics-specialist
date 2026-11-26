@@ -201,6 +201,51 @@ describe("Phase 1 — @fm27/fm-engine Deterministic Math & Analytics Suite", () 
     const baselineGrade = gradeImportedTactic(lockedPlans[0]!.tactic, players, { improve: false });
     const improvedGrade = gradeImportedTactic(lockedPlans[0]!.tactic, players, { improve: true });
     expect(improvedGrade.rankingFit).toBeGreaterThanOrEqual(baselineGrade.rankingFit);
+
+    // Suboptimal roles on an assigned board: Optimize Roles upgrades IP/OOP roles, preserves 11 starters & team instructions, and is idempotent
+    const degradedTactic = {
+      ...lockedPlans[0]!.tactic,
+      slots: lockedPlans[0]!.tactic.slots.map((slot) =>
+        slot.inPossession.positionId === "GK"
+          ? {
+              ...slot,
+              inPossession: { ...slot.inPossession, roleId: "BallPlayingGoalkeeper" },
+            }
+          : slot.inPossession.positionId === "AMR" || slot.inPossession.positionId === "AML"
+            ? {
+                ...slot,
+                inPossession: { ...slot.inPossession, roleId: "WideMidfielder" },
+                outOfPossession: { ...slot.outOfPossession, roleId: "OPTrackingWinger" },
+              }
+            : slot,
+      ),
+    };
+    const subBase = gradeImportedTactic(degradedTactic, players, {
+      improve: false,
+      lineupPreferences: [{ playerUid: 1015, mustStart: true }],
+    });
+    const subOpt = gradeImportedTactic(degradedTactic, players, {
+      improve: true,
+      lineupPreferences: [{ playerUid: 1015, mustStart: true }],
+    });
+    expect(subOpt.rankingFit).toBeGreaterThan(subBase.rankingFit);
+    expect(subOpt.tactic.slots.map((s) => s.playerUid)).toEqual(
+      degradedTactic.slots.map((s) => s.playerUid),
+    );
+    expect(subOpt.tactic.teamInstructions).toEqual(degradedTactic.teamInstructions);
+    const subOptSecondPass = gradeImportedTactic(subOpt.tactic, players, {
+      improve: true,
+      lineupPreferences: [{ playerUid: 1015, mustStart: true }],
+    });
+    expect(
+      subOptSecondPass.tactic.slots.map(
+        (s) => `${s.playerUid}:${s.inPossession.roleId}:${s.outOfPossession.roleId}`,
+      ),
+    ).toEqual(
+      subOpt.tactic.slots.map(
+        (s) => `${s.playerUid}:${s.inPossession.roleId}:${s.outOfPossession.roleId}`,
+      ),
+    );
   });
 
   it("computes 18-Zone Heatmap, 6-Pillar Balance Score, Squad Audit, Wonderkid Ranking, Staff Optimizer, and Training Load", () => {

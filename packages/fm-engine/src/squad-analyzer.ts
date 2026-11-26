@@ -720,29 +720,100 @@ export function analyzeSquadAndGenerateTactics(
 
 /**
  * Grades an imported `.fmf` / manual `DualPhaseTactic` against a squad using FixedRoleFit + Hungarian,
- * and optionally runs up to 3 steepest-ascent hill-climbing rounds (`> 0.12` gain threshold).
+ * preserving valid assigned starters (when locks are satisfied) and running multi-slot role & instruction
+ * optimization when `improve: true`.
  */
 export function gradeImportedTactic(
   tactic: DualPhaseTactic,
   squadPlayers: ReadonlyArray<Player>,
-  options?: { improve?: boolean; patchVersion?: string },
+  options?: {
+    improve?: boolean;
+    lineupPreferences?: readonly LineupPreference[];
+    patchVersion?: string;
+  },
 ): TacticPlanResult {
   const patchVersion = options?.patchVersion ?? tactic.patchVersion ?? "27.0";
-  const primaryPlayers = selectPrimarySquadPlayers(squadPlayers);
-  const normalized = normalizeAndValidateSquad(primaryPlayers, [], patchVersion);
+  const lineupPrefs = options?.lineupPreferences ?? [];
+  const primaryPlayers = selectPrimarySquadPlayers(squadPlayers, lineupPrefs);
+  const normalized = normalizeAndValidateSquad(primaryPlayers, lineupPrefs, patchVersion);
   const rp = getRoleProfiles(patchVersion);
   const profileById = new Map(rp.Roles.map((r) => [r.Id, r]));
   const specialistSet = new Set(rp.SpecialistRoles);
   const catalog = getPitchCatalog(patchVersion);
+  const stylesCatalog = getTacticalStyles(patchVersion);
+  const styleObj = tactic.styleId
+    ? stylesCatalog.TacticalStyles.find(
+        (s) =>
+          s.Id.toLowerCase() === tactic.styleId!.toLowerCase() ||
+          s.Name.toLowerCase() === tactic.styleId!.toLowerCase(),
+      )
+    : undefined;
+
+  const preferencesByUid = new Map<number, LineupPreference>();
+  for (const pref of lineupPrefs) {
+    preferencesByUid.set(pref.playerUid, pref);
+  }
+  const mustStartUids = lineupPrefs
+    .filter((p) => p.mustStart)
+    .map((p) => p.playerUid);
+  const byUid = new Map(normalized.map((p, idx) => [p.uid, idx]));
+
+  const resolveAssignedIndices = (
+    candidate: DualPhaseTactic,
+    rawFits: (number | null)[][],
+  ): number[] => {
+    const inSlots = candidate.slots.map((s) => s.inPossession.positionId);
+    const outSlots = candidate.slots.map((s) => s.outOfPossession.positionId);
+
+    const explicitIndices = candidate.slots
+      .map((s) => (s.playerUid !== undefined ? byUid.get(s.playerUid) : undefined))
+      .filter((idx): idx is number => idx !== undefined);
+
+    if (new Set(explicitIndices).size === 11) {
+      const assignedUidSet = new Set(explicitIndices.map((idx) => normalized[idx]!.uid));
+      const allMustStartsIncluded = mustStartUids.every(
+        (uid) => !byUid.has(uid) || assignedUidSet.has(uid),
+      );
+      const allLocksSatisfied = explicitIndices.every((pIdx, sIdx) => {
+        const p = normalized[pIdx]!;
+        const pref = preferencesByUid.get(p.uid);
+        if (!satisfiesLineupLock(pref, inSlots[sIdx]!, outSlots[sIdx]!)) return false;
+        return (rawFits[sIdx]?.[pIdx] ?? -1000) > -500;
+      });
+      if (allMustStartsIncluded && allLocksSatisfied) {
+        return explicitIndices;
+      }
+    }
+
+    const matrix = buildAssignmentMatrix({
+      inSlots,
+      outSlots,
+      rawFits,
+      players: normalized,
+      styleAttributes: styleObj?.Attributes,
+      preferencesByUid,
+    });
+    return solveHungarianMax(matrix);
+  };
 
   const measure = (candidate: DualPhaseTactic): TacticPlanResult => {
     const inSlots = candidate.slots.map((s) => s.inPossession.positionId);
     const outSlots = candidate.slots.map((s) => s.outOfPossession.positionId);
 
-    const rawFits: number[][] = candidate.slots.map((slot) => {
+    const rawFits: (number | null)[][] = candidate.slots.map((slot) => {
       const inRole = profileById.get(slot.inPossession.roleId) ?? rp.Roles[0]!;
       const outRole = profileById.get(slot.outOfPossession.roleId) ?? rp.Roles[0]!;
       return normalized.map((p) => {
+        const pref = preferencesByUid.get(p.uid);
+        if (
+          !satisfiesLineupLock(
+            pref,
+            slot.inPossession.positionId,
+            slot.outOfPossession.positionId,
+          )
+        ) {
+          return null;
+        }
         const inQ = scoreSingleRoleQuality(p, slot.inPossession.positionId, inRole, specialistSet);
         const outQ = scoreSingleRoleQuality(
           p,
@@ -760,7 +831,7 @@ export function gradeImportedTactic(
       });
     });
 
-    const assigned = solveHungarianMax(rawFits);
+    const assigned = resolveAssignedIndices(candidate, rawFits);
     const starters: CoachingUnitStarter[] = assigned.map((pIdx, sIdx) => ({
       player: normalized[pIdx]!,
       inSlot: inSlots[sIdx]!,
@@ -772,12 +843,15 @@ export function gradeImportedTactic(
     const startingFit =
       assigned.reduce((acc, pIdx, sIdx) => acc + (rawFits[sIdx]?.[pIdx] ?? 0), 0) / 11;
 
-    const highPress = (candidate.teamInstructions.LineOfEngagement ?? 62) === 61;
+    const highPress =
+      (candidate.teamInstructions.LineOfEngagement ?? 62) === 61 ||
+      Boolean(styleObj?.HighPress);
     const coaching = reviewCoachingKnowledge({
       starters,
       inSlots,
       outSlots,
       teamInstructions: candidate.teamInstructions,
+      styleName: styleObj?.Name,
       highPress,
       finalize: false,
       patchVersion,
@@ -820,91 +894,130 @@ export function gradeImportedTactic(
   let bestResult = measure(tactic);
   if (!options?.improve) return bestResult;
 
-  // Up to 3 rounds of Steepest-Ascent Hill Climbing (> 0.12 net gain gate)
-  let currentTactic = bestResult.tactic;
-  for (let round = 0; round < 3; round++) {
+  // Multi-pass Steepest-Ascent Optimization across all 11 starters' IP/OOP roles & duties
+  let currentTactic: DualPhaseTactic = {
+    ...bestResult.tactic,
+    teamInstructions: resolveTeamInstructionConflicts(
+      bestResult.tactic.teamInstructions,
+      catalog,
+    ),
+  };
+  bestResult = measure(currentTactic);
+
+  for (let round = 0; round < 14; round++) {
     let roundBest: TacticPlanResult | null = null;
     const inSlots = currentTactic.slots.map((s) => s.inPossession.positionId);
     const outSlots = currentTactic.slots.map((s) => s.outOfPossession.positionId);
-
-    const highPress = (currentTactic.teamInstructions.LineOfEngagement ?? 62) === 61;
+    const highPress =
+      (currentTactic.teamInstructions.LineOfEngagement ?? 62) === 61 ||
+      Boolean(styleObj?.HighPress);
+    const activeOutletCount = currentTactic.slots.filter((s) =>
+      isOopOutletRole(s.outOfPossession.roleId),
+    ).length;
 
     for (let sIdx = 0; sIdx < 11; sIdx++) {
       const slot = currentTactic.slots[sIdx]!;
-      const ipAlts = getSolverCandidateRolesForSlot(
-        slot.inPossession.positionId,
-        0,
-        inSlots,
-        {
-          styleId: currentTactic.styleId,
-          highPress,
-          patchVersion,
-        },
-      );
-      for (const altRole of ipAlts) {
-        if (altRole.Id === slot.inPossession.roleId) continue;
-        const neighbor: DualPhaseTactic = {
-          ...currentTactic,
-          slots: currentTactic.slots.map((s, idx) =>
-            idx === sIdx
-              ? {
-                  ...s,
-                  inPossession: {
-                    ...s.inPossession,
-                    roleId: altRole.Id,
-                    duty: inferDutyForRole(altRole.Id, 0),
-                  },
-                }
-              : s,
-          ),
-        };
-        const res = measure(neighbor);
-        if (res.rankingFit > (roundBest?.rankingFit ?? bestResult.rankingFit) + 0.12) {
-          roundBest = res;
-        }
-      }
+      const starterIdx = slot.playerUid !== undefined ? byUid.get(slot.playerUid) : undefined;
+      const starterPlayer = starterIdx !== undefined ? normalized[starterIdx] : undefined;
+      const pref = slot.playerUid !== undefined ? preferencesByUid.get(slot.playerUid) : undefined;
 
-      const oopAlts = getSolverCandidateRolesForSlot(
-        slot.outOfPossession.positionId,
-        1,
-        outSlots,
-        {
-          styleId: currentTactic.styleId,
-          highPress,
-          patchVersion,
-        },
-      );
-      for (const altRole of oopAlts) {
-        if (altRole.Id === slot.outOfPossession.roleId) continue;
-        const neighbor: DualPhaseTactic = {
-          ...currentTactic,
-          slots: currentTactic.slots.map((s, idx) =>
-            idx === sIdx
-              ? {
-                  ...s,
-                  outOfPossession: { ...s.outOfPossession, roleId: altRole.Id },
-                }
-              : s,
-          ),
-        };
-        const res = measure(neighbor);
-        if (res.rankingFit > (roundBest?.rankingFit ?? bestResult.rankingFit) + 0.12) {
-          roundBest = res;
-        }
-      }
-    }
-
-    for (const grp of catalog.Instructions.slice(0, 8)) {
-      for (const opt of grp.Options) {
-        if ((currentTactic.teamInstructions[grp.Group] ?? 0) === opt.Bit) continue;
-        const nextTi = resolveTeamInstructionConflicts(
-          { ...currentTactic.teamInstructions, [grp.Group]: opt.Bit },
-          catalog,
+      if (!pref?.lockedInRole) {
+        const ipAlts = getSolverCandidateRolesForSlot(
+          slot.inPossession.positionId,
+          0,
+          inSlots,
+          {
+            styleId: currentTactic.styleId,
+            preferredRoles: styleObj?.PreferredRoles,
+            highPress,
+            player: starterPlayer,
+            patchVersion,
+          },
         );
-        const neighbor: DualPhaseTactic = { ...currentTactic, teamInstructions: nextTi };
-        const res = measure(neighbor);
-        if (res.rankingFit > (roundBest?.rankingFit ?? bestResult.rankingFit) + 0.12) {
-          roundBest = res;
+        for (const altRole of ipAlts) {
+          if (altRole.Id === slot.inPossession.roleId) continue;
+          const nextPi = starterPlayer
+            ? recommendPlayerInstructions(
+                starterPlayer,
+                0,
+                slot.inPossession.positionId,
+                altRole.Id,
+                patchVersion,
+              )
+            : slot.inPossession.playerInstructionBits;
+          const neighbor: DualPhaseTactic = {
+            ...currentTactic,
+            slots: currentTactic.slots.map((s, idx) =>
+              idx === sIdx
+                ? {
+                    ...s,
+                    inPossession: {
+                      ...s.inPossession,
+                      roleId: altRole.Id,
+                      duty: inferDutyForRole(altRole.Id, 0),
+                      playerInstructionBits: nextPi,
+                    },
+                  }
+                : s,
+            ),
+          };
+          const res = measure(neighbor);
+          if (res.rankingFit > (roundBest?.rankingFit ?? bestResult.rankingFit) + 0.025) {
+            roundBest = res;
+          }
+        }
+      }
+
+      if (!pref?.lockedOutRole) {
+        const oopAlts = getSolverCandidateRolesForSlot(
+          slot.outOfPossession.positionId,
+          1,
+          outSlots,
+          {
+            styleId: currentTactic.styleId,
+            preferredRoles: styleObj?.PreferredRoles,
+            highPress,
+            player: starterPlayer,
+            patchVersion,
+          },
+        );
+        for (const altRole of oopAlts) {
+          if (altRole.Id === slot.outOfPossession.roleId) continue;
+          if (
+            isOopOutletRole(altRole.Id) &&
+            !isOopOutletRole(slot.outOfPossession.roleId) &&
+            activeOutletCount >= 1
+          ) {
+            continue;
+          }
+          const nextPi = starterPlayer
+            ? recommendPlayerInstructions(
+                starterPlayer,
+                1,
+                slot.outOfPossession.positionId,
+                altRole.Id,
+                patchVersion,
+              )
+            : slot.outOfPossession.playerInstructionBits;
+          const neighbor: DualPhaseTactic = {
+            ...currentTactic,
+            slots: currentTactic.slots.map((s, idx) =>
+              idx === sIdx
+                ? {
+                    ...s,
+                    outOfPossession: {
+                      ...s.outOfPossession,
+                      roleId: altRole.Id,
+                      playerInstructionBits: nextPi,
+                    },
+                  }
+                : s,
+            ),
+          };
+          const res = measure(neighbor);
+          if (res.rankingFit > (roundBest?.rankingFit ?? bestResult.rankingFit) + 0.025) {
+            roundBest = res;
+          }
         }
       }
     }

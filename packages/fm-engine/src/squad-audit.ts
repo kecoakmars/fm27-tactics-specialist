@@ -1,4 +1,4 @@
-import { getRoleProfiles } from "@fm27/fm-data";
+import { getRoleProfiles, getTacticalStyles } from "@fm27/fm-data";
 import type {
   AttributeName,
   DualPhaseTactic,
@@ -7,13 +7,14 @@ import type {
   SquadAuditResult,
 } from "@fm27/shared-types";
 import { computeSlotFit } from "./fit-calculator.js";
-import { solveHungarianMax } from "./hungarian.js";
+import { buildAssignmentMatrix, solveHungarianMax } from "./hungarian.js";
 import {
   getPlayerAttribute,
   normalizeAndValidateSquad,
 } from "./normalizer.js";
 import {
-  getCandidateRolesForSlot,
+  getSolverCandidateRolesForSlot,
+  isOopOutletRole,
   scoreSingleRoleQuality,
 } from "./role-evaluator.js";
 
@@ -28,6 +29,18 @@ export function auditSquadAgainstTactic(
   const patchVersion = tactic.patchVersion || "27.0";
   const normalized = normalizeAndValidateSquad(squadPlayers, [], patchVersion);
   const rp = getRoleProfiles(patchVersion);
+  const stylesCatalog = getTacticalStyles(patchVersion);
+  const styleObj = tactic.styleId
+    ? stylesCatalog.TacticalStyles.find(
+        (s) =>
+          s.Id.toLowerCase() === tactic.styleId!.toLowerCase() ||
+          s.Name.toLowerCase() === tactic.styleId!.toLowerCase(),
+      )
+    : undefined;
+  const highPress =
+    (tactic.teamInstructions.LineOfEngagement ?? 62) === 61 ||
+    Boolean(styleObj?.HighPress);
+
   const profileById = new Map(rp.Roles.map((r) => [r.Id, r]));
   const specialistSet = new Set(rp.SpecialistRoles);
 
@@ -44,7 +57,7 @@ export function auditSquadAgainstTactic(
   if (new Set(explicitIndices).size === 11) {
     starterPlayerIndices = explicitIndices;
   } else {
-    const fitMatrix = tactic.slots.map((slot) => {
+    const rawFits: (number | null)[][] = tactic.slots.map((slot) => {
       const inRole = profileById.get(slot.inPossession.roleId) ?? rp.Roles[0]!;
       const outRole = profileById.get(slot.outOfPossession.roleId) ?? rp.Roles[0]!;
       return normalized.map((p) => {
@@ -64,11 +77,21 @@ export function auditSquadAgainstTactic(
         );
       });
     });
-    starterPlayerIndices = solveHungarianMax(fitMatrix);
+    const matrix = buildAssignmentMatrix({
+      inSlots,
+      outSlots,
+      rawFits,
+      players: normalized,
+      styleAttributes: styleObj?.Attributes,
+    });
+    starterPlayerIndices = solveHungarianMax(matrix);
   }
 
   const starterIdxSet = new Set(starterPlayerIndices);
   const benchPlayers = normalized.filter((_, idx) => !starterIdxSet.has(idx));
+  const activeOutletCount = tactic.slots.filter((s) =>
+    isOopOutletRole(s.outOfPossession.roleId),
+  ).length;
 
   const deficitCounter = new Map<AttributeName, number>();
   const starterAudits: SlotAuditItem[] = tactic.slots.map((slot, sIdx) => {
@@ -115,9 +138,16 @@ export function auditSquadAgainstTactic(
       .sort((a, b) => b.fitGain - a.fitGain)
       .slice(0, 3);
 
-    // Better alternative roles for the current starter
+    // Better alternative roles curated for the active tactical style & player profile
     const betterRoleAlternatives: SlotAuditItem["betterRoleAlternatives"] = [];
-    for (const altIn of getCandidateRolesForSlot(inPos, 0, inSlots, patchVersion)) {
+    const ipCandidates = getSolverCandidateRolesForSlot(inPos, 0, inSlots, {
+      styleId: tactic.styleId,
+      preferredRoles: styleObj?.PreferredRoles,
+      highPress,
+      player,
+      patchVersion,
+    });
+    for (const altIn of ipCandidates) {
       if (altIn.Id === inRole.Id) continue;
       const altInQ = scoreSingleRoleQuality(player, inPos, altIn, specialistSet);
       const proj = Math.round(computeSlotFit(player, inPos, outPos, altInQ, outQ) * 100) / 100;
@@ -125,8 +155,23 @@ export function auditSquadAgainstTactic(
         betterRoleAlternatives.push({ phase: "IP", roleId: altIn.Id, projectedFit: proj });
       }
     }
-    for (const altOut of getCandidateRolesForSlot(outPos, 1, outSlots, patchVersion)) {
+
+    const oopCandidates = getSolverCandidateRolesForSlot(outPos, 1, outSlots, {
+      styleId: tactic.styleId,
+      preferredRoles: styleObj?.PreferredRoles,
+      highPress,
+      player,
+      patchVersion,
+    });
+    for (const altOut of oopCandidates) {
       if (altOut.Id === outRole.Id) continue;
+      if (
+        isOopOutletRole(altOut.Id) &&
+        !isOopOutletRole(outRole.Id) &&
+        activeOutletCount >= 1
+      ) {
+        continue;
+      }
       const altOutQ = scoreSingleRoleQuality(player, outPos, altOut, specialistSet);
       const proj = Math.round(computeSlotFit(player, inPos, outPos, inQ, altOutQ) * 100) / 100;
       if (proj > fitScore + 0.3) {

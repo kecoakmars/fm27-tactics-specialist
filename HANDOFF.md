@@ -33,10 +33,11 @@
    - Mengganti dropdown `Gaya` (*Style*) atau `Formasi` (*Shape*) saat save `.fm` aktif otomatis menyusun ulang 11 pemain klub terbaik tanpa mengosongkan nama pemain di lapangan.
    - Impor `.fmf` buatan sendiri diikuti impor `.fm` tidak saling menimpa paksa (pemain klub dipasang ke taktik `.fmf` aktif, disertai tombol untuk mencari taktik terbaik baru).
 
-5. **Penyederhanaan UI/UX Khusus Pemain FM & Switch Bahasa `ID | EN` (`75f3b1d` — Tahap 5):**
+5. **Penyederhanaan UI/UX Khusus Pemain FM, Switch Bahasa `ID | EN`, & Optimasi Peran Skuad (`75f3b1d` + commit terbaru):**
    - Tombol switch **`ID | EN`** di `TopNavShell.tsx` (`useLocaleStore.ts`, tersimpan di `localStorage`) mengubah seluruh teks antarmuka secara instan tanpa mencampur bahasa Indonesia–Inggris, sembari tetap mempertahankan istilah resmi in-game FM27 (`GK`, `DCL`, `Inside Forward`, `Gegenpress`, `Defend/Support/Attack`).
    - Seluruh opsi `.fm27.json`, `.json`, dan `CSV / HTML` telah dihapus dari UI (fokus murni `.fm` dan `.fmf`).
    - Seluruh label teknis/programmer (`Mode A/B/C`, `100% Data Deterministik (Non-AI)`, `Diproses 100% lokal di browser...`, `Zstd`, `Web Worker`, `Hungarian Solver`, rumus `ValueRatio`, `DDM`, `RankingFit`, `Eligibility Matrix Key`, `gemini-decision-1`) serta teks penjelasan/tutorial panjang telah dibersihkan dari layar.
+   - Tombol **`Optimalkan Peran`** (`Optimize Roles`) di halaman `/squad` telah diperbaiki penuh: membandingkan skor kecocokan taktik saat ini vs proyeksi optimal (`baseline` vs `improved`), menyelaraskan kandidat peran `RoleFitTable` dengan `gradeImportedTactic` (maks 1 OOP Outlet, tanpa peran *gimmick*), mempertahankan 11 starter yang sudah dipasang / dikunci (`lineupPreferences`), memperbarui *Duty* + *Player Instructions* per peran baru, menampilkan notifikasi ringkasan perubahan, dan berubah menjadi badge **`Peran Sudah Optimal ✓`** bila seluruh peran sudah maksimal.
 
 ---
 
@@ -65,12 +66,7 @@
 
 ## 3. Bug, Error, atau Bagian Kode yang Masih Setengah Jalan
 
-1. **[PENTING UNTUK CLOUD / CI] Test ke-4 di `tests/unified-analyzer.spec.ts` (Baris 141) Belum Memakai `it.skipIf`:**
-   - File `tests/fixtures/sample-real.fm` (~70 MB) sengaja di-ignore oleh `.gitignore` sehingga **tidak ada** di clone repositori cloud maupun runner GitHub Actions.
-   - Di `tests/fm-save-parser.spec.ts:116`, test pembacaan `sample-real.fm` sudah memakai `it.skipIf(!fs.existsSync(SAMPLE_SAVE_PATH))`, tetapi test regresi baru di `tests/unified-analyzer.spec.ts:141` (`Real .fm save (Manchester United)...`) masih langsung memanggil `fs.readFileSync("tests/fixtures/sample-real.fm")` tanpa `it.skipIf`.
-   - **Dampak:** Menjalankan `pnpm test` penuh di sesi cloud baru akan gagal `ENOENT` pada satu test tersebut sampai ditambahkan `const REAL_FM_PATH = ...; it.skipIf(!fs.existsSync(REAL_FM_PATH))(...)`.
-
-2. **Sesi `.fm` Hanya Hidup di RAM Tab Browser (Hilang Saat Refresh Halaman):**
+1. **Sesi `.fm` Hanya Hidup di RAM Tab Browser (Hilang Saat Refresh Halaman):**
    - Objek `liveFmSave` disimpan di memori runtime `useTacticStore` (tidak disimpan ke `localStorage` karena ukuran data melampaui kuota ~5 MB). Jika pengguna me-refresh halaman (`F5`), taktik di papan tetap bisa dipulihkan, namun data klub/pemain/wonderkids dari `.fm` harus dimuat ulang. *(Opsional ke depan: simpan ringkasan klub terpilih + pool ke `IndexedDB` agar tahan refresh).*
 
 3. **Struktur Navigasi Atas vs Kotak Ringkasan 5-Tab Masih Bisa Dipadatkan Lagi:**

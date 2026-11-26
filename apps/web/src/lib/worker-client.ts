@@ -9,6 +9,7 @@ import {
 } from "@fm27/fm-codec";
 import type {
   DualPhaseTactic,
+  LineupPreference,
   Player,
   SquadAuditResult,
   TacticPlanResult,
@@ -428,11 +429,13 @@ export function gradeImportedTacticInWorker(
   tactic: DualPhaseTactic,
   players: Player[],
   improve = true,
+  lineupPreferences?: readonly LineupPreference[],
 ): Promise<TacticPlanResult> {
   return runEngineTaskWithPaintYield<TacticPlanResult>({
     type: "GRADE_IMPORTED",
     tactic,
     players,
     improve,
+    lineupPreferences,
   });
 }
