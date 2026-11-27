@@ -251,18 +251,19 @@ export function UnifiedReportDashboard({
                         <button
                           type="button"
                           onClick={() => {
+                            const fixLabel = localized.autoFixText ?? al.autoFix!.text;
                             setTeamInstruction(al.autoFix!.group, al.autoFix!.toBit, true);
                             onNotify?.(
                               "ok",
                               t(
-                                `Instruksi diterapkan: ${al.autoFix!.text}`,
-                                `Applied instruction: ${al.autoFix!.text}`,
+                                `Instruksi diterapkan: ${fixLabel}`,
+                                `Applied instruction: ${fixLabel}`,
                               ),
                             );
                           }}
                           className="self-start mt-0.5 px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/35 text-[10px] font-bold hover:bg-emerald-500/30 cursor-pointer"
                         >
-                          {t("Terapkan", "Apply")}: {al.autoFix.text}
+                          {t("Terapkan", "Apply")}: {localized.autoFixText ?? al.autoFix.text}
                         </button>
                       )}
                     </div>

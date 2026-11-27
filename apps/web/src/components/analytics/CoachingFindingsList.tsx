@@ -71,7 +71,7 @@ export function CoachingFindingsList({ alerts }: CoachingFindingsListProps) {
                 {alert.autoFix && (
                   <div className="pt-1 flex items-center justify-between gap-2 border-t border-white/8 mt-1">
                     <span className="text-[11px] text-emerald-300 truncate">
-                      {alert.autoFix.text}
+                      {localized.autoFixText ?? alert.autoFix.text}
                     </span>
                     <button
                       id={`apply-autofix-${alert.id}`}
