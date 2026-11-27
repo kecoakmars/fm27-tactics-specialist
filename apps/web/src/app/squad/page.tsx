@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getPitchCatalog, getTacticalStyles } from "@fm27/fm-data";
 import type { TacticPlanResult } from "@fm27/shared-types";
+import { ActiveTeamInstructionsSummary } from "../../components/instructions/ActiveTeamInstructionsSummary";
 import { ReplacementModal } from "../../components/squad/ReplacementModal";
 import { RoleFitTable } from "../../components/squad/RoleFitTable";
 import { SquadImporter } from "../../components/squad/SquadImporter";
@@ -495,18 +496,21 @@ export default function SquadAuditPage() {
       )}
 
       {activePlayers.length > 0 && (
-        <RoleFitTable
-          audit={auditResult}
-          players={activePlayers}
-          lineupPreferences={lineupPreferences}
-          patchVersion={tactic.patchVersion}
-          onInspectSlot={(idx) => setInspectSlotIdx(idx)}
-          onApplyRoleAlternative={(slotIdx, phase, roleId) =>
-            setSlotRole(slotIdx, phase, roleId)
-          }
-          onToggleMustStart={toggleMustStart}
-          onSetSlotLock={setPlayerSlotLock}
-        />
+        <>
+          <ActiveTeamInstructionsSummary tactic={tactic} />
+          <RoleFitTable
+            audit={auditResult}
+            players={activePlayers}
+            lineupPreferences={lineupPreferences}
+            patchVersion={tactic.patchVersion}
+            onInspectSlot={(idx) => setInspectSlotIdx(idx)}
+            onApplyRoleAlternative={(slotIdx, phase, roleId) =>
+              setSlotRole(slotIdx, phase, roleId)
+            }
+            onToggleMustStart={toggleMustStart}
+            onSetSlotLock={setPlayerSlotLock}
+          />
+        </>
       )}
 
       {inspectedAuditItem && inspectedSlot && (

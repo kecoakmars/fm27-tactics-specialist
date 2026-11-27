@@ -17,6 +17,7 @@ import {
   type HeatmapOverlayMode,
 } from "@/components/analytics/Heatmap18Zone";
 import { UnifiedReportDashboard } from "@/components/analytics/UnifiedReportDashboard";
+import { ActiveTeamInstructionsSummary } from "@/components/instructions/ActiveTeamInstructionsSummary";
 import { MentalityBar } from "@/components/instructions/MentalityBar";
 import { PlayerInstructionModal } from "@/components/instructions/PlayerInstructionModal";
 import { TeamInstructionPanel } from "@/components/instructions/TeamInstructionPanel";
@@ -781,6 +782,10 @@ export default function TacticalBoardWorkspacePage() {
 
           {inspectorTab === "analytics" ? (
             <>
+              <ActiveTeamInstructionsSummary
+                tactic={tactic}
+                onEditClick={() => setInspectorTab("instructions")}
+              />
               <BalanceRadar report={balanceReport} />
               <CoachingFindingsList alerts={balanceReport.alerts} />
             </>

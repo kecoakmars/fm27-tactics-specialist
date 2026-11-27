@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
+import { getPitchCatalog } from "@fm27/fm-data";
 import type { UnifiedReport } from "@fm27/fm-engine";
+import { ActiveTeamInstructionsSummary } from "@/components/instructions/ActiveTeamInstructionsSummary";
 import { localizeTacticalAlert, useLocale } from "@/stores/useLocaleStore";
 import { useTacticStore } from "@/stores/useTacticStore";
 import { useTrainingStore } from "@/stores/useTrainingStore";
@@ -44,6 +46,11 @@ export function UnifiedReportDashboard({
 
   const { tacticAdvice, squadBlueprintOrAudit, trainingPlan, staffPlan, wonderkidPlan } =
     report;
+
+  const roleNameMap = useMemo(() => {
+    const cat = getPitchCatalog(report.patchVersion);
+    return new Map(cat.Roles.map((r) => [r.Id, r.Name]));
+  }, [report.patchVersion]);
 
   return (
     <section
@@ -144,7 +151,8 @@ export function UnifiedReportDashboard({
 
       {/* TAB 1: FORMATION */}
       {activeTab === "formation" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 text-xs">
+        <div className="flex flex-col gap-3 text-xs">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
           <div className="rounded-xl p-3 bg-[#0B0F19] border border-white/8 flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <span className="font-bold text-slate-200">
@@ -295,6 +303,9 @@ export function UnifiedReportDashboard({
               ))}
             </div>
           </div>
+          </div>
+
+          <ActiveTeamInstructionsSummary tactic={tacticAdvice.activeTactic} compact />
         </div>
       )}
 
@@ -384,7 +395,8 @@ export function UnifiedReportDashboard({
                             {item.playerName}
                           </td>
                           <td className="py-1.5 pr-2 text-slate-300">
-                            {item.inRoleId} / {item.outRoleId}
+                            {roleNameMap.get(item.inRoleId) ?? item.inRoleId} /{" "}
+                            {roleNameMap.get(item.outRoleId) ?? item.outRoleId}
                           </td>
                           <td className="py-1.5 pr-2 font-mono-metric font-bold text-emerald-300">
                             {item.fitScore.toFixed(0)}
