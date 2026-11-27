@@ -31,7 +31,8 @@ export function UnifiedReportDashboard({
     assignPlayerToSlot,
     pushTrainingPlanToStore,
     solveBestTacticForCurrentClub,
-    dismissUnifiedReport,
+    unifiedReportMinimized,
+    toggleUnifiedReportMinimized,
   } = useTacticStore();
   const shortlistUids = useTrainingStore((s) => s.shortlistUids);
   const toggleShortlistUid = useTrainingStore((s) => s.toggleShortlistUid);
@@ -56,7 +57,9 @@ export function UnifiedReportDashboard({
     <section
       id="unified-report-dashboard"
       aria-label={t("Ringkasan Tim", "Team Summary")}
-      className="tactical-surface rounded-2xl p-4 border border-emerald-500/30 flex flex-col gap-3.5"
+      className={`tactical-surface rounded-2xl border border-emerald-500/30 flex flex-col gap-3.5 ${
+        unifiedReportMinimized ? "px-4 py-2.5" : "p-4"
+      }`}
     >
       {/* Clean Header */}
       <div className="flex flex-wrap items-center justify-between gap-2.5">
@@ -68,6 +71,11 @@ export function UnifiedReportDashboard({
             IP {tacticAdvice.activeTactic.inFormation} → OOP{" "}
             {tacticAdvice.activeTactic.outFormation}
           </span>
+          {unifiedReportMinimized && (
+            <span className="px-2 py-0.5 rounded text-[11px] font-mono-metric bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+              {t("Skor", "Score")} {tacticAdvice.balance.overallScore.toFixed(0)}/100
+            </span>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -113,16 +121,26 @@ export function UnifiedReportDashboard({
             </button>
           )}
           <button
+            id="toggle-minimize-unified-report-btn"
             type="button"
-            onClick={dismissUnifiedReport}
-            className="px-2 py-1 rounded-lg text-xs text-slate-400 hover:text-slate-100 bg-[#0B0F19] border border-white/10 cursor-pointer"
+            aria-expanded={!unifiedReportMinimized}
+            onClick={toggleUnifiedReportMinimized}
+            className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition cursor-pointer ${
+              unifiedReportMinimized
+                ? "bg-cyan-500/18 text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/28"
+                : "text-slate-300 hover:text-slate-100 bg-[#0B0F19] border-white/10"
+            }`}
           >
-            {t("Tutup", "Close")}
+            {unifiedReportMinimized
+              ? t("Buka Ringkasan ▾", "Expand ▾")
+              : t("Minimize ▴", "Minimize ▴")}
           </button>
         </div>
       </div>
 
-      {/* 5-Tab Bar */}
+      {!unifiedReportMinimized && (
+        <>
+          {/* 5-Tab Bar */}
       <div
         role="tablist"
         className="flex flex-wrap gap-1.5 p-1 rounded-xl bg-[#0B0F19] border border-white/10"
@@ -737,6 +755,8 @@ export function UnifiedReportDashboard({
             </div>
           )}
         </div>
+      )}
+        </>
       )}
     </section>
   );

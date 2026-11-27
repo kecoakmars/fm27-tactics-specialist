@@ -243,6 +243,7 @@ export interface TacticStoreState {
   clubPickerOpen: boolean;
   fmImportProgress: FmImportProgressState | null;
   unifiedReport: UnifiedReport | null;
+  unifiedReportMinimized: boolean;
   globalNotice: GlobalToastNotice | null;
 
   viewMode: PitchViewMode;
@@ -310,6 +311,8 @@ export interface TacticStoreState {
   clearFmSaveSession: () => void;
   refreshUnifiedReport: () => void;
   dismissUnifiedReport: () => void;
+  setUnifiedReportMinimized: (minimized: boolean) => void;
+  toggleUnifiedReportMinimized: () => void;
   pushTrainingPlanToStore: () => boolean;
 }
 
@@ -328,6 +331,7 @@ export const useTacticStore = create<TacticStoreState>()(
       clubPickerOpen: false,
       fmImportProgress: null,
       unifiedReport: null,
+      unifiedReportMinimized: false,
       globalNotice: null,
 
       viewMode: "split",
@@ -987,7 +991,7 @@ export const useTacticStore = create<TacticStoreState>()(
             worldStaffPool: state.worldStaffPool,
             patchVersion: state.tactic.patchVersion,
           });
-          return { unifiedReport: computedReport };
+          return { unifiedReport: computedReport, unifiedReportMinimized: false };
         });
         if (computedReport) {
           syncDependentStoresFromReport(computedReport);
@@ -995,6 +999,10 @@ export const useTacticStore = create<TacticStoreState>()(
       },
 
       dismissUnifiedReport: () => set({ unifiedReport: null }),
+      setUnifiedReportMinimized: (unifiedReportMinimized) =>
+        set({ unifiedReportMinimized }),
+      toggleUnifiedReportMinimized: () =>
+        set((state) => ({ unifiedReportMinimized: !state.unifiedReportMinimized })),
 
       pushTrainingPlanToStore: () => {
         const report = get().unifiedReport;
