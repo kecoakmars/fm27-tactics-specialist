@@ -411,7 +411,7 @@ function extractPlayerInGameFamiliarity(
   const out = new Array<number>(9);
   for (let idx = 0; idx < 9; idx++) {
     const val = readI8(gameDb, famAt + idx);
-    if (val < -100 || val > 60) return undefined;
+    if (val < -100 || val > 100) return undefined;
     out[idx] = val;
   }
 

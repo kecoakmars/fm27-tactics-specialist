@@ -470,20 +470,38 @@ export function buildDualPhaseTacticCardSvg(
     })
     .join("\n");
 
-  const intBarW = Math.max(8, Math.round((metrics.intensity.score / 100) * 144));
-  const compBarW = Math.max(8, Math.round((metrics.complexity.score / 100) * 144));
+  const renderEightSegmentsSvg = (
+    x: number,
+    y: number,
+    filled: number,
+    activeHex: string,
+    w = 15,
+    h = 9,
+    gap = 3,
+  ) =>
+    Array.from({ length: 8 })
+      .map(
+        (_, i) =>
+          `<rect x="${x + i * (w + gap)}" y="${y}" width="${w}" height="${h}" rx="1.8" fill="${i < filled ? activeHex : "#1E293B"}"/>`,
+      )
+      .join("");
+
   const intColor =
-    metrics.intensity.score >= 78
+    metrics.intensity.level === "extreme"
       ? "#F43F5E"
-      : metrics.intensity.score >= 58
+      : metrics.intensity.level === "high"
         ? "#FBBF24"
-        : "#34D399";
+        : metrics.intensity.level === "moderate"
+          ? "#34D399"
+          : "#38BDF8";
   const compColor =
-    metrics.complexity.score >= 78
+    metrics.complexity.level === "extreme"
       ? "#F59E0B"
-      : metrics.complexity.score >= 58
+      : metrics.complexity.level === "high"
         ? "#22D3EE"
-        : "#34D399";
+        : metrics.complexity.level === "moderate"
+          ? "#34D399"
+          : "#38BDF8";
 
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">`,
@@ -503,18 +521,16 @@ export function buildDualPhaseTacticCardSvg(
     `  <rect x="898" y="31" width="118" height="66" rx="11" fill="#0B0F19" stroke="#10B981" stroke-opacity="0.45" stroke-width="1.2"/>`,
     `  <text x="957" y="52" text-anchor="middle" fill="#94A3B8" font-family="system-ui, sans-serif" font-size="10" font-weight="700">${locale === "id" ? "SKOR TAKTIK" : "TACTIC SCORE"}</text>`,
     `  <text x="957" y="81" text-anchor="middle" fill="#34D399" font-family="monospace" font-size="24" font-weight="800">${balance.overallScore.toFixed(0)}<tspan font-size="12" fill="#64748B">/100</tspan></text>`,
-    // Intensity mini-card
+    // Intensity 8-segment mini-card
     `  <rect x="1028" y="31" width="168" height="66" rx="11" fill="#0B0F19" stroke="#1E293B" stroke-width="1"/>`,
     `  <text x="1040" y="51" fill="#CBD5E1" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700">${locale === "id" ? "INTENSITAS" : "INTENSITY"}</text>`,
-    `  <text x="1184" y="51" text-anchor="end" fill="${intColor}" font-family="monospace" font-size="12" font-weight="800">${metrics.intensity.score.toFixed(0)}</text>`,
-    `  <rect x="1040" y="66" width="144" height="8" rx="4" fill="#1E293B"/>`,
-    `  <rect x="1040" y="66" width="${intBarW}" height="8" rx="4" fill="${intColor}"/>`,
-    // Complexity mini-card
+    `  <text x="1184" y="51" text-anchor="end" fill="${intColor}" font-family="monospace" font-size="12" font-weight="800">${metrics.intensity.segments8}/8</text>`,
+    `  ${renderEightSegmentsSvg(1040, 65, metrics.intensity.segments8, intColor)}`,
+    // Complexity 8-segment mini-card
     `  <rect x="1206" y="31" width="168" height="66" rx="11" fill="#0B0F19" stroke="#1E293B" stroke-width="1"/>`,
     `  <text x="1218" y="51" fill="#CBD5E1" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700">${locale === "id" ? "KOMPLEKSITAS" : "COMPLEXITY"}</text>`,
-    `  <text x="1362" y="51" text-anchor="end" fill="${compColor}" font-family="monospace" font-size="12" font-weight="800">${metrics.complexity.score.toFixed(0)}</text>`,
-    `  <rect x="1218" y="66" width="144" height="8" rx="4" fill="#1E293B"/>`,
-    `  <rect x="1218" y="66" width="${compBarW}" height="8" rx="4" fill="${compColor}"/>`,
+    `  <text x="1362" y="51" text-anchor="end" fill="${compColor}" font-family="monospace" font-size="12" font-weight="800">${metrics.complexity.segments8}/8</text>`,
+    `  ${renderEightSegmentsSvg(1218, 65, metrics.complexity.segments8, compColor)}`,
     // Effectiveness 10-bar mini-card
     `  <rect x="1384" y="31" width="172" height="66" rx="11" fill="#0B0F19" stroke="#1E293B" stroke-width="1"/>`,
     `  <text x="1396" y="51" fill="#CBD5E1" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700">${locale === "id" ? "EFEKTIVITAS" : "EFFECTIVENESS"}</text>`,

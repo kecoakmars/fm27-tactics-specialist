@@ -23,14 +23,17 @@ export type TacticalFamiliarityLevel =
 
 export interface TacticalIntensityMetric {
   score: number;
+  segments8: number;
   level: TacticalIndicatorLevel;
   drivers: string[];
+  driversId: string[];
   squadWarningId: string | null;
   squadWarningEn: string | null;
 }
 
 export interface TacticalComplexityMetric {
   score: number;
+  segments8: number;
   level: TacticalIndicatorLevel;
   activeTeamInstructions: number;
   customPlayerInstructions: number;
@@ -67,6 +70,8 @@ export interface TacticalEffectivenessMetric {
   hasSquadContext: boolean;
   hasFmFamiliarity: boolean;
   playerEffectiveness: PlayerSlotEffectiveness[];
+  lowestStarterName: string | null;
+  lowestStarterBars: number | null;
   summaryNoteId: string;
   summaryNoteEn: string;
 }
@@ -77,26 +82,22 @@ export interface TacticalMetricsReport {
   effectiveness: TacticalEffectivenessMetric;
 }
 
-const COMPLEX_ROLE_IDS = new Set<string>([
+// True hybrid / free-roam roles that add genuine cognitive complexity in FM27
+const HYBRID_COMPLEX_ROLE_IDS = new Set<string>([
   "InvertedWingBack",
   "InsideWingBack",
-  "InsideFullBack",
+  "PlaymakingWingBack",
+  "OverlappingCentreBack",
   "Libero",
   "HalfBack",
-  "Regista",
-  "RoamingPlaymaker",
-  "Mezzala",
-  "SegundoVolante",
-  "Raumdeuter",
-  "Trequartista",
-  "CompleteForward",
+  "BoxToBoxPlaymaker",
+  "MidfieldPlaymaker",
+  "SecondStriker",
+  "FreeRole",
   "FalseNine",
-  "InvertedWinger",
   "ChannelMidfielder",
-  "WideCentreBack",
-  "BallPlayingCentreBack",
-  "SweeperKeeper",
-  "CompleteWingBack",
+  "ChannelForward",
+  "PlaymakingWinger",
 ]);
 
 function clamp100(val: number): number {
@@ -107,10 +108,21 @@ export function scoreToFamiliarityBars(score: number): number {
   return Math.max(1, Math.min(10, Math.round(Math.max(0, Math.min(100, score)) / 10)));
 }
 
-function resolveIndicatorLevel(score: number): TacticalIndicatorLevel {
+export function scoreToEightSegments(score: number): number {
+  return Math.max(1, Math.min(8, Math.round((Math.max(0, Math.min(100, score)) / 100) * 8)));
+}
+
+function resolveIntensityLevel(score: number): TacticalIndicatorLevel {
+  if (score >= 82) return "extreme";
+  if (score >= 60) return "high";
+  if (score >= 38) return "moderate";
+  return "low";
+}
+
+function resolveComplexityLevel(score: number): TacticalIndicatorLevel {
   if (score >= 78) return "extreme";
-  if (score >= 58) return "high";
-  if (score >= 36) return "moderate";
+  if (score >= 56) return "high";
+  if (score >= 35) return "moderate";
   return "low";
 }
 
@@ -121,12 +133,13 @@ export function resolveFamiliarityLevel(score: number): TacticalFamiliarityLevel
   return "awkward";
 }
 
+/**
+ * Sports Interactive internal `-100..+100` signed familiarity byte -> `0..100%`
+ * (`-100` = 0%, `0` = 50% = 5/10 bars, `+25` = 62.5% = 6/10 bars, `+100` = 100% = 10/10 bars).
+ */
 function scaleFmFamiliarityByteTo100(val: number): number {
-  const clamped = Math.max(-100, Math.min(50, val));
-  if (clamped <= 0) {
-    return 15 + ((clamped + 100) / 100) * 27;
-  }
-  return 42 + (clamped / 50) * 54;
+  const clamped = Math.max(-100, Math.min(100, val));
+  return (clamped + 100) / 2;
 }
 
 function readFmCorridorByte(fam: readonly number[], posId: string): number | null {
@@ -135,7 +148,6 @@ function readFmCorridorByte(fam: readonly number[], posId: string): number | nul
   if (canon === "GK") {
     return fam[1] !== undefined && fam[1] > -100 ? fam[1]! : null;
   }
-  // Outfield slots require outfield familiarity block (byte[2] > -100 or byte[3] > -100)
   if ((fam[2] ?? -100) === -100 && (fam[3] ?? -100) === -100) {
     return null;
   }
@@ -177,105 +189,120 @@ function readFmCorridorByte(fam: readonly number[], posId: string): number | nul
 function computeRawIntensityScore(
   tactic: DualPhaseTactic,
   avgTransitionDistance: number,
-): { score: number; drivers: string[] } {
+): { score: number; driversEn: string[]; driversId: string[] } {
   const ti = tactic.teamInstructions;
-  let intensityRaw = 36;
-  const drivers: string[] = [];
+  let intensityRaw = 40;
+  const driversEn: string[] = [];
+  const driversId: string[] = [];
 
-  intensityRaw += (tactic.mentality - 4) * 5.5;
-  if (tactic.mentality >= 6) drivers.push("Attacking Mentality");
-  else if (tactic.mentality <= 2) drivers.push("Defensive Mentality");
+  intensityRaw += (tactic.mentality - 4) * 4.5;
+  if (tactic.mentality >= 6) {
+    driversEn.push("Attacking Mentality");
+    driversId.push("Mentalitas Menyerang");
+  } else if (tactic.mentality <= 2) {
+    driversEn.push("Defensive Mentality");
+    driversId.push("Mentalitas Bertahan");
+  }
 
   const tempo = ti.Tempo ?? 0;
   if (tempo === 46) {
-    intensityRaw += 14;
-    drivers.push("Much Higher Tempo");
+    intensityRaw += 9.5;
+    driversEn.push("Much Higher Tempo");
+    driversId.push("Tempo Sangat Cepat");
   } else if (tempo === 47) {
-    intensityRaw += 8;
-    drivers.push("Higher Tempo");
+    intensityRaw += 5;
+    driversEn.push("Higher Tempo");
+    driversId.push("Tempo Cepat");
   } else if (tempo === 48) {
-    intensityRaw -= 6;
+    intensityRaw -= 4.5;
   } else if (tempo === 49) {
-    intensityRaw -= 11;
+    intensityRaw -= 8.5;
   }
 
   const loe = ti.LineOfEngagement ?? 62;
   if (loe === 61) {
-    intensityRaw += 11;
-    drivers.push("High Press");
+    intensityRaw += 6;
+    driversEn.push("High Press");
+    driversId.push("Pressing Atas");
   } else if (loe === 63) {
-    intensityRaw -= 7;
+    intensityRaw -= 5.5;
   }
 
   const defLine = ti.DefensiveLine ?? 0;
   if (defLine === 56) {
-    intensityRaw += 8;
-    drivers.push("Much Higher Line");
+    intensityRaw += 5.5;
+    driversEn.push("Much Higher Line");
+    driversId.push("Garis Bek Sangat Tinggi");
   } else if (defLine === 57) {
-    intensityRaw += 4;
+    intensityRaw += 2.5;
   } else if (defLine === 58) {
-    intensityRaw -= 3;
+    intensityRaw -= 2.5;
   } else if (defLine === 59) {
-    intensityRaw -= 6;
+    intensityRaw -= 5;
   }
 
-  if (ti.DefensiveLineBehaviour === 76) intensityRaw += 5;
-  else if (ti.DefensiveLineBehaviour === 77) intensityRaw -= 4;
+  if (ti.DefensiveLineBehaviour === 76) intensityRaw += 3;
+  else if (ti.DefensiveLineBehaviour === 77) intensityRaw -= 2.5;
 
   const triggerPress = ti.TriggerPress ?? 0;
   if (triggerPress === 65) {
-    intensityRaw += 15;
-    drivers.push("Trigger Press Much More Often");
+    intensityRaw += 8;
+    driversEn.push("Constant Pressing");
+    driversId.push("Pressing Sangat Sering");
   } else if (triggerPress === 66) {
-    intensityRaw += 9;
-    drivers.push("Trigger Press More Often");
+    intensityRaw += 4.5;
+    driversEn.push("More Pressing");
+    driversId.push("Pressing Lebih Sering");
   } else if (triggerPress === 67) {
-    intensityRaw -= 6;
+    intensityRaw -= 4.5;
   } else if (triggerPress === 68) {
-    intensityRaw -= 11;
+    intensityRaw -= 8;
   }
 
   if (ti.DefensiveTransition === 70) {
-    intensityRaw += 12;
-    drivers.push("Counter-Press");
+    intensityRaw += 6;
+    driversEn.push("Counter-Press");
+    driversId.push("Counter-Press");
   } else if (ti.DefensiveTransition === 71) {
-    intensityRaw -= 6;
+    intensityRaw -= 4.5;
   }
 
   if (ti.AttackingTransition === 54) {
-    intensityRaw += 6;
-    drivers.push("Counter-Attack");
+    intensityRaw += 3.5;
+    driversEn.push("Counter-Attack");
+    driversId.push("Serangan Balik Cepat");
   } else if (ti.AttackingTransition === 55) {
-    intensityRaw -= 4;
+    intensityRaw -= 2.5;
   }
 
   if (ti.Tackling === 72) {
-    intensityRaw += 6;
-    drivers.push("Get Stuck In");
+    intensityRaw += 4.5;
+    driversEn.push("Get Stuck In");
+    driversId.push("Tekel Keras");
   } else if (ti.Tackling === 73) {
-    intensityRaw -= 3;
+    intensityRaw -= 2;
   }
 
-  if (ti.PreventShortGKDistribution === 69) intensityRaw += 5;
-  if (ti.GoalkeeperDistributionSpeed === 42) intensityRaw += 3;
-  else if (ti.GoalkeeperDistributionSpeed === 43) intensityRaw -= 3;
-  if (ti.TimeWasting === 78) intensityRaw -= 6;
+  if (ti.PreventShortGKDistribution === 69) intensityRaw += 2;
+  if (ti.GoalkeeperDistributionSpeed === 42) intensityRaw += 1.5;
+  else if (ti.GoalkeeperDistributionSpeed === 43) intensityRaw -= 1.5;
+  if (ti.TimeWasting === 78) intensityRaw -= 4;
 
   const attackDuties = tactic.slots.filter((s) => s.inPossession.duty === "Attack").length;
-  intensityRaw += Math.max(0, attackDuties - 3) * 2.5;
-  intensityRaw += Math.min(10, Math.max(0, (avgTransitionDistance - 6) * 0.8));
+  intensityRaw += Math.min(4.5, Math.max(0, attackDuties - 3) * 1.5);
+  intensityRaw += Math.min(3, Math.max(0, (avgTransitionDistance - 8) * 0.35));
 
   const pressMorePiCount = tactic.slots.filter((s) =>
     s.outOfPossession.playerInstructionBits.includes(29),
   ).length;
-  intensityRaw += Math.min(6, pressMorePiCount * 1.5);
+  intensityRaw += Math.min(3, pressMorePiCount * 0.6);
 
-  return { score: clamp100(intensityRaw), drivers };
+  return { score: clamp100(intensityRaw), driversEn, driversId };
 }
 
 /**
  * Evaluates per-player tactical effectiveness (0-100 & 1-10 FM27 segments) for a specific slot,
- * combining real `.fm` monthly familiarity bytes (when available) with live IP/OOP role & instruction fit.
+ * calibrated directly to FM27's `-100..+100` (`(val + 100) / 2`) in-game familiarity scale.
  */
 export function computePlayerSlotEffectiveness(
   player: Player | NormalizedPlayerProfile,
@@ -311,8 +338,8 @@ export function computePlayerSlotEffectiveness(
     }
 
     const isComplexRole =
-      COMPLEX_ROLE_IDS.has(slot.inPossession.roleId) ||
-      COMPLEX_ROLE_IDS.has(slot.outOfPossession.roleId);
+      HYBRID_COMPLEX_ROLE_IDS.has(slot.inPossession.roleId) ||
+      HYBRID_COMPLEX_ROLE_IDS.has(slot.outOfPossession.roleId);
     if (isComplexRole) {
       const iq = averagePlayerAttributes(norm, ["decisions", "vision", "teamwork"]);
       if (iq < 11.8) instructionDelta -= 3.5;
@@ -330,8 +357,8 @@ export function computePlayerSlotEffectiveness(
       const corrPct = scaleFmFamiliarityByteTo100(corrAvg);
       const genPct = scaleFmFamiliarityByteTo100(norm.tacticalFamiliarity[0] ?? 0);
       const sharpMod =
-        norm.matchSharpness !== undefined ? (norm.matchSharpness - 88) * 0.08 : 0;
-      fmFamiliarityScore = clamp100(corrPct * 0.76 + genPct * 0.24 + sharpMod);
+        norm.matchSharpness !== undefined ? (norm.matchSharpness - 90) * 0.06 : 0;
+      fmFamiliarityScore = clamp100(corrPct * 0.55 + genPct * 0.45 + sharpMod);
     } else {
       fmFamiliarityScore = 10;
     }
@@ -344,12 +371,13 @@ export function computePlayerSlotEffectiveness(
 
   let score: number;
   if (fmFamiliarityScore !== null) {
-    score = clamp100(
-      (fmFamiliarityScore * 0.66 + adjustedFit * 0.34) * (0.35 + 0.65 * posGate),
-    );
+    // Respect actual trained .fm familiarity without artificial inflation; apply role/position delta honestly
+    const roleDelta = Math.max(-14, Math.min(4, (adjustedFit - 78) * 0.28));
+    score = clamp100((fmFamiliarityScore + roleDelta) * (0.25 + 0.75 * posGate));
   } else {
+    // Without .fm training history (e.g. CSV), estimate realistic pre-season readiness (~55-74%)
     const posFamPct = Math.min(100, Math.max(0, ((inPosFam + outPosFam) / 40) * 100));
-    score = clamp100(adjustedFit * 0.68 + posFamPct * 0.32);
+    score = clamp100((adjustedFit * 0.52 + posFamPct * 0.24) * (0.35 + 0.65 * posGate));
   }
 
   return {
@@ -399,7 +427,7 @@ export function computePlayerBestTacticEffectiveness(
 
 /**
  * Computes deterministic Intensity, Complexity, and Per-Player Effectiveness (Familiarity)
- * indicators for a DualPhaseTactic, enriched with live `.fm` familiarity & squad attributes.
+ * indicators calibrated to FM27's scale while providing beginner-friendly diagnostics.
  */
 export function computeTacticalMetrics(
   tactic: DualPhaseTactic,
@@ -415,14 +443,15 @@ export function computeTacticalMetrics(
     );
   const ti = tactic.teamInstructions;
 
-  // --- 1. INTENSITY (0..100) ---
-  const { score: intensityScore, drivers } = computeRawIntensityScore(
-    tactic,
-    balance.heatmap.averageTransitionDistance,
-  );
-  const intensityLevel = resolveIndicatorLevel(intensityScore);
+  // --- 1. INTENSITY (0..100 & 1..8 segments) ---
+  const {
+    score: intensityScore,
+    driversEn,
+    driversId,
+  } = computeRawIntensityScore(tactic, balance.heatmap.averageTransitionDistance);
+  const intensityLevel = resolveIntensityLevel(intensityScore);
 
-  // --- 2. COMPLEXITY (0..100) ---
+  // --- 2. COMPLEXITY (0..100 & 1..8 segments) ---
   let activeTeamInstructions = 0;
   for (const group of catalog.Instructions) {
     const bit = ti[group.Group] ?? group.Current;
@@ -445,8 +474,8 @@ export function computeTacticalMetrics(
       phaseShiftSlots += 1;
     }
     if (
-      COMPLEX_ROLE_IDS.has(slot.inPossession.roleId) ||
-      COMPLEX_ROLE_IDS.has(slot.outOfPossession.roleId)
+      HYBRID_COMPLEX_ROLE_IDS.has(slot.inPossession.roleId) ||
+      HYBRID_COMPLEX_ROLE_IDS.has(slot.outOfPossession.roleId)
     ) {
       specialistRoleCount += 1;
     }
@@ -473,18 +502,22 @@ export function computeTacticalMetrics(
     }
   }
 
+  const creativeFreedomDelta =
+    ti.CreativeFreedom === 19 ? 4 : ti.CreativeFreedom === 20 ? -2 : 0;
+
   const complexityRaw =
-    14 +
-    activeTeamInstructions * 4.2 +
-    Math.min(20, customPlayerInstructions * 1.4) +
-    phaseShiftSlots * 2.8 +
-    specialistRoleCount * 4.0 +
-    Math.min(12, Math.max(0, (balance.heatmap.averageTransitionDistance - 5) * 0.9));
+    18 +
+    Math.min(34, activeTeamInstructions * 2.3) +
+    Math.min(18, customPlayerInstructions * 0.9) +
+    Math.min(18, phaseShiftSlots * 2.4) +
+    Math.min(14, specialistRoleCount * 3.2) +
+    creativeFreedomDelta +
+    Math.min(6, Math.max(0, (balance.heatmap.averageTransitionDistance - 8) * 0.45));
 
   const complexityScore = clamp100(complexityRaw);
-  const complexityLevel = resolveIndicatorLevel(complexityScore);
+  const complexityLevel = resolveComplexityLevel(complexityScore);
 
-  // --- 3. EFFECTIVENESS / PER-PLAYER FAMILIARITY (0..100 & 10 BARS) ---
+  // --- 3. EFFECTIVENESS / PER-PLAYER FAMILIARITY (0..100 & 1..10 BARS) ---
   const criticalAlertCount = balance.alerts.filter((a) => a.severity === "critical").length;
   const structuralScore = clamp100(balance.overallScore - criticalAlertCount * 3.5);
 
@@ -561,9 +594,9 @@ export function computeTacticalMetrics(
           (x) => getPlayerAttribute(x.profile, "injury_proneness") >= 14,
         ).length;
 
-        if (intensityScore >= 72 && (avgStamina < 13.2 || injuryProneCount >= 3)) {
-          intensityWarningId = `Intensitas tinggi untuk stamina/work rate skuad (${avgStamina.toFixed(1)})${injuryProneCount >= 3 ? ` · ${injuryProneCount} pemain rawan cedera` : ""}`;
-          intensityWarningEn = `High intensity vs squad stamina/work rate (${avgStamina.toFixed(1)})${injuryProneCount >= 3 ? ` · ${injuryProneCount} injury-prone starters` : ""}`;
+        if (intensityScore >= 68 && (avgStamina < 13.2 || injuryProneCount >= 3)) {
+          intensityWarningId = `Stamina rata-rata tim (${avgStamina.toFixed(1)}) rawan terkuras${injuryProneCount >= 3 ? ` · ${injuryProneCount} starter rentan cedera` : " — siapkan rotasi"}`;
+          intensityWarningEn = `Squad stamina (${avgStamina.toFixed(1)}) may tire quickly${injuryProneCount >= 3 ? ` · ${injuryProneCount} injury-prone starters` : " — rotate often"}`;
         }
 
         const avgTacticalIq =
@@ -572,16 +605,15 @@ export function computeTacticalMetrics(
             0,
           ) / outfieldStarters.length;
 
-        if (complexityScore >= 68 && avgTacticalIq < 12.8) {
-          complexityWarningId = `Instruksi cukup rumit untuk rata-rata Decisions/Teamwork skuad (${avgTacticalIq.toFixed(1)})`;
-          complexityWarningEn = `High tactical complexity vs squad Decisions/Teamwork (${avgTacticalIq.toFixed(1)})`;
+        if (complexityScore >= 65 && avgTacticalIq < 12.8) {
+          complexityWarningId = `Agak rumit untuk rata-rata Keputusan & Kerja Sama tim (${avgTacticalIq.toFixed(1)})`;
+          complexityWarningEn = `Slightly complex for squad Decisions & Teamwork (${avgTacticalIq.toFixed(1)})`;
         }
       }
     }
   }
 
   const hasFmFamiliarity = playerEffectiveness.some((pe) => pe.hasFmFamiliarity);
-  // Team Effectiveness = exact average of the 11 Starters when squad is loaded; structural score otherwise
   const effectivenessScore =
     naturalFamiliarityScore !== null ? naturalFamiliarityScore : structuralScore;
   const effectivenessBars = scoreToFamiliarityBars(effectivenessScore);
@@ -593,27 +625,35 @@ export function computeTacticalMetrics(
       : null;
   const lowestShortName = lowestStarter
     ? lowestStarter.playerName.split(" ").slice(-1)[0] ?? lowestStarter.playerName
-    : "";
+    : null;
 
   const summaryNoteId =
     naturalFamiliarityScore !== null
-      ? `${hasFmFamiliarity ? "Rata-rata Familiarity .fm 11 starter" : "Rata-rata kesiapan 11 starter"}${lowestStarter ? ` · Terendah: ${lowestShortName} (${lowestStarter.bars}/10)` : ""}`
-      : `Skor struktur taktik (${structuralScore.toFixed(0)}) · Muat save .fm untuk Efektivitas per pemain`;
+      ? hasFmFamiliarity
+        ? `Dari save .fm (11 starter)${lowestShortName && lowestStarter ? ` · Paling butuh adaptasi: ${lowestShortName} (${lowestStarter.bars}/10)` : ""} · Naik lewat menit main & latihan.`
+        : `Estimasi kesiapan awal 11 starter · Muat ulang file .fm untuk membaca familiarity latihan asli.`
+      : `Estimasi struktur taktik · Muat save .fm untuk melihat kesiapan asli tiap pemain.`;
+
   const summaryNoteEn =
     naturalFamiliarityScore !== null
-      ? `${hasFmFamiliarity ? "11-starter .fm Familiarity average" : "11-starter readiness average"}${lowestStarter ? ` · Lowest: ${lowestShortName} (${lowestStarter.bars}/10)` : ""}`
-      : `Structural tactic score (${structuralScore.toFixed(0)}) · Load .fm save for per-player Effectiveness`;
+      ? hasFmFamiliarity
+        ? `From .fm save (11 starters)${lowestShortName && lowestStarter ? ` · Needs adaptation: ${lowestShortName} (${lowestStarter.bars}/10)` : ""} · Grows via matches & training.`
+        : `Initial 11-starter readiness estimate · Reload .fm save to read live training familiarity.`
+      : `Structural tactic estimate · Load .fm save to view real per-player familiarity.`;
 
   return {
     intensity: {
       score: intensityScore,
+      segments8: scoreToEightSegments(intensityScore),
       level: intensityLevel,
-      drivers: drivers.slice(0, 4),
+      drivers: driversEn.slice(0, 3),
+      driversId: driversId.slice(0, 3),
       squadWarningId: intensityWarningId,
       squadWarningEn: intensityWarningEn,
     },
     complexity: {
       score: complexityScore,
+      segments8: scoreToEightSegments(complexityScore),
       level: complexityLevel,
       activeTeamInstructions,
       customPlayerInstructions,
@@ -631,6 +671,8 @@ export function computeTacticalMetrics(
       hasSquadContext,
       hasFmFamiliarity,
       playerEffectiveness,
+      lowestStarterName: lowestShortName,
+      lowestStarterBars: lowestStarter ? lowestStarter.bars : null,
       summaryNoteId,
       summaryNoteEn,
     },

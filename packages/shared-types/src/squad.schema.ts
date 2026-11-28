@@ -91,7 +91,7 @@ export const PlayerSchema = z.object({
   attributes: PlayerAttributesSchema,
   positions: PositionFamiliaritySchema,
   personality: z.record(z.string(), z.number().min(0).max(20)).optional(),
-  tacticalFamiliarity: z.array(z.number().int().min(-100).max(60)).length(9).optional(),
+  tacticalFamiliarity: z.array(z.number().int().min(-100).max(100)).length(9).optional(),
   condition: z.number().min(0).max(100).optional(),
   matchSharpness: z.number().min(0).max(100).optional(),
 });

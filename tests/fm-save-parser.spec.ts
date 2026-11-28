@@ -3,7 +3,7 @@ import path from "node:path";
 import vm from "node:vm";
 import { describe, expect, it } from "vitest";
 import { parseFmSave, scaleFmRawAttribute } from "@fm27/fm-codec";
-import { analyzeUnified } from "@fm27/fm-engine";
+import { analyzeUnified, computeTacticalMetrics } from "@fm27/fm-engine";
 import { ALL_49_ATTRIBUTES } from "@fm27/shared-types";
 
 const SAMPLE_SAVE_PATH = path.resolve(__dirname, "fixtures/sample-real.fm");
@@ -178,6 +178,19 @@ describe("FM26/FM27 Client-Side .fm Save Parser & Live World Pool", () => {
       expect(reportA.mode).toBe("squad-only");
       expect(reportA.deterministicBadge).toBe("100% Data Deterministik (Non-AI)");
       expect(reportA.tacticAdvice.recommendedTactic.slots).toHaveLength(11);
+
+      // Verify calibrated FM27 indicators on real Nov Season-1 Man Utd save (~6/10 familiarity, non-100 complexity)
+      const firstTeam = roster.filter((p) => p.teamSlot === "First Team");
+      const liveMetrics = computeTacticalMetrics(
+        reportA.tacticAdvice.recommendedTactic,
+        firstTeam.length >= 11 ? firstTeam : roster,
+      );
+      expect(liveMetrics.effectiveness.hasFmFamiliarity).toBe(true);
+      expect(liveMetrics.effectiveness.bars).toBeGreaterThanOrEqual(5);
+      expect(liveMetrics.effectiveness.bars).toBeLessThanOrEqual(7);
+      expect(liveMetrics.complexity.score).toBeLessThan(85);
+      expect(liveMetrics.intensity.segments8).toBeGreaterThanOrEqual(1);
+      expect(liveMetrics.intensity.segments8).toBeLessThanOrEqual(8);
       expect(reportA.squadBlueprintOrAudit.kind).toBe("audit");
       expect(reportA.squadBlueprintOrAudit.audit?.starterAudits).toHaveLength(11);
       expect(reportA.trainingPlan.schedule.days).toHaveLength(7);

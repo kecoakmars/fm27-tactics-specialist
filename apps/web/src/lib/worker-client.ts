@@ -30,7 +30,7 @@ import {
 type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never;
 type EngineWorkerPayload = DistributiveOmit<EngineWorkerRequest, "id">;
 
-const SAVE_WORKER_URL = "/workers/fm-save-worker.js?v=2";
+const SAVE_WORKER_URL = "/workers/fm-save-worker.js?v=3";
 const SAVE_WORKER_HANDSHAKE_TIMEOUT_MS = 15_000;
 const SAVE_WORKER_HEARTBEAT_TIMEOUT_MS = 90_000;
 

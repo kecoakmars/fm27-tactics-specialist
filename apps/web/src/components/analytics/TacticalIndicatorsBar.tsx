@@ -18,10 +18,10 @@ export interface TacticalIndicatorsBarProps {
   compact?: boolean;
 }
 
-function getIndicatorTone(level: TacticalIndicatorLevel, kind: "intensity" | "complexity") {
+function getStepMeterTone(level: TacticalIndicatorLevel, kind: "intensity" | "complexity") {
   if (level === "extreme") {
     return {
-      bar: kind === "intensity" ? "bg-rose-500" : "bg-amber-500",
+      segment: kind === "intensity" ? "bg-rose-500" : "bg-amber-500",
       badge:
         kind === "intensity"
           ? "bg-rose-500/18 text-rose-300 border-rose-500/40"
@@ -31,7 +31,7 @@ function getIndicatorTone(level: TacticalIndicatorLevel, kind: "intensity" | "co
   }
   if (level === "high") {
     return {
-      bar: kind === "intensity" ? "bg-amber-400" : "bg-cyan-400",
+      segment: kind === "intensity" ? "bg-amber-400" : "bg-cyan-400",
       badge:
         kind === "intensity"
           ? "bg-amber-500/15 text-amber-300 border-amber-500/35"
@@ -41,13 +41,13 @@ function getIndicatorTone(level: TacticalIndicatorLevel, kind: "intensity" | "co
   }
   if (level === "moderate") {
     return {
-      bar: "bg-emerald-400",
+      segment: "bg-emerald-400",
       badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/35",
       value: "text-emerald-300",
     };
   }
   return {
-    bar: "bg-sky-400",
+    segment: "bg-sky-400",
     badge: "bg-sky-500/15 text-sky-300 border-sky-500/35",
     value: "text-sky-300",
   };
@@ -78,6 +78,27 @@ function getFamiliarityTone(level: TacticalFamiliarityLevel) {
   }
 }
 
+function EightSegmentBar({
+  filledCount,
+  activeClass,
+}: {
+  filledCount: number;
+  activeClass: string;
+}) {
+  return (
+    <div className="flex items-center gap-1 w-full" aria-hidden="true">
+      {Array.from({ length: 8 }).map((_, idx) => (
+        <span
+          key={idx}
+          className={`h-2.5 flex-1 rounded-[2.5px] transition-colors ${
+            idx < filledCount ? activeClass : "bg-slate-800/90 border border-white/6"
+          }`}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function TacticalIndicatorsBar({
   tactic,
   squadPlayers,
@@ -96,46 +117,97 @@ export function TacticalIndicatorsBar({
     [balanceReport, squadPlayers, tactic],
   );
 
-  const levelLabel = (lvl: TacticalIndicatorLevel, kind: "intensity" | "complexity") => {
-    if (kind === "intensity") {
-      switch (lvl) {
-        case "extreme":
-          return t("Ekstrem", "Extreme");
-        case "high":
-          return t("Tinggi", "High");
-        case "moderate":
-          return t("Sedang", "Moderate");
-        default:
-          return t("Rendah", "Low");
-      }
-    }
+  const intensityLabel = (lvl: TacticalIndicatorLevel) => {
     switch (lvl) {
       case "extreme":
-        return t("Sangat Kompleks", "Very Complex");
+        return t("Sangat Menguras", "Very Demanding");
       case "high":
-        return t("Kompleks", "Complex");
+        return t("Tinggi", "High");
+      case "moderate":
+        return t("Seimbang", "Balanced");
+      default:
+        return t("Hemat Stamina", "Low Load");
+    }
+  };
+
+  const intensityBeginnerHint = (lvl: TacticalIndicatorLevel) => {
+    switch (lvl) {
+      case "extreme":
+        return t(
+          "Stamina cepat habis — wajib rotasi pemain di babak ke-2 & jadwal padat.",
+          "Drains stamina fast — rotate subs early in the 2nd half & busy weeks.",
+        );
+      case "high":
+        return t(
+          "Temponya agresif — siapkan pemain cadangan bugar mulai menit 65.",
+          "Energetic pressing — keep fresh bench legs ready around minute 65.",
+        );
+      case "moderate":
+        return t(
+          "Beban fisik ideal — aman dipakai rutin sepanjang musim.",
+          "Balanced physical workload — safe for regular weekly matches.",
+        );
+      default:
+        return t(
+          "Sangat hemat tenaga — cocok untuk mengamankan keunggulan atau jadwal padat.",
+          "Conserves energy — great for seeing out leads or congested fixtures.",
+        );
+    }
+  };
+
+  const complexityLabel = (lvl: TacticalIndicatorLevel) => {
+    switch (lvl) {
+      case "extreme":
+        return t("Sangat Rumit", "Very Complex");
+      case "high":
+        return t("Cukup Rumit", "Complex");
       case "moderate":
         return t("Terstruktur", "Structured");
       default:
-        return t("Sederhana", "Simple");
+        return t("Mudah Dipahami", "Simple");
+    }
+  };
+
+  const complexityBeginnerHint = (lvl: TacticalIndicatorLevel) => {
+    switch (lvl) {
+      case "extreme":
+        return t(
+          "Banyak aturan khusus — butuh waktu latihan lebih lama agar tim tidak bingung.",
+          "Heavy tactical rules — takes extra training weeks for players to master.",
+        );
+      case "high":
+        return t(
+          "Cukup menuntut kecerdasan posisi (Decisions & Teamwork) skuad.",
+          "Demands solid Decisions & Teamwork across your starting XI.",
+        );
+      case "moderate":
+        return t(
+          "Instruksi jelas & rapi — mudah dipelajari mayoritas pemain.",
+          "Clear tactical structure — easy for most squads to pick up.",
+        );
+      default:
+        return t(
+          "Sangat simpel — pemain langsung paham meski baru berganti taktik.",
+          "Plug-and-play simplicity — players adapt quickly with minimal friction.",
+        );
     }
   };
 
   const familiarityLabel = (lvl: TacticalFamiliarityLevel) => {
     switch (lvl) {
       case "fluid":
-        return t("Sangat Padu (Fluid)", "Fluid");
+        return t("Sangat Padu", "Fluid");
       case "accomplished":
-        return t("Matang (Accomplished)", "Accomplished");
+        return t("Matang", "Accomplished");
       case "competent":
-        return t("Cukup (Competent)", "Competent");
+        return t("Mulai Paham", "Competent");
       default:
-        return t("Kurang Cocok (Awkward)", "Awkward");
+        return t("Butuh Adaptasi", "Awkward");
     }
   };
 
-  const intTone = getIndicatorTone(metrics.intensity.level, "intensity");
-  const compTone = getIndicatorTone(metrics.complexity.level, "complexity");
+  const intTone = getStepMeterTone(metrics.intensity.level, "intensity");
+  const compTone = getStepMeterTone(metrics.complexity.level, "complexity");
   const effTone = getFamiliarityTone(metrics.effectiveness.level);
 
   const intWarning =
@@ -144,109 +216,120 @@ export function TacticalIndicatorsBar({
     locale === "id" ? metrics.complexity.squadWarningId : metrics.complexity.squadWarningEn;
   const effNote =
     locale === "id" ? metrics.effectiveness.summaryNoteId : metrics.effectiveness.summaryNoteEn;
+  const activeDrivers =
+    locale === "id" ? metrics.intensity.driversId : metrics.intensity.drivers;
 
   return (
     <section
       id="tactical-indicators-bar"
       aria-label={t(
-        "Indikator Intensitas, Kompleksitas & Efektivitas",
-        "Intensity, Complexity & Effectiveness Indicators",
+        "Indikator Beban Fisik, Kerumitan & Kesiapan Taktik",
+        "Physical Load, Complexity & Tactical Readiness Indicators",
       )}
       className={`grid grid-cols-1 md:grid-cols-3 gap-3 ${compact ? "" : ""}`}
     >
-      {/* 1. INTENSITAS */}
+      {/* 1. BEBAN FISIK (INTENSITAS) */}
       <div className="tactical-surface rounded-xl p-3.5 flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
-              {t("Intensitas", "Intensity")}
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+              {t("Intensitas Fisik", "Intensity")}
             </span>
             <span
-              className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${intTone.badge}`}
+              className={`px-2 py-0.5 rounded-md text-[10px] font-bold border truncate ${intTone.badge}`}
             >
-              {levelLabel(metrics.intensity.level, "intensity")}
+              {intensityLabel(metrics.intensity.level)}
             </span>
           </div>
-          <span className={`font-mono-metric text-sm font-extrabold ${intTone.value}`}>
-            {metrics.intensity.score.toFixed(0)}
-            <span className="text-[10px] text-slate-500 font-normal">/100</span>
+          <span className={`font-mono-metric text-xs font-extrabold shrink-0 ${intTone.value}`}>
+            {metrics.intensity.segments8}
+            <span className="text-[10px] text-slate-500 font-normal">/8</span>
           </span>
         </div>
 
-        <div className="h-2.5 w-full rounded-full bg-slate-900 overflow-hidden border border-white/5">
-          <div
-            className={`h-full rounded-full transition-all duration-300 ${intTone.bar}`}
-            style={{ width: `${Math.max(4, Math.min(100, metrics.intensity.score))}%` }}
-          />
-        </div>
+        <EightSegmentBar
+          filledCount={metrics.intensity.segments8}
+          activeClass={intTone.segment}
+        />
 
         <div className="text-[11px] text-slate-400 leading-snug">
           {intWarning ? (
             <span className="text-amber-300 font-medium">⚠ {intWarning}</span>
-          ) : metrics.intensity.drivers.length > 0 ? (
-            <span>
-              {t("Pemicu utama:", "Key drivers:")}{" "}
-              <strong className="text-slate-200 font-medium">
-                {metrics.intensity.drivers.slice(0, 3).join(" · ")}
-              </strong>
-            </span>
           ) : (
-            <span>
-              {t(
-                "Beban fisik dan intensitas pressing seimbang sepanjang laga.",
-                "Balanced physical load and pressing workload across 90 minutes.",
-              )}
-            </span>
+            <span>{intensityBeginnerHint(metrics.intensity.level)}</span>
           )}
         </div>
+
+        {activeDrivers.length > 0 && (
+          <div className="flex flex-wrap gap-1 pt-0.5">
+            {activeDrivers.map((drv) => (
+              <span
+                key={drv}
+                className="px-1.5 py-0.5 rounded bg-[#0B0F19] border border-white/8 text-[10px] text-slate-300"
+              >
+                {drv}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* 2. KOMPLEKSITAS */}
+      {/* 2. KERUMITAN TAKTIK (KOMPLEKSITAS) */}
       <div className="tactical-surface rounded-xl p-3.5 flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
               {t("Kompleksitas", "Complexity")}
             </span>
             <span
-              className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${compTone.badge}`}
+              className={`px-2 py-0.5 rounded-md text-[10px] font-bold border truncate ${compTone.badge}`}
             >
-              {levelLabel(metrics.complexity.level, "complexity")}
+              {complexityLabel(metrics.complexity.level)}
             </span>
           </div>
-          <span className={`font-mono-metric text-sm font-extrabold ${compTone.value}`}>
-            {metrics.complexity.score.toFixed(0)}
-            <span className="text-[10px] text-slate-500 font-normal">/100</span>
+          <span className={`font-mono-metric text-xs font-extrabold shrink-0 ${compTone.value}`}>
+            {metrics.complexity.segments8}
+            <span className="text-[10px] text-slate-500 font-normal">/8</span>
           </span>
         </div>
 
-        <div className="h-2.5 w-full rounded-full bg-slate-900 overflow-hidden border border-white/5">
-          <div
-            className={`h-full rounded-full transition-all duration-300 ${compTone.bar}`}
-            style={{ width: `${Math.max(4, Math.min(100, metrics.complexity.score))}%` }}
-          />
-        </div>
+        <EightSegmentBar
+          filledCount={metrics.complexity.segments8}
+          activeClass={compTone.segment}
+        />
 
         <div className="text-[11px] text-slate-400 leading-snug">
           {compWarning ? (
             <span className="text-amber-300 font-medium">⚠ {compWarning}</span>
           ) : (
-            <span className="font-mono-metric text-[10px] text-slate-300">
-              {metrics.complexity.activeTeamInstructions} TI ·{" "}
-              {metrics.complexity.customPlayerInstructions} PI ·{" "}
-              {metrics.complexity.phaseShiftSlots} {t("geser fase", "phase shifts")} ·{" "}
-              {metrics.complexity.specialistRoleCount} {t("peran spesialis", "specialist roles")}
+            <span>{complexityBeginnerHint(metrics.complexity.level)}</span>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-1 pt-0.5">
+          <span className="px-1.5 py-0.5 rounded bg-[#0B0F19] border border-white/8 text-[10px] text-slate-300">
+            {metrics.complexity.activeTeamInstructions}{" "}
+            {t("instruksi tim", "team rules")}
+          </span>
+          <span className="px-1.5 py-0.5 rounded bg-[#0B0F19] border border-white/8 text-[10px] text-slate-300">
+            {metrics.complexity.customPlayerInstructions}{" "}
+            {t("instruksi individu", "player tasks")}
+          </span>
+          {metrics.complexity.phaseShiftSlots > 0 && (
+            <span className="px-1.5 py-0.5 rounded bg-[#0B0F19] border border-white/8 text-[10px] text-cyan-300">
+              {metrics.complexity.phaseShiftSlots}{" "}
+              {t("geser posisi IP→OOP", "phase shifts")}
             </span>
           )}
         </div>
       </div>
 
-      {/* 3. EFEKTIVITAS (10-BAR FM27 FAMILIARITY) */}
+      {/* 3. KESIAPAN TAKTIK (EFEKTIVITAS / FAMILIARITY) */}
       <div className="tactical-surface rounded-xl p-3.5 flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
-              {t("Efektivitas", "Effectiveness")}
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+              {t("Efektivitas Tim", "Effectiveness")}
             </span>
             <span
               className={`px-2 py-0.5 rounded-md text-[10px] font-bold border truncate ${effTone.badge}`}
@@ -254,11 +337,9 @@ export function TacticalIndicatorsBar({
               {familiarityLabel(metrics.effectiveness.level)}
             </span>
           </div>
-          <span className={`font-mono-metric text-sm font-extrabold shrink-0 ${effTone.value}`}>
+          <span className={`font-mono-metric text-xs font-extrabold shrink-0 ${effTone.value}`}>
             {metrics.effectiveness.bars}
-            <span className="text-[10px] text-slate-500 font-normal">
-              /10 ({metrics.effectiveness.score.toFixed(0)})
-            </span>
+            <span className="text-[10px] text-slate-500 font-normal">/10</span>
           </span>
         </div>
 
