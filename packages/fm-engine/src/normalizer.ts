@@ -22,6 +22,9 @@ export interface NormalizedPlayerProfile {
   fullProfile: boolean;
   isGoalkeeper: boolean;
   isUsableOutfielder: boolean;
+  tacticalFamiliarity?: readonly number[];
+  condition?: number;
+  matchSharpness?: number;
 }
 
 export function canonicalPositionKey(slot: string): PositionKey14 {
@@ -313,6 +316,9 @@ export function normalizePlayer(
     fullProfile,
     isGoalkeeper,
     isUsableOutfielder,
+    ...(input.tacticalFamiliarity ? { tacticalFamiliarity: input.tacticalFamiliarity } : {}),
+    ...(input.condition !== undefined ? { condition: input.condition } : {}),
+    ...(input.matchSharpness !== undefined ? { matchSharpness: input.matchSharpness } : {}),
   };
 }
 

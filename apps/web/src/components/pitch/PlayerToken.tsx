@@ -9,6 +9,7 @@ export interface PlayerTokenProps {
   cx: number;
   cy: number;
   roleLabel: string;
+  effectivenessScore?: number;
   isSelected: boolean;
   isHovered: boolean;
   isDragSource: boolean;
@@ -30,6 +31,7 @@ export function PlayerToken({
   cx,
   cy,
   roleLabel,
+  effectivenessScore,
   isSelected,
   isHovered,
   isDragSource,
@@ -46,6 +48,20 @@ export function PlayerToken({
   const displayName = slot.playerName
     ? slot.playerName.split(" ").slice(-1)[0] ?? cfg.positionId
     : `#${slot.slotIndex + 1} ${cfg.positionId}`;
+  const effBars =
+    effectivenessScore !== undefined
+      ? Math.max(1, Math.min(10, Math.round(effectivenessScore / 10)))
+      : null;
+  const effColor =
+    effectivenessScore === undefined
+      ? "#34D399"
+      : effectivenessScore >= 78
+        ? "#34D399"
+        : effectivenessScore >= 62
+          ? "#A3E635"
+          : effectivenessScore >= 42
+            ? "#FBBF24"
+            : "#F43F5E";
 
   return (
     <g
@@ -139,21 +155,21 @@ export function PlayerToken({
         {cfg.positionId}·{dutyLetter}
       </text>
 
-      {/* Nameplate & full role subtitle */}
+      {/* Nameplate & 10-segment FM27 effectiveness strip */}
       <g transform="translate(0, 30)">
         <rect
           x={-48}
           y={-9}
           width={96}
-          height={20}
+          height={effBars !== null ? 24 : 20}
           rx={5}
           fill="#0B0F19"
-          fillOpacity={0.9}
+          fillOpacity={0.92}
           stroke="rgba(255,255,255,0.12)"
           strokeWidth={1}
         />
         <text
-          y={4}
+          y={effBars !== null ? 2.5 : 4}
           textAnchor="middle"
           fill="#F8FAFC"
           fontSize={10}
@@ -161,10 +177,25 @@ export function PlayerToken({
         >
           {displayName.slice(0, 14)}
         </text>
+        {effBars !== null && (
+          <g transform="translate(-40, 8.5)">
+            {Array.from({ length: 10 }).map((_, idx) => (
+              <rect
+                key={idx}
+                x={idx * 8.1}
+                y={0}
+                width={6.8}
+                height={3.2}
+                rx={0.8}
+                fill={idx < effBars ? effColor : "#1E293B"}
+              />
+            ))}
+          </g>
+        )}
       </g>
 
       {(isSelected || isHovered) && (
-        <g transform="translate(0, 49)">
+        <g transform={`translate(0, ${effBars !== null ? 53 : 49})`}>
           <rect
             x={-60}
             y={-8}

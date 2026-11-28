@@ -367,6 +367,59 @@ function readI16LE(buf: Uint8Array, offset: number): number {
   return u >= 0x8000 ? u - 0x10000 : u;
 }
 
+function readI8(buf: Uint8Array, offset: number): number {
+  const b = buf[offset]!;
+  return b >= 0x80 ? b - 0x100 : b;
+}
+
+function extractPlayerInGameFamiliarity(
+  gameDb: Uint8Array,
+  rec: number,
+  windowEnd: number,
+): number[] | undefined {
+  const scanLimit = Math.min(windowEnd - 11, rec + 175);
+  let famAt = -1;
+
+  for (let k = rec + 128; k <= scanLimit - 4; k++) {
+    if (
+      gameDb[k] === 0xff &&
+      gameDb[k + 1] === 0xff &&
+      gameDb[k + 2] === 0xff &&
+      gameDb[k + 3] === 0xff &&
+      gameDb[k + 5] === 0x07
+    ) {
+      famAt = k + 6;
+      break;
+    }
+  }
+
+  if (famAt < 0) {
+    for (let k = rec + 128; k <= scanLimit; k++) {
+      if (gameDb[k] === 0x0c && gameDb[k + 1] === 0x07) {
+        const b1 = readI8(gameDb, k + 3);
+        const b2 = readI8(gameDb, k + 4);
+        if (b1 === -100 || b2 === -100) {
+          famAt = k + 2;
+          break;
+        }
+      }
+    }
+  }
+
+  if (famAt < 0 || famAt + 9 > gameDb.length) return undefined;
+
+  const out = new Array<number>(9);
+  for (let idx = 0; idx < 9; idx++) {
+    const val = readI8(gameDb, famAt + idx);
+    if (val < -100 || val > 60) return undefined;
+    out[idx] = val;
+  }
+
+  // Outfielders have byte[1] === -100; Goalkeepers have byte[2] === -100
+  if (out[1] !== -100 && out[2] !== -100) return undefined;
+  return out;
+}
+
 function readU32LE(buf: Uint8Array, offset: number): number {
   return (
     (buf[offset]! |
@@ -1593,6 +1646,18 @@ export function parseFmSave(
             : teamIdx >= 2
               ? "U18 / Youth"
               : "Affiliate / B";
+      const condRaw = rec + 108 <= gameDb.length ? readU16LE(gameDb, rec + 106) : 0xffff;
+      const sharpRaw = rec + 112 <= gameDb.length ? readU16LE(gameDb, rec + 110) : 0xffff;
+      const condition =
+        condRaw >= 100 && condRaw <= 10_000 ? Math.round(condRaw / 100) : undefined;
+      const matchSharpness =
+        sharpRaw >= 100 && sharpRaw <= 10_000 ? Math.round(sharpRaw / 100) : undefined;
+      const tacticalFamiliarity = extractPlayerInGameFamiliarity(
+        gameDb,
+        rec,
+        personWindowEnd,
+      );
+
       const playerObj: Player = {
         uid,
         name: playerName,
@@ -1609,6 +1674,9 @@ export function parseFmSave(
         attributes: attributes as PlayerAttributes,
         positions: positions as PositionFamiliarity,
         ...(person?.personality ? { personality: person.personality } : {}),
+        ...(tacticalFamiliarity ? { tacticalFamiliarity } : {}),
+        ...(condition !== undefined ? { condition } : {}),
+        ...(matchSharpness !== undefined ? { matchSharpness } : {}),
       };
       let list = playersByClub[clubObj.uid];
       if (!list) {

@@ -324,6 +324,7 @@ export default function SquadAuditPage() {
         <>
           <ActiveTeamInstructionsSummary tactic={tactic} />
           <RoleFitTable
+            tactic={tactic}
             audit={auditResult}
             players={activePlayers}
             lineupPreferences={lineupPreferences}

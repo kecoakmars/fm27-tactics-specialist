@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useStore } from "zustand";
 import {
   decodeTacticFromUrlHash,
@@ -9,9 +8,10 @@ import {
   exportFmf,
 } from "@fm27/fm-codec";
 import { getPitchCatalog, getTacticalStyles } from "@fm27/fm-data";
-import { computeTacticalBalance } from "@fm27/fm-engine";
+import { computeTacticalBalance, computeTacticalMetrics } from "@fm27/fm-engine";
 import { BalanceRadar } from "@/components/analytics/BalanceRadar";
 import { CoachingFindingsList } from "@/components/analytics/CoachingFindingsList";
+import { FamiliaritySegmentsBar } from "@/components/analytics/FamiliaritySegmentsBar";
 import {
   Heatmap18Zone,
   PitchColorLegend,
@@ -24,6 +24,7 @@ import { PlayerInstructionModal } from "@/components/instructions/PlayerInstruct
 import { TeamInstructionPanel } from "@/components/instructions/TeamInstructionPanel";
 import { DualPhasePitch } from "@/components/pitch/DualPhasePitch";
 import { SplitViewPitch } from "@/components/pitch/SplitViewPitch";
+import { TacticPngPreviewModal } from "@/components/tactics/TacticPngPreviewModal";
 import { TacticRecommendationPanel } from "@/components/tactics/TacticRecommendationPanel";
 import {
   importAnySupportedFile,
@@ -31,7 +32,6 @@ import {
   importTacticBytes,
 } from "@/lib/file-importer";
 import { sanitizeFileName, triggerBrowserDownload } from "@/lib/local-folder-sync";
-import { exportDualPhasePngCard } from "@/lib/svg-card-exporter";
 import { useFolderSyncStore } from "@/stores/useFolderSyncStore";
 import { useLocale } from "@/stores/useLocaleStore";
 import { useTacticStore } from "@/stores/useTacticStore";
@@ -78,6 +78,7 @@ export default function TacticalBoardWorkspacePage() {
   } | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [pngPreviewOpen, setPngPreviewOpen] = useState(false);
 
   const stylesCatalog = useMemo(
     () => getTacticalStyles(tactic.patchVersion),
@@ -95,6 +96,15 @@ export default function TacticalBoardWorkspacePage() {
   const balanceReport = useMemo(
     () => computeTacticalBalance(tactic, clubPlayers.length >= 11 ? clubPlayers : undefined),
     [clubPlayers, tactic],
+  );
+  const tacticalMetrics = useMemo(
+    () =>
+      computeTacticalMetrics(
+        tactic,
+        clubPlayers.length >= 11 ? clubPlayers : undefined,
+        balanceReport,
+      ),
+    [balanceReport, clubPlayers, tactic],
   );
 
   const activeShapeId = useMemo(() => {
@@ -355,23 +365,17 @@ export default function TacticalBoardWorkspacePage() {
     }
   };
 
-  const handleExportPngCard = async () => {
-    setBusyAction("png");
-    try {
-      await exportDualPhasePngCard(tactic);
-      notify(
-        "ok",
-        t("Gambar taktik berhasil diunduh", "Tactical image downloaded"),
-      );
-    } catch {
-      notify("error", t("Gagal menyimpan gambar", "Image download failed"));
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
   const selectedSlot =
     selectedSlotIndex !== null ? tactic.slots[selectedSlotIndex] ?? null : null;
+  const selectedSlotEff = useMemo(
+    () =>
+      selectedSlot
+        ? tacticalMetrics.effectiveness.playerEffectiveness.find(
+            (pe) => pe.slotIndex === selectedSlot.slotIndex,
+          ) ?? null
+        : null,
+    [selectedSlot, tacticalMetrics.effectiveness.playerEffectiveness],
+  );
 
   const buildOverlayForBoard = (boardPhase: "ip" | "oop") => {
     if (heatmapMode === "off") return undefined;
@@ -445,7 +449,7 @@ export default function TacticalBoardWorkspacePage() {
       <section className="tactical-surface rounded-2xl p-4 flex flex-col gap-3.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-[260px] flex-1">
-            <div>
+            <div className="w-full">
               <h1 className="sr-only">FM27 Tactical Board</h1>
               <input
                 id="tactic-title-input"
@@ -453,7 +457,7 @@ export default function TacticalBoardWorkspacePage() {
                 aria-label={t("Nama Taktik", "Tactic Name")}
                 value={tactic.title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="text-lg sm:text-xl font-extrabold bg-transparent border-b border-transparent hover:border-white/15 focus:border-cyan-400 focus:outline-none text-slate-50 w-full max-w-md"
+                className="text-lg sm:text-xl font-extrabold bg-transparent border-b border-transparent hover:border-white/15 focus:border-cyan-400 focus:outline-none text-slate-50 w-full max-w-xl"
               />
               <div className="flex items-center gap-2 mt-1 text-xs font-mono-metric">
                 <span className="text-cyan-400 font-bold">IP {tactic.inFormation}</span>
@@ -475,20 +479,50 @@ export default function TacticalBoardWorkspacePage() {
                 type="button"
                 disabled={pastCount === 0}
                 onClick={() => undo()}
+                aria-label="Undo"
                 title="Undo (Ctrl+Z)"
-                className="px-2.5 py-1.5 rounded-md text-xs font-semibold text-slate-300 disabled:text-slate-600 hover:bg-slate-800/80 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed"
+                className="p-1.5 rounded-md text-slate-300 disabled:text-slate-600 hover:bg-slate-800/80 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed"
               >
-                Undo
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M9 14 4 9l5-5" />
+                  <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11" />
+                </svg>
               </button>
               <button
                 id="redo-tactic-btn"
                 type="button"
                 disabled={futureCount === 0}
                 onClick={() => redo()}
+                aria-label="Redo"
                 title="Redo (Ctrl+Y)"
-                className="px-2.5 py-1.5 rounded-md text-xs font-semibold text-slate-300 disabled:text-slate-600 hover:bg-slate-800/80 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed"
+                className="p-1.5 rounded-md text-slate-300 disabled:text-slate-600 hover:bg-slate-800/80 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed"
               >
-                Redo
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m15 14 5-5-5-5" />
+                  <path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13" />
+                </svg>
               </button>
             </div>
 
@@ -518,7 +552,7 @@ export default function TacticalBoardWorkspacePage() {
               id="export-png-card-btn"
               type="button"
               disabled={busyAction !== null}
-              onClick={() => void handleExportPngCard()}
+              onClick={() => setPngPreviewOpen(true)}
               className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-[#0B0F19] hover:bg-slate-800 text-slate-300 border border-white/10 cursor-pointer"
             >
               {t("Gambar PNG", "PNG Image")}
@@ -532,14 +566,6 @@ export default function TacticalBoardWorkspacePage() {
             >
               {t("Bagikan", "Share")}
             </button>
-
-            <Link
-              id="open-summary-page-link"
-              href="/summary"
-              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 transition"
-            >
-              {t("Ringkasan →", "Summary →")}
-            </Link>
           </div>
         </div>
 
@@ -727,6 +753,29 @@ export default function TacticalBoardWorkspacePage() {
                   </div>
                 </div>
               </div>
+
+              {selectedSlotEff && (
+                <div className="rounded-lg px-2.5 py-2 bg-[#0B0F19] border border-white/8 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-[11px] font-bold text-slate-300">
+                      {t("Efektivitas:", "Effectiveness:")}
+                    </span>
+                    <FamiliaritySegmentsBar
+                      score={selectedSlotEff.score}
+                      size="sm"
+                      showNumeric
+                    />
+                  </div>
+                  {selectedSlotEff.condition !== undefined && (
+                    <span className="font-mono-metric text-[10px] text-slate-400 shrink-0">
+                      {t("Fisik", "Cond")} {selectedSlotEff.condition}%
+                      {selectedSlotEff.matchSharpness !== undefined
+                        ? ` · ${t("Tajam", "Sharp")} ${selectedSlotEff.matchSharpness}%`
+                        : ""}
+                    </span>
+                  )}
+                </div>
+              )}
             </section>
           )}
 
@@ -872,6 +921,13 @@ export default function TacticalBoardWorkspacePage() {
       </div>
 
       <PlayerInstructionModal />
+      <TacticPngPreviewModal
+        open={pngPreviewOpen}
+        tactic={tactic}
+        squadPlayers={clubPlayers}
+        onClose={() => setPngPreviewOpen(false)}
+        onNotify={notify}
+      />
     </main>
   );
 }

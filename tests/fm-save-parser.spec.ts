@@ -149,6 +149,8 @@ describe("FM26/FM27 Client-Side .fm Save Parser & Live World Pool", () => {
           expect(val).toBeLessThanOrEqual(20);
         }
       }
+      expect(roster.some((p) => Array.isArray(p.tacticalFamiliarity) && p.tacticalFamiliarity.length === 9)).toBe(true);
+      expect(roster.some((p) => typeof p.condition === "number" && p.condition >= 1 && p.condition <= 100)).toBe(true);
 
       for (const wk of parsed.worldWonderkids.slice(0, 25)) {
         expect(wk.age).toBeLessThanOrEqual(21);

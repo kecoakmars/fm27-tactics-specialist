@@ -9,6 +9,7 @@ import {
 } from "@fm27/fm-engine";
 import type { DualPhaseTactic, Player } from "@fm27/shared-types";
 import { useLocale } from "@/stores/useLocaleStore";
+import { FamiliaritySegmentsBar } from "./FamiliaritySegmentsBar";
 
 export interface TacticalIndicatorsBarProps {
   tactic: DualPhaseTactic;
@@ -56,25 +57,21 @@ function getFamiliarityTone(level: TacticalFamiliarityLevel) {
   switch (level) {
     case "fluid":
       return {
-        bar: "bg-emerald-400",
         badge: "bg-emerald-500/18 text-emerald-300 border-emerald-500/40",
         value: "text-emerald-300",
       };
     case "accomplished":
       return {
-        bar: "bg-cyan-400",
-        badge: "bg-cyan-500/18 text-cyan-300 border-cyan-500/40",
-        value: "text-cyan-300",
+        badge: "bg-lime-500/18 text-lime-300 border-lime-500/40",
+        value: "text-lime-300",
       };
     case "competent":
       return {
-        bar: "bg-amber-400",
         badge: "bg-amber-500/18 text-amber-300 border-amber-500/40",
         value: "text-amber-300",
       };
     default:
       return {
-        bar: "bg-rose-500",
         badge: "bg-rose-500/18 text-rose-300 border-rose-500/40",
         value: "text-rose-300",
       };
@@ -176,7 +173,7 @@ export function TacticalIndicatorsBar({
           </span>
         </div>
 
-        <div className="h-2 w-full rounded-full bg-slate-900 overflow-hidden border border-white/5">
+        <div className="h-2.5 w-full rounded-full bg-slate-900 overflow-hidden border border-white/5">
           <div
             className={`h-full rounded-full transition-all duration-300 ${intTone.bar}`}
             style={{ width: `${Math.max(4, Math.min(100, metrics.intensity.score))}%` }}
@@ -223,7 +220,7 @@ export function TacticalIndicatorsBar({
           </span>
         </div>
 
-        <div className="h-2 w-full rounded-full bg-slate-900 overflow-hidden border border-white/5">
+        <div className="h-2.5 w-full rounded-full bg-slate-900 overflow-hidden border border-white/5">
           <div
             className={`h-full rounded-full transition-all duration-300 ${compTone.bar}`}
             style={{ width: `${Math.max(4, Math.min(100, metrics.complexity.score))}%` }}
@@ -244,31 +241,28 @@ export function TacticalIndicatorsBar({
         </div>
       </div>
 
-      {/* 3. EFEKTIVITAS (FAMILIARITY) */}
+      {/* 3. EFEKTIVITAS (10-BAR FM27 FAMILIARITY) */}
       <div className="tactical-surface rounded-xl p-3.5 flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
-              {t("Efektivitas (Familiarity)", "Effectiveness (Familiarity)")}
+              {t("Efektivitas", "Effectiveness")}
             </span>
             <span
-              className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${effTone.badge}`}
+              className={`px-2 py-0.5 rounded-md text-[10px] font-bold border truncate ${effTone.badge}`}
             >
               {familiarityLabel(metrics.effectiveness.level)}
             </span>
           </div>
-          <span className={`font-mono-metric text-sm font-extrabold ${effTone.value}`}>
-            {metrics.effectiveness.score.toFixed(0)}
-            <span className="text-[10px] text-slate-500 font-normal">/100</span>
+          <span className={`font-mono-metric text-sm font-extrabold shrink-0 ${effTone.value}`}>
+            {metrics.effectiveness.bars}
+            <span className="text-[10px] text-slate-500 font-normal">
+              /10 ({metrics.effectiveness.score.toFixed(0)})
+            </span>
           </span>
         </div>
 
-        <div className="h-2 w-full rounded-full bg-slate-900 overflow-hidden border border-white/5">
-          <div
-            className={`h-full rounded-full transition-all duration-300 ${effTone.bar}`}
-            style={{ width: `${Math.max(4, Math.min(100, metrics.effectiveness.score))}%` }}
-          />
-        </div>
+        <FamiliaritySegmentsBar score={metrics.effectiveness.score} size="md" />
 
         <div className="text-[11px] text-slate-400 leading-snug">{effNote}</div>
       </div>

@@ -142,12 +142,14 @@ describe("Phase 2 — Dual-Phase Pitch Store, SVG Card & Local Folder Sync", () 
     expect(directPath).toBe("Direct.fmf");
   });
 
-  it("generates a complete 1600x900 Dual-Phase SVG tactical card", () => {
+  it("generates a complete 1600x900 Dual-Phase SVG tactical card with gameplan & pillars", () => {
     const tactic = buildPresetTactic("WingPlay");
-    const svg = buildDualPhaseTacticCardSvg(tactic);
+    const svg = buildDualPhaseTacticCardSvg(tactic, { locale: "en" });
     expect(svg).toContain('width="1600" height="900"');
     expect(svg).toContain("IN POSSESSION");
     expect(svg).toContain("OUT OF POSSESSION");
+    expect(svg).toContain("TACTICAL IDENTITY &amp; GAMEPLAN");
+    expect(svg).toContain("6 TACTICAL BALANCE PILLARS");
     expect(svg).toContain(tactic.inFormation);
   });
 

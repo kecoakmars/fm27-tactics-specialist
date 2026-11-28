@@ -1,13 +1,17 @@
-import { getPitchCatalog } from "@fm27/fm-data";
-import type { DualPhaseTactic, Player } from "@fm27/shared-types";
+import { getPitchCatalog, getRoleProfiles } from "@fm27/fm-data";
+import type { DualPhaseTactic, Player, SlotAssignment } from "@fm27/shared-types";
 import { computeTacticalBalance, type TacticalBalanceReport } from "./balance-scorer.js";
+import { computeSlotFit } from "./fit-calculator.js";
 import { getPlayerInstructionPolicy } from "./instruction-planner.js";
 import {
   averagePlayerAttributes,
+  canonicalPositionKey,
   getPlayerAttribute,
   getPlayerSlotFamiliarity,
   normalizePlayer,
+  type NormalizedPlayerProfile,
 } from "./normalizer.js";
+import { scoreSingleRoleQuality } from "./role-evaluator.js";
 import { auditSquadAgainstTactic } from "./squad-audit.js";
 
 export type TacticalIndicatorLevel = "low" | "moderate" | "high" | "extreme";
@@ -36,12 +40,33 @@ export interface TacticalComplexityMetric {
   squadWarningEn: string | null;
 }
 
+export interface PlayerSlotEffectiveness {
+  slotIndex: number;
+  playerUid: number;
+  playerName: string;
+  inSlot: string;
+  outSlot: string;
+  inRoleId: string;
+  outRoleId: string;
+  score: number;
+  bars: number;
+  level: TacticalFamiliarityLevel;
+  fmFamiliarityScore: number | null;
+  roleSlotFitScore: number;
+  hasFmFamiliarity: boolean;
+  condition?: number;
+  matchSharpness?: number;
+}
+
 export interface TacticalEffectivenessMetric {
   score: number;
+  bars: number;
   level: TacticalFamiliarityLevel;
   structuralScore: number;
   naturalFamiliarityScore: number | null;
   hasSquadContext: boolean;
+  hasFmFamiliarity: boolean;
+  playerEffectiveness: PlayerSlotEffectiveness[];
   summaryNoteId: string;
   summaryNoteEn: string;
 }
@@ -78,6 +103,10 @@ function clamp100(val: number): number {
   return Math.round(Math.max(0, Math.min(100, val)) * 10) / 10;
 }
 
+export function scoreToFamiliarityBars(score: number): number {
+  return Math.max(1, Math.min(10, Math.round(Math.max(0, Math.min(100, score)) / 10)));
+}
+
 function resolveIndicatorLevel(score: number): TacticalIndicatorLevel {
   if (score >= 78) return "extreme";
   if (score >= 58) return "high";
@@ -85,32 +114,71 @@ function resolveIndicatorLevel(score: number): TacticalIndicatorLevel {
   return "low";
 }
 
-function resolveFamiliarityLevel(score: number): TacticalFamiliarityLevel {
-  if (score >= 82) return "fluid";
-  if (score >= 68) return "accomplished";
-  if (score >= 52) return "competent";
+export function resolveFamiliarityLevel(score: number): TacticalFamiliarityLevel {
+  if (score >= 80) return "fluid";
+  if (score >= 65) return "accomplished";
+  if (score >= 48) return "competent";
   return "awkward";
 }
 
-/**
- * Computes deterministic Intensity, Complexity, and Effectiveness (Natural Familiarity)
- * indicators for a DualPhaseTactic, optionally enriched with live squad attributes.
- */
-export function computeTacticalMetrics(
-  tactic: DualPhaseTactic,
-  squadPlayers?: readonly Player[],
-  existingBalance?: TacticalBalanceReport,
-): TacticalMetricsReport {
-  const catalog = getPitchCatalog(tactic.patchVersion);
-  const balance =
-    existingBalance ??
-    computeTacticalBalance(
-      tactic,
-      squadPlayers && squadPlayers.length >= 11 ? squadPlayers : undefined,
-    );
-  const ti = tactic.teamInstructions;
+function scaleFmFamiliarityByteTo100(val: number): number {
+  const clamped = Math.max(-100, Math.min(50, val));
+  if (clamped <= 0) {
+    return 15 + ((clamped + 100) / 100) * 27;
+  }
+  return 42 + (clamped / 50) * 54;
+}
 
-  // --- 1. INTENSITY (0..100) ---
+function readFmCorridorByte(fam: readonly number[], posId: string): number | null {
+  if (fam.length < 9) return null;
+  const canon = canonicalPositionKey(posId);
+  if (canon === "GK") {
+    return fam[1] !== undefined && fam[1] > -100 ? fam[1]! : null;
+  }
+  // Outfield slots require outfield familiarity block (byte[2] > -100 or byte[3] > -100)
+  if ((fam[2] ?? -100) === -100 && (fam[3] ?? -100) === -100) {
+    return null;
+  }
+  const dc = fam[2] ?? 0;
+  const fb = fam[3] ?? 0;
+  const cm = fam[4] ?? 0;
+  const st = fam[5] ?? 0;
+  const am = fam[6] ?? 0;
+  const sec = fam[7] ?? 0;
+
+  switch (canon) {
+    case "DC":
+      return dc;
+    case "DL":
+    case "DR":
+      return fb;
+    case "WBL":
+    case "WBR":
+      return fb * 0.72 + am * 0.28;
+    case "DM":
+      return cm * 0.58 + fb * 0.42;
+    case "MC":
+      return cm;
+    case "ML":
+    case "MR":
+      return am * 0.52 + cm * 0.48;
+    case "AMC":
+      return am;
+    case "AML":
+    case "AMR":
+      return am * 0.65 + sec * 0.35;
+    case "STC":
+      return st * 0.7 + sec * 0.3;
+    default:
+      return cm;
+  }
+}
+
+function computeRawIntensityScore(
+  tactic: DualPhaseTactic,
+  avgTransitionDistance: number,
+): { score: number; drivers: string[] } {
+  const ti = tactic.teamInstructions;
   let intensityRaw = 36;
   const drivers: string[] = [];
 
@@ -195,14 +263,163 @@ export function computeTacticalMetrics(
 
   const attackDuties = tactic.slots.filter((s) => s.inPossession.duty === "Attack").length;
   intensityRaw += Math.max(0, attackDuties - 3) * 2.5;
-  intensityRaw += Math.min(10, Math.max(0, (balance.heatmap.averageTransitionDistance - 6) * 0.8));
+  intensityRaw += Math.min(10, Math.max(0, (avgTransitionDistance - 6) * 0.8));
 
   const pressMorePiCount = tactic.slots.filter((s) =>
     s.outOfPossession.playerInstructionBits.includes(29),
   ).length;
   intensityRaw += Math.min(6, pressMorePiCount * 1.5);
 
-  const intensityScore = clamp100(intensityRaw);
+  return { score: clamp100(intensityRaw), drivers };
+}
+
+/**
+ * Evaluates per-player tactical effectiveness (0-100 & 1-10 FM27 segments) for a specific slot,
+ * combining real `.fm` monthly familiarity bytes (when available) with live IP/OOP role & instruction fit.
+ */
+export function computePlayerSlotEffectiveness(
+  player: Player | NormalizedPlayerProfile,
+  slot: SlotAssignment,
+  tactic: DualPhaseTactic,
+  options?: { intensityScore?: number },
+): PlayerSlotEffectiveness {
+  const patchVersion = tactic.patchVersion || "27.0";
+  const norm =
+    "isGoalkeeper" in player ? player : normalizePlayer(player, patchVersion);
+  const rp = getRoleProfiles(patchVersion);
+  const specialistSet = new Set(rp.SpecialistRoles);
+  const roleById = new Map(rp.Roles.map((r) => [r.Id, r]));
+
+  const inPos = slot.inPossession.positionId;
+  const outPos = slot.outOfPossession.positionId;
+  const inRole = roleById.get(slot.inPossession.roleId) ?? rp.Roles[0]!;
+  const outRole = roleById.get(slot.outOfPossession.roleId) ?? rp.Roles[0]!;
+
+  const inQ = scoreSingleRoleQuality(norm, inPos, inRole, specialistSet);
+  const outQ = scoreSingleRoleQuality(norm, outPos, outRole, specialistSet);
+  const rawFit = computeSlotFit(norm, inPos, outPos, inQ, outQ);
+  const roleSlotFitScore = clamp100(Math.max(8, rawFit));
+
+  const intensityScore = options?.intensityScore ?? computeRawIntensityScore(tactic, 8).score;
+  let instructionDelta = 0;
+  if (inPos !== "GK") {
+    const workStamina = averagePlayerAttributes(norm, ["stamina", "work_rate"]);
+    if (intensityScore >= 72 && workStamina < 11.5) {
+      instructionDelta -= 3.5;
+    } else if (intensityScore >= 70 && workStamina >= 15) {
+      instructionDelta += 1.5;
+    }
+
+    const isComplexRole =
+      COMPLEX_ROLE_IDS.has(slot.inPossession.roleId) ||
+      COMPLEX_ROLE_IDS.has(slot.outOfPossession.roleId);
+    if (isComplexRole) {
+      const iq = averagePlayerAttributes(norm, ["decisions", "vision", "teamwork"]);
+      if (iq < 11.8) instructionDelta -= 3.5;
+      else if (iq >= 15.2) instructionDelta += 1.5;
+    }
+  }
+  const adjustedFit = clamp100(roleSlotFitScore + instructionDelta);
+
+  let fmFamiliarityScore: number | null = null;
+  if (norm.tacticalFamiliarity && norm.tacticalFamiliarity.length === 9) {
+    const inCorr = readFmCorridorByte(norm.tacticalFamiliarity, inPos);
+    const outCorr = readFmCorridorByte(norm.tacticalFamiliarity, outPos);
+    if (inCorr !== null && outCorr !== null) {
+      const corrAvg = inCorr * 0.55 + outCorr * 0.45;
+      const corrPct = scaleFmFamiliarityByteTo100(corrAvg);
+      const genPct = scaleFmFamiliarityByteTo100(norm.tacticalFamiliarity[0] ?? 0);
+      const sharpMod =
+        norm.matchSharpness !== undefined ? (norm.matchSharpness - 88) * 0.08 : 0;
+      fmFamiliarityScore = clamp100(corrPct * 0.76 + genPct * 0.24 + sharpMod);
+    } else {
+      fmFamiliarityScore = 10;
+    }
+  }
+
+  const inPosFam = getPlayerSlotFamiliarity(norm, inPos);
+  const outPosFam = getPlayerSlotFamiliarity(norm, outPos);
+  const minPos20 = Math.min(inPosFam, outPosFam);
+  const posGate = Math.min(1, Math.max(0.15, minPos20 / 14));
+
+  let score: number;
+  if (fmFamiliarityScore !== null) {
+    score = clamp100(
+      (fmFamiliarityScore * 0.66 + adjustedFit * 0.34) * (0.35 + 0.65 * posGate),
+    );
+  } else {
+    const posFamPct = Math.min(100, Math.max(0, ((inPosFam + outPosFam) / 40) * 100));
+    score = clamp100(adjustedFit * 0.68 + posFamPct * 0.32);
+  }
+
+  return {
+    slotIndex: slot.slotIndex,
+    playerUid: norm.uid,
+    playerName: norm.name,
+    inSlot: inPos,
+    outSlot: outPos,
+    inRoleId: slot.inPossession.roleId,
+    outRoleId: slot.outOfPossession.roleId,
+    score,
+    bars: scoreToFamiliarityBars(score),
+    level: resolveFamiliarityLevel(score),
+    fmFamiliarityScore,
+    roleSlotFitScore: adjustedFit,
+    hasFmFamiliarity: fmFamiliarityScore !== null,
+    ...(norm.condition !== undefined ? { condition: norm.condition } : {}),
+    ...(norm.matchSharpness !== undefined ? { matchSharpness: norm.matchSharpness } : {}),
+  };
+}
+
+/**
+ * Evaluates a bench or squad player's best effectiveness across compatible slots in `tactic`
+ * (or their assigned slot if currently in the starting 11).
+ */
+export function computePlayerBestTacticEffectiveness(
+  player: Player,
+  tactic: DualPhaseTactic,
+): PlayerSlotEffectiveness {
+  const assignedSlot = tactic.slots.find((s) => s.playerUid === player.uid);
+  if (assignedSlot) {
+    return computePlayerSlotEffectiveness(player, assignedSlot, tactic);
+  }
+
+  const norm = normalizePlayer(player, tactic.patchVersion || "27.0");
+  let best: PlayerSlotEffectiveness | null = null;
+  for (const slot of tactic.slots) {
+    const isGkSlot = slot.inPossession.positionId === "GK";
+    if (isGkSlot !== norm.isGoalkeeper) continue;
+    const cand = computePlayerSlotEffectiveness(norm, slot, tactic);
+    if (!best || cand.score > best.score) {
+      best = cand;
+    }
+  }
+  return best ?? computePlayerSlotEffectiveness(norm, tactic.slots[0]!, tactic);
+}
+
+/**
+ * Computes deterministic Intensity, Complexity, and Per-Player Effectiveness (Familiarity)
+ * indicators for a DualPhaseTactic, enriched with live `.fm` familiarity & squad attributes.
+ */
+export function computeTacticalMetrics(
+  tactic: DualPhaseTactic,
+  squadPlayers?: readonly Player[],
+  existingBalance?: TacticalBalanceReport,
+): TacticalMetricsReport {
+  const catalog = getPitchCatalog(tactic.patchVersion);
+  const balance =
+    existingBalance ??
+    computeTacticalBalance(
+      tactic,
+      squadPlayers && squadPlayers.length >= 11 ? squadPlayers : undefined,
+    );
+  const ti = tactic.teamInstructions;
+
+  // --- 1. INTENSITY (0..100) ---
+  const { score: intensityScore, drivers } = computeRawIntensityScore(
+    tactic,
+    balance.heatmap.averageTransitionDistance,
+  );
   const intensityLevel = resolveIndicatorLevel(intensityScore);
 
   // --- 2. COMPLEXITY (0..100) ---
@@ -210,7 +427,7 @@ export function computeTacticalMetrics(
   for (const group of catalog.Instructions) {
     const bit = ti[group.Group] ?? group.Current;
     if (bit <= 0) continue;
-    if (group.Group === "LineOfEngagement" && bit === 62) continue; // Mid block baseline
+    if (group.Group === "LineOfEngagement" && bit === 62) continue;
     const opt = group.Options.find((o) => o.Bit === bit);
     const lbl = opt?.Label.toLowerCase() ?? "";
     if (lbl === "standard" || lbl === "balanced" || lbl === "mixed" || lbl === "mixed crosses") {
@@ -267,7 +484,7 @@ export function computeTacticalMetrics(
   const complexityScore = clamp100(complexityRaw);
   const complexityLevel = resolveIndicatorLevel(complexityScore);
 
-  // --- 3. EFFECTIVENESS / NATURAL FAMILIARITY (0..100) ---
+  // --- 3. EFFECTIVENESS / PER-PLAYER FAMILIARITY (0..100 & 10 BARS) ---
   const criticalAlertCount = balance.alerts.filter((a) => a.severity === "critical").length;
   const structuralScore = clamp100(balance.overallScore - criticalAlertCount * 3.5);
 
@@ -276,6 +493,7 @@ export function computeTacticalMetrics(
   let intensityWarningEn: string | null = null;
   let complexityWarningId: string | null = null;
   let complexityWarningEn: string | null = null;
+  const playerEffectiveness: PlayerSlotEffectiveness[] = [];
 
   const hasSquadContext = Boolean(squadPlayers && squadPlayers.length >= 11);
 
@@ -290,20 +508,47 @@ export function computeTacticalMetrics(
         sa,
         profile: byUid.get(sa.playerUid),
       }))
-      .filter((x): x is { sa: (typeof audit.starterAudits)[number]; profile: NonNullable<ReturnType<typeof byUid.get>> } =>
-        Boolean(x.profile),
+      .filter(
+        (
+          x,
+        ): x is {
+          sa: (typeof audit.starterAudits)[number];
+          profile: NonNullable<ReturnType<typeof byUid.get>>;
+        } => Boolean(x.profile),
       );
 
-    if (starterProfiles.length > 0) {
-      const posFamAvg20 =
-        starterProfiles.reduce((acc, item) => {
-          const inFam = getPlayerSlotFamiliarity(item.profile, item.sa.inSlot);
-          const outFam = getPlayerSlotFamiliarity(item.profile, item.sa.outSlot);
-          return acc + (inFam + outFam) * 0.5;
-        }, 0) / starterProfiles.length;
+    for (const item of starterProfiles) {
+      const slotObj = tactic.slots[item.sa.slotIndex] ?? {
+        slotIndex: item.sa.slotIndex,
+        playerUid: item.sa.playerUid,
+        playerName: item.sa.playerName,
+        inPossession: {
+          positionId: item.sa.inSlot,
+          roleId: item.sa.inRoleId,
+          duty: "Support" as const,
+          playerInstructionBits: [],
+          markingPositionMask: 0,
+        },
+        outOfPossession: {
+          positionId: item.sa.outSlot,
+          roleId: item.sa.outRoleId,
+          duty: "Defend" as const,
+          playerInstructionBits: [],
+          markingPositionMask: 0,
+        },
+      };
+      playerEffectiveness.push(
+        computePlayerSlotEffectiveness(item.profile, slotObj, tactic, {
+          intensityScore,
+        }),
+      );
+    }
 
-      const posFamPct = Math.min(100, Math.max(0, (posFamAvg20 / 20) * 100));
-      naturalFamiliarityScore = clamp100(audit.overallSquadFit * 0.65 + posFamPct * 0.35);
+    if (playerEffectiveness.length > 0) {
+      naturalFamiliarityScore = clamp100(
+        playerEffectiveness.reduce((acc, pe) => acc + pe.score, 0) /
+          playerEffectiveness.length,
+      );
 
       const outfieldStarters = starterProfiles.filter((x) => x.sa.inSlot !== "GK");
       if (outfieldStarters.length > 0) {
@@ -335,20 +580,29 @@ export function computeTacticalMetrics(
     }
   }
 
+  const hasFmFamiliarity = playerEffectiveness.some((pe) => pe.hasFmFamiliarity);
+  // Team Effectiveness = exact average of the 11 Starters when squad is loaded; structural score otherwise
   const effectivenessScore =
-    naturalFamiliarityScore !== null
-      ? clamp100(structuralScore * 0.45 + naturalFamiliarityScore * 0.55)
-      : structuralScore;
+    naturalFamiliarityScore !== null ? naturalFamiliarityScore : structuralScore;
+  const effectivenessBars = scoreToFamiliarityBars(effectivenessScore);
   const effectivenessLevel = resolveFamiliarityLevel(effectivenessScore);
+
+  const lowestStarter =
+    playerEffectiveness.length > 0
+      ? [...playerEffectiveness].sort((a, b) => a.score - b.score)[0]!
+      : null;
+  const lowestShortName = lowestStarter
+    ? lowestStarter.playerName.split(" ").slice(-1)[0] ?? lowestStarter.playerName
+    : "";
 
   const summaryNoteId =
     naturalFamiliarityScore !== null
-      ? `Gabungan struktur 6 pilar (${structuralScore.toFixed(0)}) & kesiapan alami skuad (${naturalFamiliarityScore.toFixed(0)})`
-      : `Skor struktur taktik (${structuralScore.toFixed(0)}) · Muat save .fm untuk Familiarity skuad`;
+      ? `${hasFmFamiliarity ? "Rata-rata Familiarity .fm 11 starter" : "Rata-rata kesiapan 11 starter"}${lowestStarter ? ` · Terendah: ${lowestShortName} (${lowestStarter.bars}/10)` : ""}`
+      : `Skor struktur taktik (${structuralScore.toFixed(0)}) · Muat save .fm untuk Efektivitas per pemain`;
   const summaryNoteEn =
     naturalFamiliarityScore !== null
-      ? `Combines 6-pillar balance (${structuralScore.toFixed(0)}) & natural squad familiarity (${naturalFamiliarityScore.toFixed(0)})`
-      : `Structural tactic score (${structuralScore.toFixed(0)}) · Load .fm save for squad familiarity`;
+      ? `${hasFmFamiliarity ? "11-starter .fm Familiarity average" : "11-starter readiness average"}${lowestStarter ? ` · Lowest: ${lowestShortName} (${lowestStarter.bars}/10)` : ""}`
+      : `Structural tactic score (${structuralScore.toFixed(0)}) · Load .fm save for per-player Effectiveness`;
 
   return {
     intensity: {
@@ -370,10 +624,13 @@ export function computeTacticalMetrics(
     },
     effectiveness: {
       score: effectivenessScore,
+      bars: effectivenessBars,
       level: effectivenessLevel,
       structuralScore,
       naturalFamiliarityScore,
       hasSquadContext,
+      hasFmFamiliarity,
+      playerEffectiveness,
       summaryNoteId,
       summaryNoteEn,
     },

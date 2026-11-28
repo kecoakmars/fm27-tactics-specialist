@@ -1,14 +1,22 @@
 "use client";
 
+import { useMemo } from "react";
 import { getPitchCatalog } from "@fm27/fm-data";
+import {
+  computePlayerBestTacticEffectiveness,
+  computePlayerSlotEffectiveness,
+} from "@fm27/fm-engine";
 import type {
+  DualPhaseTactic,
   LineupPreference,
   Player,
   SquadAuditResult,
 } from "@fm27/shared-types";
+import { FamiliaritySegmentsBar } from "../analytics/FamiliaritySegmentsBar";
 import { useLocale } from "../../stores/useLocaleStore";
 
 interface RoleFitTableProps {
+  tactic: DualPhaseTactic;
   audit: SquadAuditResult | null;
   players: readonly Player[];
   lineupPreferences: readonly LineupPreference[];
@@ -24,6 +32,7 @@ interface RoleFitTableProps {
 }
 
 export function RoleFitTable({
+  tactic,
   audit,
   players,
   lineupPreferences,
@@ -37,7 +46,16 @@ export function RoleFitTable({
   const catalog = getPitchCatalog(patchVersion);
   const roleNameById = new Map(catalog.Roles.map((r) => [r.Id, r.Name]));
   const lockByUid = new Map(lineupPreferences.map((lp) => [lp.playerUid, lp]));
+  const playerByUid = useMemo(() => new Map(players.map((p) => [p.uid, p])), [players]);
   const weakSet = new Set(audit?.weakestThreeSlotIndices ?? []);
+
+  const squadBestEffByUid = useMemo(() => {
+    const map = new Map<number, ReturnType<typeof computePlayerBestTacticEffectiveness>>();
+    for (const p of players) {
+      map.set(p.uid, computePlayerBestTacticEffectiveness(p, tactic));
+    }
+    return map;
+  }, [players, tactic]);
 
   return (
     <div className="space-y-4">
@@ -54,6 +72,7 @@ export function RoleFitTable({
                   <th className="py-2 pr-3">{t("Pemain", "Player")}</th>
                   <th className="py-2 pr-3">{t("Peran IP", "IP Role")}</th>
                   <th className="py-2 pr-3">{t("Peran OOP", "OOP Role")}</th>
+                  <th className="py-2 pr-3">{t("Efektivitas", "Effectiveness")}</th>
                   <th className="py-2 pr-3">{t("Kecocokan", "Fit")}</th>
                   <th className="py-2 pr-3">{t("Saran Peran", "Role Suggestion")}</th>
                   <th className="py-2 text-right">{t("Opsi", "Options")}</th>
@@ -63,6 +82,13 @@ export function RoleFitTable({
                 {audit.starterAudits.map((row) => {
                   const isWeak = weakSet.has(row.slotIndex);
                   const bestAlt = row.betterRoleAlternatives[0];
+                  const playerObj = playerByUid.get(row.playerUid);
+                  const slotObj = tactic.slots[row.slotIndex];
+                  const eff =
+                    playerObj && slotObj
+                      ? computePlayerSlotEffectiveness(playerObj, slotObj, tactic)
+                      : null;
+
                   return (
                     <tr
                       key={row.slotIndex}
@@ -73,13 +99,42 @@ export function RoleFitTable({
                         <span className="text-amber-300">{row.outSlot}</span>
                       </td>
                       <td className="py-2 pr-3 font-medium text-slate-100">
-                        {row.playerName}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span>{row.playerName}</span>
+                          {playerObj?.condition !== undefined && (
+                            <span
+                              title={t("Kondisi Fisik / Ketajaman", "Condition / Sharpness")}
+                              className="rounded bg-slate-800/90 px-1.5 py-0.5 font-mono text-[10px] text-slate-300"
+                            >
+                              {playerObj.condition}%
+                              {playerObj.matchSharpness !== undefined
+                                ? ` · ${playerObj.matchSharpness}%`
+                                : ""}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-2 pr-3 text-slate-300">
                         {roleNameById.get(row.inRoleId) ?? row.inRoleId}
                       </td>
                       <td className="py-2 pr-3 text-slate-300">
                         {roleNameById.get(row.outRoleId) ?? row.outRoleId}
+                      </td>
+                      <td className="py-2 pr-3">
+                        {eff ? (
+                          <FamiliaritySegmentsBar
+                            score={eff.score}
+                            size="sm"
+                            showNumeric
+                            title={
+                              eff.fmFamiliarityScore !== null
+                                ? `${eff.bars}/10 · FM Fam ${eff.fmFamiliarityScore.toFixed(0)} · Fit ${eff.roleSlotFitScore.toFixed(0)}`
+                                : `${eff.bars}/10 (${eff.score.toFixed(0)})`
+                            }
+                          />
+                        ) : (
+                          <span className="text-slate-500">-</span>
+                        )}
                       </td>
                       <td className="py-2 pr-3 font-mono font-semibold">
                         <span
@@ -146,7 +201,7 @@ export function RoleFitTable({
           </span>
         </div>
 
-        <div className="mt-3 max-h-72 overflow-y-auto">
+        <div className="mt-3 max-h-80 overflow-y-auto">
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-slate-800 text-[11px] uppercase text-slate-400">
@@ -154,6 +209,7 @@ export function RoleFitTable({
                 <th className="py-1.5 pr-2">{t("Pemain", "Player")}</th>
                 <th className="py-1.5 pr-2">{t("Usia", "Age")}</th>
                 <th className="py-1.5 pr-2">{t("Posisi Alami", "Positions")}</th>
+                <th className="py-1.5 pr-2">{t("Efektivitas Taktik", "Effectiveness")}</th>
                 <th className="py-1.5 pr-2">{t("Posisi IP", "IP Position")}</th>
                 <th className="py-1.5">{t("Posisi OOP", "OOP Position")}</th>
               </tr>
@@ -165,6 +221,7 @@ export function RoleFitTable({
                   .filter(([, v]) => v >= 15)
                   .map(([k]) => k)
                   .join(", ");
+                const bestEff = squadBestEffByUid.get(p.uid);
 
                 return (
                   <tr key={p.uid} className="hover:bg-slate-800/30">
@@ -200,6 +257,23 @@ export function RoleFitTable({
                     </td>
                     <td className="py-1.5 pr-2 font-mono text-cyan-300">
                       {naturalPos || "-"}
+                    </td>
+                    <td className="py-1.5 pr-2">
+                      {bestEff ? (
+                        <div className="flex items-center gap-2">
+                          <FamiliaritySegmentsBar
+                            score={bestEff.score}
+                            size="xs"
+                            showNumeric
+                            title={`${bestEff.inSlot}/${bestEff.outSlot}: ${bestEff.bars}/10 (${bestEff.score.toFixed(0)})`}
+                          />
+                          <span className="font-mono text-[10px] text-slate-400">
+                            {bestEff.inSlot}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-500">-</span>
+                      )}
                     </td>
                     <td className="py-1.5 pr-2">
                       <select

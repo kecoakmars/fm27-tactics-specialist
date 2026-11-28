@@ -375,7 +375,11 @@ describe("Phase 1 — @fm27/fm-engine Deterministic Math & Analytics Suite", () 
     expect(highMetrics.complexity.activeTeamInstructions).toBeGreaterThanOrEqual(6);
     expect(highMetrics.effectiveness.hasSquadContext).toBe(true);
     expect(highMetrics.effectiveness.naturalFamiliarityScore).not.toBeNull();
+    expect(highMetrics.effectiveness.playerEffectiveness).toHaveLength(11);
+    expect(highMetrics.effectiveness.bars).toBeGreaterThanOrEqual(1);
+    expect(highMetrics.effectiveness.bars).toBeLessThanOrEqual(10);
     expect(noSquadMetrics.effectiveness.hasSquadContext).toBe(false);
     expect(noSquadMetrics.effectiveness.naturalFamiliarityScore).toBeNull();
+    expect(noSquadMetrics.effectiveness.playerEffectiveness).toHaveLength(0);
   });
 });

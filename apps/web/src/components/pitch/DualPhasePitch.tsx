@@ -2,6 +2,7 @@
 
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { getPitchCatalog } from "@fm27/fm-data";
+import { computeTacticalMetrics } from "@fm27/fm-engine";
 import { useLocale } from "@/stores/useLocaleStore";
 import { useTacticStore } from "@/stores/useTacticStore";
 import { PlayerToken } from "./PlayerToken";
@@ -34,6 +35,7 @@ export function DualPhasePitch({
   const { t } = useLocale();
   const {
     tactic,
+    clubPlayers,
     selectedSlotIndex,
     hoveredSlotIndex,
     showTransitionVectors,
@@ -41,6 +43,12 @@ export function DualPhasePitch({
     hoverSlot,
     moveSlotToPosition,
   } = useTacticStore();
+
+  const slotEffectivenessByIndex = useMemo(() => {
+    if (clubPlayers.length < 11) return null;
+    const metrics = computeTacticalMetrics(tactic, clubPlayers);
+    return new Map(metrics.effectiveness.playerEffectiveness.map((pe) => [pe.slotIndex, pe.score]));
+  }, [clubPlayers, tactic]);
 
   const [draggingSlotIdx, setDraggingSlotIdx] = useState<number | null>(null);
   const [dragSnapPosId, setDragSnapPosId] = useState<string | null>(null);
@@ -297,6 +305,7 @@ export function DualPhasePitch({
                 cx={cx}
                 cy={cy}
                 roleLabel={roleName}
+                effectivenessScore={slotEffectivenessByIndex?.get(slot.slotIndex)}
                 isSelected={selectedSlotIndex === slot.slotIndex}
                 isHovered={hoveredSlotIndex === slot.slotIndex}
                 isDragSource={draggingSlotIdx === slot.slotIndex}
