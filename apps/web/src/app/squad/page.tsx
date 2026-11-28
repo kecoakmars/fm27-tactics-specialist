@@ -1,8 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getPitchCatalog, getTacticalStyles } from "@fm27/fm-data";
+import { getPitchCatalog } from "@fm27/fm-data";
 import type { TacticPlanResult } from "@fm27/shared-types";
 import { ActiveTeamInstructionsSummary } from "../../components/instructions/ActiveTeamInstructionsSummary";
 import { ReplacementModal } from "../../components/squad/ReplacementModal";
@@ -10,7 +10,6 @@ import { RoleFitTable } from "../../components/squad/RoleFitTable";
 import { SquadImporter } from "../../components/squad/SquadImporter";
 import { WeakestPositionsCard } from "../../components/squad/WeakestPositionsCard";
 import {
-  analyzeSquadInWorker,
   auditSquadInWorker,
   gradeImportedTacticInWorker,
 } from "../../lib/worker-client";
@@ -19,7 +18,6 @@ import { useSquadStore } from "../../stores/useSquadStore";
 import { useTacticStore } from "../../stores/useTacticStore";
 
 export default function SquadAuditPage() {
-  const router = useRouter();
   const { t } = useLocale();
   const tactic = useTacticStore((s) => s.tactic);
   const loadTactic = useTacticStore((s) => s.loadTactic);
@@ -29,21 +27,12 @@ export default function SquadAuditPage() {
 
   const players = useSquadStore((s) => s.players);
   const lineupPreferences = useSquadStore((s) => s.lineupPreferences);
-  const priorities = useSquadStore((s) => s.priorities);
-  const styleFilter = useSquadStore((s) => s.styleFilter);
-  const generatedPlans = useSquadStore((s) => s.generatedPlans);
   const auditResult = useSquadStore((s) => s.auditResult);
-  const isBusy = useSquadStore((s) => s.isBusy);
   const errorMessage = useSquadStore((s) => s.errorMessage);
 
   const toggleMustStart = useSquadStore((s) => s.toggleMustStart);
   const setPlayerSlotLock = useSquadStore((s) => s.setPlayerSlotLock);
-  const setObjective = useSquadStore((s) => s.setObjective);
-  const setRiskOffset = useSquadStore((s) => s.setRiskOffset);
-  const setStyleFilter = useSquadStore((s) => s.setStyleFilter);
-  const setGeneratedPlans = useSquadStore((s) => s.setGeneratedPlans);
   const setAuditResult = useSquadStore((s) => s.setAuditResult);
-  const setBusy = useSquadStore((s) => s.setBusy);
   const setError = useSquadStore((s) => s.setError);
 
   const [inspectSlotIdx, setInspectSlotIdx] = useState<number | null>(null);
@@ -52,7 +41,6 @@ export default function SquadAuditPage() {
   const [squadTierFilter, setSquadTierFilter] = useState<"first-team" | "first-and-u21" | "all">("first-team");
   const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const stylesCatalog = getTacticalStyles(tactic.patchVersion);
   const pitchCatalog = getPitchCatalog(tactic.patchVersion);
   const roleNameById = useMemo(
     () => new Map(pitchCatalog.Roles.map((r) => [r.Id, r.Name])),
@@ -139,65 +127,6 @@ export default function SquadAuditPage() {
     };
   }, [activePlayers, lineupPreferences, tactic, setAuditResult, setError, t]);
 
-  useEffect(() => {
-    if (activePlayers.length < 11 || generatedPlans.length > 0) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const plans = await analyzeSquadInWorker(activePlayers, {
-          styleId: styleFilter || undefined,
-          priorities,
-          lineupPreferences,
-          patchVersion: tactic.patchVersion,
-        });
-        if (!cancelled) {
-          setGeneratedPlans(plans);
-        }
-      } catch {
-        // Ignore if squad lacks GK
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    activePlayers,
-    generatedPlans.length,
-    lineupPreferences,
-    priorities,
-    setGeneratedPlans,
-    styleFilter,
-    tactic.patchVersion,
-  ]);
-
-  async function handleAutoGenerateBestTactics() {
-    if (activePlayers.length < 11) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const plans = await analyzeSquadInWorker(activePlayers, {
-        styleId: styleFilter || undefined,
-        priorities,
-        lineupPreferences,
-        patchVersion: tactic.patchVersion,
-      });
-      setGeneratedPlans(plans);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : t("Gagal menyusun rekomendasi formasi", "Could not generate tactics"),
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function handleLoadPlanToBoard(plan: TacticPlanResult) {
-    loadTactic(plan.tactic);
-    router.push("/");
-  }
-
   const optimizationDiff = useMemo(() => {
     if (!baselineCurrent || !gradedCurrent) {
       return { changedSlotCount: 0, examples: [] as string[] };
@@ -279,12 +208,18 @@ export default function SquadAuditPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-xl font-bold text-slate-100">
-            {t("Skuad & Rekomendasi Taktik", "Squad & Tactic Finder")}
+            {t("Skuad & Audit Posisi", "Squad & Role Audit")}
           </h1>
           <span className="rounded-lg border border-white/10 bg-[#111827] px-2.5 py-1 text-xs text-slate-300">
             <strong className="text-cyan-300">{tactic.title}</strong> (IP{" "}
             {tactic.inFormation} / OOP {tactic.outFormation})
           </span>
+          <Link
+            href="/"
+            className="rounded-lg border border-emerald-500/35 bg-emerald-500/12 px-2.5 py-1 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20 transition"
+          >
+            {t("Cari Taktik Terbaik di Papan Taktik →", "Find Best Tactics on Board →")}
+          </Link>
         </div>
 
         {baselineCurrent && gradedCurrent && (
@@ -375,116 +310,6 @@ export default function SquadAuditPage() {
               "Load a career save (.fm) to see your best XI & recommended formations.",
             )}
           </h2>
-        </section>
-      )}
-
-      {players.length >= 11 && (
-        <section className="rounded-xl border border-slate-800 bg-[#111827] p-4">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div className="flex flex-wrap items-end gap-3">
-              <div>
-                <label className="block text-[11px] text-slate-400">
-                  {t("Gaya Bermain", "Tactical Style")}
-                </label>
-                <select
-                  value={styleFilter}
-                  onChange={(e) => setStyleFilter(e.target.value)}
-                  className="mt-1 rounded-lg border border-slate-700 bg-[#0B0F19] px-2.5 py-1.5 text-xs text-slate-100"
-                >
-                  <option value="">{t("Semua Gaya Bermain", "All Tactical Styles")}</option>
-                  <option value="__auto__">{t("Otomatis", "Automatic")}</option>
-                  {stylesCatalog.TacticalStyles.map((st) => (
-                    <option key={st.Id} value={st.Id}>
-                      {st.Name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[11px] text-slate-400">
-                  {t("Pendekatan Laga", "Match Approach")}
-                </label>
-                <select
-                  value={priorities.objective}
-                  onChange={(e) =>
-                    setObjective(
-                      e.target.value as
-                        | "WinNow"
-                        | "Balanced"
-                        | "ProtectLead"
-                        | "Underdog",
-                    )
-                  }
-                  className="mt-1 rounded-lg border border-slate-700 bg-[#0B0F19] px-2.5 py-1.5 text-xs text-slate-100"
-                >
-                  <option value="Balanced">{t("Seimbang", "Balanced")}</option>
-                  <option value="WinNow">{t("Menyerang Penuh", "Attacking")}</option>
-                  <option value="ProtectLead">{t("Amankan Keunggulan", "Protect Lead")}</option>
-                  <option value="Underdog">{t("Tim Underdog", "Underdog")}</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[11px] text-slate-400">
-                  {t("Keberanian Risiko", "Risk Level")} ({priorities.riskOffset >= 0 ? "+" : ""}
-                  {priorities.riskOffset})
-                </label>
-                <input
-                  type="range"
-                  min={-2}
-                  max={2}
-                  step={1}
-                  value={priorities.riskOffset}
-                  onChange={(e) => setRiskOffset(Number(e.target.value))}
-                  className="mt-2 w-28 accent-cyan-400"
-                />
-              </div>
-            </div>
-
-            <button
-              type="button"
-              disabled={isBusy}
-              onClick={() => void handleAutoGenerateBestTactics()}
-              className="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-50 cursor-pointer"
-            >
-              {isBusy
-                ? t("Menyusun Formasi...", "Finding Best Tactics...")
-                : t("Cari Formasi Terbaik", "Find Best Tactics")}
-            </button>
-          </div>
-
-          {generatedPlans.length > 0 && (
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {generatedPlans.slice(0, 6).map((plan, idx) => (
-                <div
-                  key={`${plan.tactic.title}-${idx}`}
-                  className="flex flex-col justify-between rounded-lg border border-slate-800 bg-[#0B0F19] p-3"
-                >
-                  <div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 font-mono text-[11px] font-bold text-emerald-300">
-                        #{idx + 1} · {t("Skor", "Fit")} {plan.rankingFit.toFixed(0)}
-                      </span>
-                    </div>
-                    <div className="mt-1.5 text-sm font-semibold text-slate-100">
-                      {plan.tactic.title}
-                    </div>
-                    <div className="mt-0.5 font-mono text-[11px] text-slate-400">
-                      IP {plan.tactic.inFormation} → OOP {plan.tactic.outFormation}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleLoadPlanToBoard(plan)}
-                    className="mt-3 w-full rounded-md border border-cyan-500/40 bg-cyan-500/15 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/25 cursor-pointer"
-                  >
-                    {t("Buka di Papan Taktik →", "Open on Tactics Board →")}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
         </section>
       )}
 

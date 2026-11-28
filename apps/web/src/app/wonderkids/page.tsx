@@ -133,7 +133,7 @@ function WonderkidsExplorerInner() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-slate-100">
-          {t("Wonderkids U-21", "U-21 Wonderkids")}
+          {t("Shortlist Pemain & Wonderkids", "Player Shortlist & Wonderkids")}
         </h1>
 
         <div className="flex flex-wrap items-center gap-2">

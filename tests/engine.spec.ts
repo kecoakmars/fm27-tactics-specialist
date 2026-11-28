@@ -11,6 +11,7 @@ import {
   computeHeatmap18Zones,
   computeSlotFit,
   computeTacticalBalance,
+  computeTacticalMetrics,
   evaluateWeeklyScheduleLoad,
   gradeImportedTactic,
   normalizeAndValidateSquad,
@@ -329,5 +330,52 @@ describe("Phase 1 — @fm27/fm-engine Deterministic Math & Analytics Suite", () 
         { name: "career.fm", byteLength: 1004, lastModifiedMs: 100 },
       ),
     ).toThrow(/modified/);
+  });
+
+  it("computes deterministic Intensity, Complexity, and Effectiveness (Familiarity) metrics", () => {
+    const csvText = fs.readFileSync(SAMPLE_SQUAD_CSV_PATH, "utf8");
+    const players = parseSquadCsv(csvText);
+    const plans = analyzeSquadAndGenerateTactics(players, { styleId: "Gegenpress" });
+    expect(plans.length).toBeGreaterThan(0);
+
+    const highPressTactic = {
+      ...plans[0]!.tactic,
+      mentality: 6,
+      teamInstructions: {
+        ...plans[0]!.tactic.teamInstructions,
+        Tempo: 46,
+        LineOfEngagement: 61,
+        DefensiveLine: 56,
+        TriggerPress: 65,
+        DefensiveTransition: 70,
+        AttackingTransition: 54,
+        Tackling: 72,
+      },
+    };
+    const lowBlockTactic = {
+      ...plans[0]!.tactic,
+      mentality: 2,
+      teamInstructions: {
+        Tempo: 49,
+        LineOfEngagement: 63,
+        DefensiveLine: 59,
+        TriggerPress: 68,
+        DefensiveTransition: 71,
+        AttackingTransition: 55,
+      },
+    };
+
+    const highMetrics = computeTacticalMetrics(highPressTactic, players);
+    const lowMetrics = computeTacticalMetrics(lowBlockTactic, players);
+    const noSquadMetrics = computeTacticalMetrics(highPressTactic);
+
+    expect(highMetrics.intensity.score).toBeGreaterThan(lowMetrics.intensity.score + 30);
+    expect(highMetrics.intensity.score).toBeGreaterThanOrEqual(75);
+    expect(lowMetrics.intensity.score).toBeLessThanOrEqual(40);
+    expect(highMetrics.complexity.activeTeamInstructions).toBeGreaterThanOrEqual(6);
+    expect(highMetrics.effectiveness.hasSquadContext).toBe(true);
+    expect(highMetrics.effectiveness.naturalFamiliarityScore).not.toBeNull();
+    expect(noSquadMetrics.effectiveness.hasSquadContext).toBe(false);
+    expect(noSquadMetrics.effectiveness.naturalFamiliarityScore).toBeNull();
   });
 });

@@ -11,9 +11,10 @@ import { useLocale } from "@/stores/useLocaleStore";
 import { useTacticStore } from "@/stores/useTacticStore";
 
 const NAV_ITEMS = [
+  { href: "/summary", idSlug: "summary", labelId: "Ringkasan", labelEn: "Summary" },
   { href: "/", idSlug: "pitch-board", labelId: "Papan Taktik", labelEn: "Tactics" },
   { href: "/squad", idSlug: "squad-audit", labelId: "Skuad", labelEn: "Squad" },
-  { href: "/wonderkids", idSlug: "wonderkids", labelId: "Wonderkids", labelEn: "Wonderkids" },
+  { href: "/wonderkids", idSlug: "wonderkids", labelId: "Shortlist", labelEn: "Shortlist" },
   { href: "/staff", idSlug: "staff-stars", labelId: "Staf Pelatih", labelEn: "Staff" },
   { href: "/training", idSlug: "training", labelId: "Latihan", labelEn: "Training" },
   { href: "/community", idSlug: "community", labelId: "Komunitas", labelEn: "Community" },

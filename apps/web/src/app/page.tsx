@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useStore } from "zustand";
 import {
   decodeTacticFromUrlHash,
@@ -16,13 +17,14 @@ import {
   PitchColorLegend,
   type HeatmapOverlayMode,
 } from "@/components/analytics/Heatmap18Zone";
-import { UnifiedReportDashboard } from "@/components/analytics/UnifiedReportDashboard";
+import { TacticalIndicatorsBar } from "@/components/analytics/TacticalIndicatorsBar";
 import { ActiveTeamInstructionsSummary } from "@/components/instructions/ActiveTeamInstructionsSummary";
 import { MentalityBar } from "@/components/instructions/MentalityBar";
 import { PlayerInstructionModal } from "@/components/instructions/PlayerInstructionModal";
 import { TeamInstructionPanel } from "@/components/instructions/TeamInstructionPanel";
 import { DualPhasePitch } from "@/components/pitch/DualPhasePitch";
 import { SplitViewPitch } from "@/components/pitch/SplitViewPitch";
+import { TacticRecommendationPanel } from "@/components/tactics/TacticRecommendationPanel";
 import {
   importAnySupportedFile,
   importFmSaveArrayBuffer,
@@ -35,13 +37,11 @@ import { useLocale } from "@/stores/useLocaleStore";
 import { useTacticStore } from "@/stores/useTacticStore";
 
 export default function TacticalBoardWorkspacePage() {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { t } = useLocale();
 
   const {
     tactic,
-    unifiedReport,
     viewMode,
     showTransitionVectors,
     selectedSlotIndex,
@@ -53,7 +53,6 @@ export default function TacticalBoardWorkspacePage() {
     applyDualShape,
     loadTactic,
     clubPlayers,
-    refreshUnifiedReport,
   } = useTacticStore();
 
   const undo = useStore(useTacticStore.temporal, (s) => s.undo);
@@ -493,37 +492,13 @@ export default function TacticalBoardWorkspacePage() {
               </button>
             </div>
 
-            <input
-              ref={fileInputRef}
-              id="import-tactic-file-input"
-              type="file"
-              accept=".fmf,.fm,.tac"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                e.target.value = "";
-                if (!f) return;
-                void handleImportPickedFile(f);
-              }}
-            />
-
-            <button
-              id="import-fmf-btn"
-              type="button"
-              disabled={busyAction !== null}
-              onClick={() => fileInputRef.current?.click()}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#0B0F19] hover:bg-slate-800 text-slate-200 border border-white/12 cursor-pointer disabled:opacity-50"
-            >
-              {t("Muat .fm / .fmf", "Load .fm / .fmf")}
-            </button>
-
             {folderStatus === "connected" && (
               <button
                 id="save-direct-folder-btn"
                 type="button"
                 disabled={busyAction !== null}
                 onClick={() => void handleSaveDirectToFm27Folder()}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition cursor-pointer"
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 transition cursor-pointer"
               >
                 {t("Simpan ke FM27", "Save to FM27")}
               </button>
@@ -536,7 +511,7 @@ export default function TacticalBoardWorkspacePage() {
               onClick={handleDownloadFmf}
               className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition cursor-pointer disabled:opacity-50"
             >
-              {t("Unduh .fmf", "Download .fmf")}
+              {t("Unduh Taktik (.fmf)", "Download Tactic (.fmf)")}
             </button>
 
             <button
@@ -558,16 +533,13 @@ export default function TacticalBoardWorkspacePage() {
               {t("Bagikan", "Share")}
             </button>
 
-            {!unifiedReport && (
-              <button
-                id="open-unified-report-btn"
-                type="button"
-                onClick={() => refreshUnifiedReport()}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 transition cursor-pointer"
-              >
-                {t("Ringkasan Tim", "Team Summary")}
-              </button>
-            )}
+            <Link
+              id="open-summary-page-link"
+              href="/summary"
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 transition"
+            >
+              {t("Ringkasan →", "Summary →")}
+            </Link>
           </div>
         </div>
 
@@ -677,14 +649,20 @@ export default function TacticalBoardWorkspacePage() {
         </div>
       </section>
 
-      {/* Team Summary Dashboard */}
-      {unifiedReport && (
-        <UnifiedReportDashboard
-          report={unifiedReport}
-          onNotify={notify}
-          onRequestLoadFm={() => fileInputRef.current?.click()}
-        />
-      )}
+      {/* Live Tactical Indicators: Intensity, Complexity, Effectiveness (Familiarity) */}
+      <TacticalIndicatorsBar
+        tactic={tactic}
+        squadPlayers={clubPlayers}
+        balanceReport={balanceReport}
+      />
+
+      {/* Tactic Recommendation & Best Tactic Finder right on the Tactics Board */}
+      <TacticRecommendationPanel
+        collapsible={true}
+        defaultOpen={false}
+        navigateToBoardOnApply={false}
+        onNotify={notify}
+      />
 
       {/* Main Tactical Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">

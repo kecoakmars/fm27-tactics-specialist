@@ -9,6 +9,7 @@ export * from "./formation-detector.js";
 export * from "./squad-analyzer.js";
 export * from "./heatmap-18zone.js";
 export * from "./balance-scorer.js";
+export * from "./tactical-metrics.js";
 export * from "./squad-audit.js";
 export * from "./wonderkid-ranker.js";
 export * from "./staff-calculator.js";

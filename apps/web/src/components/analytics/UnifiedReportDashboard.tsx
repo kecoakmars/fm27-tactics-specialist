@@ -42,7 +42,7 @@ export function UnifiedReportDashboard({
     { id: "squad", label: t("Skuad", "Squad") },
     { id: "training", label: t("Latihan", "Training") },
     { id: "staff", label: t("Staf Pelatih", "Staff") },
-    { id: "wonderkids", label: "Wonderkids" },
+    { id: "wonderkids", label: "Shortlist" },
   ];
 
   const { tacticAdvice, squadBlueprintOrAudit, trainingPlan, staffPlan, wonderkidPlan } =
